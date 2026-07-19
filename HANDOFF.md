@@ -49,11 +49,12 @@ Framing throughout: this is not fitness tracking. It's **uptime monitoring for o
 - 39 tests passing (`lib/uptime.test.ts`, `lib/monitor.test.ts`), `tsc` clean, `eslint` clean, production build succeeds.
 - All palette tokens pass WCAG AA (ink 16.5:1, ink-dim 9.6:1, ink-mute 5.5:1, amber 9.7:1, red 5.6:1).
 
+- **Telegram paging verified 2026-07-19.** Bot `@parsa_system_bot`, chat id stored in `system_state`. A real `DOWN 3 DAYS` alert was composed by `/api/monitor/check` and delivered to the phone — the full loop (fade detected → alert composed → delivered) is proven, not just unit-tested.
+
 **Written but NOT yet verified end-to-end:**
 
-- **Telegram delivery has never actually fired.** `TELEGRAM_BOT_TOKEN` is unset and no `telegram_chat_id` is stored. The paging *logic* is tested; the *delivery* is not. Use "send test page" in `/settings` once the bot exists.
-- **Vercel cron has never run** — not deployed yet.
-- The weekly signal check and plateau path work in unit tests but have no real longitudinal data behind them.
+- **Vercel cron has never run** — not deployed yet. The route works locally; the schedule is unproven.
+- The weekly signal check and plateau path pass unit tests but have no real longitudinal data behind them. The 4-week flat window is an educated guess.
 
 ## File map (key files)
 
@@ -71,8 +72,8 @@ Framing throughout: this is not fitness tracking. It's **uptime monitoring for o
 
 ## Roadmap / next steps
 
-1. **← ACTIVE: Create the Telegram bot** and connect it (`/settings` → chat id → send test page). Until this fires, the app's core feature is unproven.
-2. Deploy to Vercel; set env vars with `vercel env add`; confirm the cron registers in the dashboard.
+1. ~~Create the Telegram bot and connect it~~ — done 2026-07-19, delivery verified.
+2. **← ACTIVE: Deploy to Vercel.** Set env vars with `vercel env add` (bot token, `CRON_SECRET`, service role key, `NEXT_PUBLIC_SITE_URL`), then confirm the cron registers in the dashboard.
 3. Run for real for a week and see whether the daily flow actually holds up.
 4. Revisit the plateau thresholds once ~6 weeks of signal data exists — the 4-week flat window is an educated guess, not a measured one.
 
@@ -92,7 +93,8 @@ Framing throughout: this is not fitness tracking. It's **uptime monitoring for o
 - **Empty history must read as 0 days down, never a large number.** An early bug greeted a new user with "DOWN 400 DAYS" — the precise framing the app exists to avoid. There's a regression test; keep it.
 - **The monitor records its paging decision regardless of delivery success.** If that write is ever moved back inside the `if (telegram_chat_id)` branch, an unconfigured channel will re-page every pass.
 - **Dev scripts read `DEV_EMAIL` / `DEV_PASSWORD` from `.env.local`.** Never hardcode credentials — this repo is public.
-- The account password was shared in a chat transcript on 2026-07-19 and **should be rotated**.
+- **Two credentials were exposed in a chat transcript on 2026-07-19 and should be rotated:** the Supabase account password, and the Telegram bot token (revoke via BotFather `/revoke`, then update `.env.local` and the Vercel env var).
+- `getUpdates` delivers each Telegram update **once** — if the chat id lookup comes back empty, call it with `?offset=-1` rather than assuming no message was sent.
 - `scratch/` is gitignored and holds screenshots; safe to delete.
 
 ## Running it

@@ -1,0 +1,109 @@
+@import "tailwindcss";
+
+/*
+ * Instrument panel.
+ *
+ * Committed dark: this gets opened at 6am and at 11pm, and a white screen at
+ * either hour is hostile. Status carries the only saturated colour in the
+ * system — "up" has no colour at all, because the absence of an alarm IS the
+ * signal. Amber and red are reserved and never decorative.
+ */
+
+@theme {
+  /* Surfaces — near-black slate, tinted very slightly blue. */
+  --color-bg: oklch(0.17 0.008 250);
+  --color-surface: oklch(0.21 0.009 250);
+  --color-surface-hi: oklch(0.25 0.01 250);
+  --color-line: oklch(0.31 0.011 250);
+  --color-line-hi: oklch(0.42 0.013 250);
+
+  /* Ink — verified ≥4.5:1 on --color-bg. */
+  --color-ink: oklch(0.95 0.004 250);
+  --color-ink-dim: oklch(0.78 0.008 250);
+  --color-ink-mute: oklch(0.63 0.01 250);
+
+  /* Status. Nothing for UP — quiet is the good state. */
+  --color-degraded: oklch(0.79 0.15 75);
+  --color-down: oklch(0.66 0.19 25);
+  --color-degraded-dim: oklch(0.42 0.08 75);
+  --color-down-dim: oklch(0.38 0.1 25);
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, "SF Mono", monospace;
+
+  /* Fixed rem scale, ratio ~1.2. No fluid clamp — product UI is viewed at
+     consistent DPI and a shrinking heading looks worse, not better. */
+  --text-2xs: 0.6875rem;
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.9375rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.75rem;
+
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    background: var(--color-bg);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* One focus treatment everywhere. Visible, never removed. */
+  :focus-visible {
+    outline: 2px solid var(--color-ink-dim);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  ::selection {
+    background: var(--color-line-hi);
+    color: var(--color-ink);
+  }
+}
+
+@layer utilities {
+  /* The day grid: 15 across reads as a readout rather than a tile wall, and
+     divides evenly into both the 30- and 90-day views. */
+  .grid-cols-15 {
+    grid-template-columns: repeat(15, minmax(0, 1fr));
+  }
+
+  /* Numbers must not jitter as they change. */
+  .tabular {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+
+  /* Blunt ops register: the label vocabulary of the whole app. */
+  .label {
+    font-size: var(--text-2xs);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-ink-mute);
+    font-weight: 500;
+  }
+}
+
+/* Motion conveys state; it never decorates. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

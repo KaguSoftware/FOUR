@@ -1,0 +1,54 @@
+import { redirect } from "next/navigation";
+import { getStatus } from "@/lib/system";
+import { signOut } from "@/app/actions";
+import { SlammedToggle } from "./slammed-toggle";
+import { TelegramSetup } from "./telegram-setup";
+import { BackLink } from "@/app/components/back-link";
+
+export const dynamic = "force-dynamic";
+
+export default async function SettingsPage() {
+  const status = await getStatus();
+  if (!status) redirect("/login");
+
+  const { state, slammed, user } = status;
+
+  return (
+    <main className="mx-auto w-full max-w-md px-5 pt-8 pb-12">
+      <header className="mb-8 flex items-baseline justify-between">
+        <h1 className="label">Settings</h1>
+        <BackLink />
+      </header>
+
+      <section className="border-line mb-6 border-b pb-6">
+        <SlammedToggle on={slammed} until={state.slammed_until} />
+      </section>
+
+      <Row label="timezone" value={state.timezone} />
+
+      <section className="mb-2">
+        <TelegramSetup chatId={state.telegram_chat_id} />
+      </section>
+
+      <Row label="account" value={user.email ?? "—"} />
+
+      <form action={signOut} className="mt-8">
+        <button
+          type="submit"
+          className="border-line text-ink-mute hover:text-ink-dim rounded border px-3 py-2 text-xs transition-colors"
+        >
+          sign out
+        </button>
+      </form>
+    </main>
+  );
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="border-line flex items-baseline justify-between border-b py-3">
+      <span className="label">{label}</span>
+      <span className="text-ink-dim text-xs">{value}</span>
+    </div>
+  );
+}

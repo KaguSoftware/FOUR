@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 import { getStatus, getSupabase } from "@/lib/system";
 import { SignalCheck } from "./signal-check";
-import { BackLink } from "@/app/components/back-link";
+import { BackLink } from "@/app/components/nav-link";
+import { Wordmark } from "@/app/components/wordmark";
 
 export const dynamic = "force-dynamic";
 
@@ -32,9 +33,9 @@ export default async function ProofPage() {
   const alreadyToday = rows.some((s) => s.observed_on === status.today);
 
   return (
-    <main className="mx-auto w-full max-w-md px-5 pt-8 pb-12">
+    <main className="mx-auto w-full max-w-md px-5 pt-[max(2rem,calc(env(safe-area-inset-top)+0.75rem))] pb-[max(3rem,env(safe-area-inset-bottom))]">
       <header className="mb-8 flex items-baseline justify-between">
-        <h1 className="label">Proof</h1>
+        <Wordmark page="proof" />
         <BackLink />
       </header>
 

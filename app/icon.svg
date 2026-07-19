@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!--
+    Three cells of the day grid: up, up, down.
+
+    The app's own vocabulary rather than a fitness cliché — no dumbbell, no
+    flame, no heart. The one hollow cell is the whole idea: a gap is visible,
+    and it is not a failure. Gaps are wide and the hollow cell's stroke is
+    heavy so all three still separate at 16px in a browser tab.
+  -->
+  <rect width="32" height="32" rx="7" fill="#0d1013"/>
+  <rect x="5"  y="11" width="7" height="10" rx="1.5" fill="#eceff1"/>
+  <rect x="14" y="11" width="7" height="10" rx="1.5" fill="#eceff1"/>
+  <rect x="24" y="12" width="5" height="8" rx="1.5" fill="none" stroke="#6b7280" stroke-width="2"/>
+</svg>

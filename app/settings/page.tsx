@@ -3,7 +3,8 @@ import { getStatus } from "@/lib/system";
 import { signOut } from "@/app/actions";
 import { SlammedToggle } from "./slammed-toggle";
 import { TelegramSetup } from "./telegram-setup";
-import { BackLink } from "@/app/components/back-link";
+import { BackLink } from "@/app/components/nav-link";
+import { Wordmark } from "@/app/components/wordmark";
 
 export const dynamic = "force-dynamic";
 
@@ -14,9 +15,9 @@ export default async function SettingsPage() {
   const { state, slammed, user } = status;
 
   return (
-    <main className="mx-auto w-full max-w-md px-5 pt-8 pb-12">
+    <main className="mx-auto w-full max-w-md px-5 pt-[max(2rem,calc(env(safe-area-inset-top)+0.75rem))] pb-[max(3rem,env(safe-area-inset-bottom))]">
       <header className="mb-8 flex items-baseline justify-between">
-        <h1 className="label">Settings</h1>
+        <Wordmark page="settings" />
         <BackLink />
       </header>
 
@@ -35,7 +36,7 @@ export default async function SettingsPage() {
       <form action={signOut} className="mt-8">
         <button
           type="submit"
-          className="border-line text-ink-mute hover:text-ink-dim rounded border px-3 py-2 text-xs transition-colors"
+          className="border-line text-ink-mute hover:text-ink-dim active:text-ink min-h-11 rounded border px-4 text-xs transition-colors"
         >
           sign out
         </button>

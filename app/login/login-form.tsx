@@ -78,7 +78,7 @@ export function LoginForm({
         value={email}
         onChange={(e) => setEmail(e.target.value)}
         placeholder="email"
-        className="bg-surface border-line focus:border-line-hi text-ink placeholder:text-ink-mute rounded border px-3 py-2.5 text-sm outline-none transition-colors"
+        className="bg-surface border-line focus:border-line-hi text-ink placeholder:text-ink-mute min-h-12 rounded border px-3 text-sm outline-none transition-colors"
       />
 
       <label className="sr-only" htmlFor="password">
@@ -91,7 +91,7 @@ export function LoginForm({
         value={password}
         onChange={(e) => setPassword(e.target.value)}
         placeholder="password"
-        className="bg-surface border-line focus:border-line-hi text-ink placeholder:text-ink-mute rounded border px-3 py-2.5 text-sm outline-none transition-colors"
+        className="bg-surface border-line focus:border-line-hi text-ink placeholder:text-ink-mute min-h-12 rounded border px-3 text-sm outline-none transition-colors"
       />
 
       {error && (
@@ -103,7 +103,7 @@ export function LoginForm({
       <button
         type="submit"
         disabled={pending}
-        className="bg-surface-hi border-line-hi text-ink hover:bg-line active:bg-line-hi rounded border px-3 py-2.5 text-sm font-medium transition-colors disabled:opacity-50"
+        className="bg-surface-hi border-line-hi text-ink hover:bg-line active:bg-line-hi min-h-12 rounded border px-3 text-sm font-medium transition-colors disabled:opacity-50"
       >
         {pending ? "..." : "Sign in"}
       </button>
@@ -111,7 +111,7 @@ export function LoginForm({
       <button
         type="button"
         onClick={sendMagicLink}
-        className="text-ink-mute hover:text-ink-dim mt-1 text-xs transition-colors"
+        className="text-ink-mute hover:text-ink-dim active:text-ink min-h-11 rounded text-xs transition-colors"
       >
         or send a magic link
       </button>

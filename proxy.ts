@@ -36,9 +36,14 @@ export async function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * Everything except static assets and the cron endpoint, which
-     * authenticates with CRON_SECRET rather than a user session.
+     * Everything except:
+     *  - static assets
+     *  - the cron endpoint, which authenticates with CRON_SECRET rather than
+     *    a user session
+     *  - the manifest and icons, which iOS fetches WITHOUT the session cookie
+     *    when installing to the home screen. Redirecting those to /login
+     *    silently breaks "Add to Home Screen".
      */
-    "/((?!_next/static|_next/image|favicon.ico|api/monitor|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|api/monitor|manifest.webmanifest|favicon.ico|icon|apple-icon|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

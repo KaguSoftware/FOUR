@@ -44,21 +44,21 @@ export function SignalCheck() {
         value={detail}
         onChange={(e) => setDetail(e.target.value)}
         placeholder="incline 8 → 10"
-        className="bg-surface border-line focus:border-line-hi text-ink placeholder:text-ink-mute w-full rounded border px-3 py-2.5 text-sm outline-none transition-colors"
+        className="bg-surface border-line focus:border-line-hi text-ink placeholder:text-ink-mute min-h-12 w-full rounded border px-3 text-sm outline-none transition-colors"
       />
 
       <div className="mt-4 flex gap-2">
         <button
           type="submit"
           disabled={pending || (!energy && !sleep && !detail.trim())}
-          className="border-line-hi bg-surface-hi text-ink hover:bg-line rounded border px-4 py-2 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+          className="border-line-hi bg-surface-hi text-ink hover:bg-line active:bg-line-hi min-h-11 rounded border px-5 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-60"
         >
-          log
+          {pending ? "…" : "log"}
         </button>
         <button
           type="button"
           onClick={() => setDone(true)}
-          className="text-ink-mute hover:text-ink-dim px-2 text-xs transition-colors"
+          className="text-ink-mute hover:text-ink-dim active:text-ink min-h-11 rounded px-3 text-xs transition-colors"
         >
           skip this week
         </button>
@@ -88,7 +88,7 @@ function Scale({
             aria-label={`${label} ${n} of 5`}
             onClick={() => onChange(n)}
             className={[
-              "tabular h-10 flex-1 rounded border text-sm transition-colors",
+              "tabular min-h-12 flex-1 rounded border text-sm transition-colors",
               value === n
                 ? "border-line-hi bg-line text-ink"
                 : "border-line bg-surface text-ink-mute hover:bg-surface-hi",

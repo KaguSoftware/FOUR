@@ -30,23 +30,30 @@ export function SlammedToggle({
             paged, one day later.
           </p>
         </div>
+        {/* Switch is 28px tall inside a 44px tap area — visually restrained,
+            physically thumb-sized. */}
         <button
           role="switch"
           aria-checked={on}
           aria-label="Slammed mode"
           disabled={pending}
           onClick={() => start(async () => void (await setSlammed(!on)))}
-          className={[
-            "relative h-6 w-11 shrink-0 rounded-full border transition-colors duration-150 disabled:opacity-50",
-            on ? "border-line-hi bg-line-hi" : "border-line bg-surface",
-          ].join(" ")}
+          className="group flex min-h-11 shrink-0 items-center px-1 disabled:opacity-50"
         >
           <span
             className={[
-              "absolute top-0.5 h-4 w-4 rounded-full transition-all duration-150",
-              on ? "left-6 bg-ink" : "left-0.5 bg-ink-mute",
+              "relative block h-7 w-12 rounded-full border transition-colors duration-150",
+              on ? "border-line-hi bg-line-hi" : "border-line bg-surface",
+              pending ? "animate-pulse" : "",
             ].join(" ")}
-          />
+          >
+            <span
+              className={[
+                "absolute top-0.5 h-5 w-5 rounded-full transition-all duration-150",
+                on ? "left-6 bg-ink" : "left-0.5 bg-ink-mute",
+              ].join(" ")}
+            />
+          </span>
         </button>
       </div>
 

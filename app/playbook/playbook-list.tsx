@@ -1,11 +1,12 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { updatePlaybook } from "@/app/actions";
 import type { PlaybookItem } from "@/lib/system";
 
 export function PlaybookList({ items }: { items: PlaybookItem[] }) {
   const [pending, start] = useTransition();
+  const [busy, setBusy] = useState<string | null>(null);
 
   if (items.length === 0) {
     return (
@@ -29,45 +30,50 @@ export function PlaybookList({ items }: { items: PlaybookItem[] }) {
               {grouped[lever].map((item) => (
                 <li
                   key={item.id}
-                  className="border-line flex items-center justify-between gap-3 border-b py-3 last:border-0"
+                  className="border-line flex items-center justify-between gap-2 border-b py-2 last:border-0"
                 >
                   <span className="text-ink-dim min-w-0 flex-1 truncate text-sm">
                     {item.label}
                   </span>
-                  <span className="tabular text-ink-mute text-xs">
+                  <span className="tabular text-ink-mute shrink-0 text-xs">
                     {item.use_count}×
                   </span>
+                  {/* 44px targets: these are tapped on a phone, not clicked. */}
                   <button
                     aria-label={`${item.is_pinned ? "Unpin" : "Pin"} ${item.label}`}
                     aria-pressed={item.is_pinned}
-                    disabled={pending}
-                    onClick={() =>
+                    disabled={pending || busy === item.id}
+                    onClick={() => {
+                      setBusy(item.id);
                       start(async () => {
                         await updatePlaybook(item.id, {
                           is_pinned: !item.is_pinned,
                         });
-                      })
-                    }
+                        setBusy(null);
+                      });
+                    }}
                     className={[
-                      "min-h-7 rounded border px-2.5 text-[0.625rem] transition-colors",
+                      "min-h-11 shrink-0 rounded border px-3 text-xs transition-colors disabled:opacity-50",
                       item.is_pinned
                         ? "border-line-hi bg-line text-ink"
-                        : "border-line text-ink-mute hover:text-ink-dim",
+                        : "border-line text-ink-mute hover:text-ink-dim active:bg-line",
                     ].join(" ")}
                   >
                     pin
                   </button>
                   <button
                     aria-label={`Archive ${item.label}`}
-                    disabled={pending}
-                    onClick={() =>
+                    disabled={pending || busy === item.id}
+                    onClick={() => {
+                      setBusy(item.id);
                       start(async () => {
                         await updatePlaybook(item.id, { archived: true });
-                      })
-                    }
-                    className="text-ink-mute hover:text-ink-dim min-h-7 px-2 text-[0.625rem] transition-colors"
+                        setBusy(null);
+                      });
+                    }}
+                    className="text-ink-mute hover:text-ink-dim active:text-ink min-h-11 shrink-0 rounded px-2 text-xs transition-colors disabled:opacity-50"
                   >
-                    archive
+                    {busy === item.id ? "…" : "archive"}
                   </button>
                 </li>
               ))}

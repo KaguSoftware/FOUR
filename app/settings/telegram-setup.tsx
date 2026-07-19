@@ -35,7 +35,7 @@ export function TelegramSetup({ chatId }: { chatId: string | null }) {
           onChange={(e) => setValue(e.target.value)}
           placeholder="telegram chat id"
           inputMode="numeric"
-          className="bg-surface border-line focus:border-line-hi text-ink placeholder:text-ink-mute min-w-0 flex-1 rounded border px-3 py-2 text-sm outline-none transition-colors"
+          className="bg-surface border-line focus:border-line-hi text-ink placeholder:text-ink-mute min-h-11 min-w-0 flex-1 rounded border px-3 text-sm outline-none transition-colors"
         />
         <button
           disabled={pending || !value.trim()}
@@ -45,9 +45,9 @@ export function TelegramSetup({ chatId }: { chatId: string | null }) {
               setStatus("saved");
             })
           }
-          className="border-line-hi bg-surface-hi text-ink hover:bg-line rounded border px-3 py-2 text-xs transition-colors disabled:opacity-60"
+          className="border-line-hi bg-surface-hi text-ink hover:bg-line active:bg-line-hi min-h-11 rounded border px-4 text-xs transition-colors disabled:opacity-60"
         >
-          save
+          {pending ? "…" : "save"}
         </button>
       </div>
 
@@ -60,9 +60,9 @@ export function TelegramSetup({ chatId }: { chatId: string | null }) {
               setStatus(r.ok ? "test page sent" : `failed: ${r.error}`);
             })
           }
-          className="text-ink-mute hover:text-ink-dim min-h-7 rounded px-1 text-xs transition-colors disabled:opacity-50"
+          className="text-ink-mute hover:text-ink-dim active:text-ink min-h-11 rounded px-2 text-xs transition-colors disabled:opacity-50"
         >
-          send test page
+          {pending ? "sending…" : "send test page"}
         </button>
         {status && <span className="text-ink-mute text-xs">{status}</span>}
       </div>

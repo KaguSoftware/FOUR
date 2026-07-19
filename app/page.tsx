@@ -1,10 +1,11 @@
-import Link from "next/link";
+import { NavLink } from "./components/nav-link";
 import { redirect } from "next/navigation";
 import { getStatus } from "@/lib/system";
 import { MILESTONE_COPY } from "@/lib/monitor";
 import { DayGrid } from "./components/day-grid";
 import { Levers } from "./components/levers";
 import { Takeover } from "./components/takeover";
+import { Wordmark } from "@/app/components/wordmark";
 
 export const dynamic = "force-dynamic";
 
@@ -43,9 +44,9 @@ export default async function StatusPage() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-md px-5 pt-10 pb-[max(2rem,env(safe-area-inset-bottom))]">
+    <main className="mx-auto w-full max-w-md px-5 pt-[max(2.5rem,calc(env(safe-area-inset-top)+1rem))] pb-[max(2rem,env(safe-area-inset-bottom))]">
       <header className="mb-9 flex items-baseline justify-between">
-        <h1 className="label">System</h1>
+        <Wordmark />
         <span
           className={[
             "text-xs font-medium tracking-wider uppercase",
@@ -115,21 +116,19 @@ export default async function StatusPage() {
       <LastActivity entries={entries} today={today} />
 
       {/* Trails the content. The dashboard is deliberately five elements;
-          stretching it to fill a tall screen reads as emptiness, not calm. */}
-      <nav className="border-line mt-10 flex gap-5 border-t pt-4">
+          stretching it to fill a tall screen reads as emptiness, not calm.
+          Spread across the full width so each target is a comfortable thumb
+          tap rather than a row of small words. */}
+      <nav className="border-line mt-10 flex justify-between border-t pt-2">
         {[
           ["/history", "history"],
           ["/proof", "proof"],
           ["/playbook", "playbook"],
           ["/settings", "settings"],
         ].map(([href, label]) => (
-          <Link
-            key={href}
-            href={href}
-            className="text-ink-mute hover:text-ink-dim text-xs transition-colors"
-          >
+          <NavLink key={href} href={href} className="flex-1 justify-center">
             {label}
-          </Link>
+          </NavLink>
         ))}
       </nav>
     </main>

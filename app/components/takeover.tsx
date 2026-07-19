@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
-import { useTransition } from "react";
+import { NavLink } from "./nav-link";
+import { useState, useTransition } from "react";
 import { logEntry } from "@/app/actions";
 import type { PlaybookItem } from "@/lib/system";
 import type { Interval } from "@/lib/uptime";
@@ -31,8 +31,11 @@ export function Takeover({
   lastDetail: string | null;
 }) {
   const [pending, startTransition] = useTransition();
+  const [chosen, setChosen] = useState<string | null>(null);
 
   function restart(item: PlaybookItem) {
+    if (chosen !== null) return; // one tap; the second is always an accident
+    setChosen(item.id);
     startTransition(async () => {
       await logEntry(item.lever, item.label);
     });
@@ -46,7 +49,7 @@ export function Takeover({
   });
 
   return (
-    <main className="mx-auto w-full max-w-md px-5 pt-16 pb-[max(2rem,env(safe-area-inset-bottom))]">
+    <main className="mx-auto w-full max-w-md px-5 pt-[max(4rem,calc(env(safe-area-inset-top)+3rem))] pb-[max(2rem,env(safe-area-inset-bottom))]">
       {/* Top of the screen, not centred: this is the first thing your eye
           should land on when the app opens. */}
       <h1 className="text-down mb-1.5 text-2xl font-medium tracking-tight">
@@ -59,11 +62,18 @@ export function Takeover({
           <button
             key={item.id}
             onClick={() => restart(item)}
-            disabled={pending || todayLevers.includes(item.lever)}
-            className="border-line-hi bg-surface-hi text-ink hover:bg-line active:bg-line-hi rounded border px-4 py-4 text-left text-sm transition-colors disabled:opacity-40"
+            disabled={chosen !== null || todayLevers.includes(item.lever)}
+            className={[
+              "min-h-16 rounded border px-4 text-left text-sm transition-colors",
+              chosen === item.id
+                ? "border-line-hi bg-line text-ink"
+                : "border-line-hi bg-surface-hi text-ink hover:bg-line active:bg-line-hi disabled:opacity-40",
+            ].join(" ")}
           >
             {item.label}
-            <span className="text-ink-mute ml-2 text-xs">{item.lever}</span>
+            <span className="text-ink-mute ml-2 text-xs">
+              {chosen === item.id && pending ? "logging…" : item.lever}
+            </span>
           </button>
         ))}
       </div>
@@ -82,12 +92,9 @@ export function Takeover({
         </p>
       )}
 
-      <Link
-        href="/history"
-        className="text-ink-mute hover:text-ink-dim mt-3 text-xs transition-colors"
-      >
+      <NavLink href="/history" className="mt-1">
         view history ↓
-      </Link>
+      </NavLink>
     </main>
   );
 }

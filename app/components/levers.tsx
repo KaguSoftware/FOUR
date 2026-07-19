@@ -1,6 +1,6 @@
 "use client";
 
-import { useOptimistic, useRef, useState, useTransition } from "react";
+import { useOptimistic, useState, useTransition } from "react";
 import { logEntry, undoEntry } from "@/app/actions";
 import type { PlaybookItem } from "@/lib/system";
 import type { Lever } from "@/lib/uptime";
@@ -10,6 +10,8 @@ import type { Lever } from "@/lib/uptime";
  *
  * Optimistic state means the grid fills the instant you tap, even on bad
  * signal in a gym basement — every second of friction is a reason to drop it.
+ * Where an action can't be optimistic, it says it is working rather than
+ * looking dead.
  */
 export function Levers({
   playbook,
@@ -21,7 +23,7 @@ export function Levers({
   compact?: boolean;
 }) {
   const [open, setOpen] = useState<Lever | null>(null);
-  const [, startTransition] = useTransition();
+  const [pending, startTransition] = useTransition();
   const [logged, setLogged] = useOptimistic(
     new Set(todayLevers),
     (state: Set<string>, action: { lever: Lever; on: boolean }) => {
@@ -55,6 +57,7 @@ export function Levers({
             key={lever}
             lever={lever}
             done={logged.has(lever)}
+            busy={pending}
             compact={compact}
             onOpen={() => setOpen(lever)}
             onUndo={() => remove(lever)}
@@ -78,12 +81,14 @@ export function Levers({
 function LeverButton({
   lever,
   done,
+  busy,
   compact,
   onOpen,
   onUndo,
 }: {
   lever: Lever;
   done: boolean;
+  busy: boolean;
   compact: boolean;
   onOpen: () => void;
   onUndo: () => void;
@@ -96,7 +101,7 @@ function LeverButton({
         disabled={done}
         className={[
           "w-full rounded border font-medium tracking-wide uppercase transition-colors duration-150",
-          compact ? "py-3 text-xs" : "py-4 text-sm",
+          compact ? "min-h-11 py-3 text-xs" : "min-h-16 py-5 text-sm",
           done
             ? "border-line bg-surface text-ink-mute"
             : "border-line-hi bg-surface-hi text-ink hover:bg-line active:bg-line-hi",
@@ -104,14 +109,16 @@ function LeverButton({
       >
         {done ? `${lever} ✓` : lever}
       </button>
-      {/* Undo sits below rather than overlapping the button it undoes. */}
+      {/* Undo sits below rather than overlapping the button it undoes, and is
+          a full-width tap target — it is used with one thumb, mid-mistake. */}
       {done && (
         <button
           onClick={onUndo}
+          disabled={busy}
           aria-label={`Undo ${lever}`}
-          className="text-ink-mute hover:text-ink-dim self-center text-[0.625rem] transition-colors"
+          className="text-ink-mute hover:text-ink-dim active:text-ink min-h-11 w-full rounded text-xs transition-colors disabled:opacity-50"
         >
-          undo
+          {busy ? "…" : "undo"}
         </button>
       )}
     </div>
@@ -137,7 +144,14 @@ function PlaybookSheet({
 }) {
   const [custom, setCustom] = useState("");
   const [typing, setTyping] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [chosen, setChosen] = useState<string | null>(null);
+
+  // One pick per sheet: the second tap is always an accident.
+  function pick(label: string) {
+    if (chosen !== null) return;
+    setChosen(label);
+    onPick(label);
+  }
 
   return (
     <div
@@ -154,14 +168,23 @@ function PlaybookSheet({
       <div className="bg-surface border-line relative w-full max-w-sm rounded-t-lg border p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:rounded-lg">
         <p className="label mb-3">{lever}</p>
 
-        <div className="flex flex-col gap-1.5">
+        <div className="flex flex-col gap-2">
           {items.slice(0, 3).map((item) => (
             <button
               key={item.id}
-              onClick={() => onPick(item.label)}
-              className="border-line bg-surface-hi text-ink hover:bg-line active:bg-line-hi rounded border px-3 py-3 text-left text-sm transition-colors"
+              onClick={() => pick(item.label)}
+              disabled={chosen !== null}
+              className={[
+                "min-h-14 rounded border px-4 text-left text-sm transition-colors",
+                chosen === item.label
+                  ? "border-line-hi bg-line text-ink"
+                  : "border-line bg-surface-hi text-ink hover:bg-line active:bg-line-hi disabled:opacity-40",
+              ].join(" ")}
             >
               {item.label}
+              {chosen === item.label && (
+                <span className="text-ink-mute ml-2 text-xs">logging…</span>
+              )}
             </button>
           ))}
 
@@ -169,21 +192,22 @@ function PlaybookSheet({
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                onPick(custom.trim() || "");
+                pick(custom.trim());
               }}
-              className="flex gap-1.5"
+              className="flex gap-2"
             >
               <input
-                ref={inputRef}
                 autoFocus
                 value={custom}
                 onChange={(e) => setCustom(e.target.value)}
                 placeholder="what did you do?"
-                className="bg-surface-hi border-line text-ink placeholder:text-ink-mute min-w-0 flex-1 rounded border px-3 py-3 text-sm outline-none"
+                aria-label="What did you do?"
+                className="bg-surface-hi border-line text-ink placeholder:text-ink-mute min-h-14 min-w-0 flex-1 rounded border px-4 text-sm outline-none"
               />
               <button
                 type="submit"
-                className="border-line-hi bg-line text-ink rounded border px-3 text-sm"
+                disabled={chosen !== null}
+                className="border-line-hi bg-line text-ink min-h-14 rounded border px-4 text-sm disabled:opacity-40"
               >
                 log
               </button>
@@ -191,7 +215,8 @@ function PlaybookSheet({
           ) : (
             <button
               onClick={() => setTyping(true)}
-              className="border-line text-ink-mute hover:text-ink-dim rounded border border-dashed px-3 py-3 text-left text-sm transition-colors"
+              disabled={chosen !== null}
+              className="border-line text-ink-mute hover:text-ink-dim min-h-14 rounded border border-dashed px-4 text-left text-sm transition-colors disabled:opacity-40"
             >
               something else
             </button>
@@ -199,8 +224,13 @@ function PlaybookSheet({
         </div>
 
         <button
-          onClick={onSkip}
-          className="text-ink-mute hover:text-ink-dim mt-3 w-full py-1 text-center text-xs transition-colors"
+          onClick={() => {
+            if (chosen !== null) return;
+            setChosen("");
+            onSkip();
+          }}
+          disabled={chosen !== null}
+          className="text-ink-mute hover:text-ink-dim active:text-ink min-h-11 w-full text-center text-xs transition-colors disabled:opacity-40"
         >
           just mark it up
         </button>

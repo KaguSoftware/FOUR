@@ -48,6 +48,20 @@
   html {
     color-scheme: dark;
     -webkit-tap-highlight-color: transparent;
+    /* Don't reflow text when the phone is rotated. */
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  /* iOS Safari ignores user-scalable=no and zooms into any focused field
+     under 16px. 16px on touch devices is the only reliable way to stop that,
+     and it is the right size for a phone regardless. */
+  @media (hover: none) and (pointer: coarse) {
+    input,
+    select,
+    textarea {
+      font-size: 16px;
+    }
   }
 
   body {
@@ -57,6 +71,25 @@
     font-size: var(--text-base);
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+    /* Launched from the home screen, iOS rubber-bands the whole page on a
+       pull. On a fixed panel that reads as breakage, not bounce. */
+    overscroll-behavior-y: none;
+  }
+
+  /* Nothing here is long enough to want text selection, and a long-press that
+     selects a label instead of firing the button feels broken. Inputs opt back
+     in below. */
+  @media (hover: none) and (pointer: coarse) {
+    body {
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+    input,
+    textarea {
+      -webkit-user-select: text;
+      user-select: text;
+    }
   }
 
   /* One focus treatment everywhere. Visible, never removed. */
@@ -77,6 +110,27 @@
      divides evenly into both the 30- and 90-day views. */
   .grid-cols-15 {
     grid-template-columns: repeat(15, minmax(0, 1fr));
+  }
+
+  /* Navigation pending dot. Starts invisible and only fades in after 120ms,
+     so a fast navigation never flashes an indicator — the delay lives here
+     rather than in a timer, so there is no state to keep in sync. */
+  .nav-pending {
+    opacity: 0;
+    animation: nav-pending-in 150ms var(--ease-out-quart) 120ms forwards,
+      nav-pending-pulse 1.2s ease-in-out 270ms infinite;
+  }
+
+  @keyframes nav-pending-in {
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes nav-pending-pulse {
+    50% {
+      opacity: 0.35;
+    }
   }
 
   /* Numbers must not jitter as they change. */

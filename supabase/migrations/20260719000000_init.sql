@@ -99,8 +99,9 @@ create table if not exists public.milestones (
 );
 
 -- ---------------------------------------------------------------------------
--- signals: weekly felt-state samples. Never daily — a daily obligation is the
--- first thing that gets cut. Nothing here ever affects uptime.
+-- signals: daily felt-state samples, one row per (day, kind). Skipping is free
+-- and costs nothing; nothing here ever affects uptime. Readers fold days into
+-- ISO weeks — a day is the sampling rate, a week is the unit of meaning.
 -- ---------------------------------------------------------------------------
 create table if not exists public.signals (
   id          uuid primary key default gen_random_uuid(),

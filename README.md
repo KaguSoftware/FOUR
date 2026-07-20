@@ -19,7 +19,8 @@ has a single job: **catch the fade early and make restarting trivial.**
 
 2. **The plateau** — you're logging every day while return-on-effort goes flat.
    Invisible to uptime, and the state a long run actually dies in. Caught by
-   comparing weekly felt-state signals against sustained high uptime.
+   comparing felt-state signals — sampled daily, read as weekly averages —
+   against sustained high uptime.
 
 ## Design rules
 

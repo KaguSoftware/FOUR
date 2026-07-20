@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   evaluateFade,
   evaluatePlateau,
+  isoWeekKey,
   pendingMilestones,
   pickMilestone,
 } from "./monitor";
@@ -136,12 +137,19 @@ describe("milestones", () => {
 
 describe("plateau monitor", () => {
   const today = "2026-07-19";
-  const weekly = (values: number[]) =>
-    values.map((v, i) => ({
-      observed_on: addDays(today, -7 * (values.length - 1 - i)),
-      kind: "energy",
-      value: v,
-    }));
+  /**
+   * One value per week, expressed as the daily samples that produce it. Weeks
+   * are the unit of meaning, but days are the unit of input, so a "week" here
+   * is a properly-sampled one rather than a single lonely row.
+   */
+  const weekly = (values: number[], perWeek = 5) =>
+    values.flatMap((v, i) =>
+      Array.from({ length: perWeek }, (_, d) => ({
+        observed_on: addDays(today, -7 * (values.length - 1 - i) - d),
+        kind: "energy",
+        value: v,
+      })),
+    );
 
   it("stays silent while signals are rising", () => {
     const r = evaluatePlateau({
@@ -184,7 +192,7 @@ describe("plateau monitor", () => {
   });
 
   it("treats missing weeks as unknown, never as a flat line", () => {
-    // Two samples only. Silence is not evidence of a plateau.
+    // Two sampled weeks only. Silence is not evidence of a plateau.
     const r = evaluatePlateau({
       signals: weekly([3, 3]),
       uptimePct: 93,
@@ -193,5 +201,58 @@ describe("plateau monitor", () => {
     });
     expect(r.flat).toBe(false);
     expect(r.reason).toContain("only 2 weeks");
+  });
+
+  // --- daily sampling -------------------------------------------------------
+  // Input is daily now, but the window is still four real weeks. These pin the
+  // fold so a dense stretch of days can never masquerade as a long trend.
+
+  it("does not fire on four flat days — four days is a mood, not a plateau", () => {
+    const r = evaluatePlateau({
+      signals: [3, 3, 3, 3].map((v, i) => ({
+        observed_on: addDays(today, -i),
+        kind: "energy",
+        value: v,
+      })),
+      uptimePct: 93,
+      today,
+      lastPlateauOn: null,
+    });
+    expect(r.flat).toBe(false);
+    expect(r.reason).toContain("only 1 weeks");
+  });
+
+  it("drops thinly-sampled weeks rather than trusting one stray day", () => {
+    // Four weeks on the calendar, but only 1 day sampled in each: not enough
+    // to call any of them a week, so there is nothing to conclude.
+    const r = evaluatePlateau({
+      signals: weekly([3, 3, 3, 3], 1),
+      uptimePct: 93,
+      today,
+      lastPlateauOn: null,
+    });
+    expect(r.flat).toBe(false);
+    expect(r.reason).toContain("only 0 weeks");
+  });
+});
+
+describe("isoWeekKey", () => {
+  it("groups days of the same week under one key", () => {
+    // Mon 2026-07-13 .. Sun 2026-07-19 are one ISO week.
+    const keys = [13, 14, 15, 16, 17, 18, 19].map((d) =>
+      isoWeekKey(`2026-07-${d}`),
+    );
+    expect(new Set(keys).size).toBe(1);
+  });
+
+  it("splits across the Monday boundary", () => {
+    expect(isoWeekKey("2026-07-19")).not.toBe(isoWeekKey("2026-07-20"));
+  });
+
+  it("sorts chronologically as a string, including across a year boundary", () => {
+    const a = isoWeekKey("2025-12-29"); // ISO week 1 of 2026
+    const b = isoWeekKey("2026-01-05");
+    expect(a < b).toBe(true);
+    expect(a.startsWith("2026-")).toBe(true);
   });
 });

@@ -46,7 +46,15 @@ Framing throughout: this is not fitness tracking. It's **uptime monitoring for o
 - Status dashboard, re-entry takeover, day grid, two-tap logging with playbook chips.
 - History (runs + outages as peers), playbook, proof, settings pages.
 - Monitor route with fade tiers, milestone ledger, plateau detection. **Verified end-to-end** against seeded data: silent at 1 day, pages at 2, escalates at 3, same-day dedupe works.
-- 39 tests passing (`lib/uptime.test.ts`, `lib/monitor.test.ts`), `tsc` clean, `eslint` clean, production build succeeds.
+- 44 tests passing (`lib/uptime.test.ts`, `lib/monitor.test.ts`), `tsc` clean, `eslint` clean, production build succeeds.
+
+- **Proof signal check moved weekly → daily, 2026-07-20.** Sampling is daily; the
+  unit of *meaning* is still a week. Verified in the browser: 6 weeks of daily
+  samples fold to 6 weekly points on the trend, and the copy states outright
+  that skipping is free. This also fixed a latent bug — `evaluatePlateau`
+  claimed to group by week but keyed on the raw date, so with daily input the
+  4-week window would have collapsed to 4 days and paged constantly. It now
+  folds into true ISO weeks and ignores weeks with fewer than 3 sampled days.
 - All palette tokens pass WCAG AA (ink 16.5:1, ink-dim 9.6:1, ink-mute 5.5:1, amber 9.7:1, red 5.6:1).
 
 - **Telegram paging verified 2026-07-19.** Bot `@parsa_system_bot`, chat id stored in `system_state`. A real `DOWN 3 DAYS` alert was composed by `/api/monitor/check` and delivered to the phone — the full loop (fade detected → alert composed → delivered) is proven, not just unit-tested.
@@ -54,7 +62,7 @@ Framing throughout: this is not fitness tracking. It's **uptime monitoring for o
 **Written but NOT yet verified end-to-end:**
 
 - **Vercel cron has never run** — not deployed yet. The route works locally; the schedule is unproven.
-- The weekly signal check and plateau path pass unit tests but have no real longitudinal data behind them. The 4-week flat window is an educated guess.
+- The daily signal check and plateau path pass unit tests but have no real longitudinal data behind them. The 4-week flat window (`PLATEAU_WEEKS`) and the 3-samples-per-week density floor (`MIN_DAYS_PER_WEEK`) are both educated guesses.
 
 ## File map (key files)
 
@@ -75,14 +83,14 @@ Framing throughout: this is not fitness tracking. It's **uptime monitoring for o
 1. ~~Create the Telegram bot and connect it~~ — done 2026-07-19, delivery verified.
 2. **← ACTIVE: Deploy to Vercel.** Set env vars with `vercel env add` (bot token, `CRON_SECRET`, service role key, `NEXT_PUBLIC_SITE_URL`), then confirm the cron registers in the dashboard.
 3. Run for real for a week and see whether the daily flow actually holds up.
-4. Revisit the plateau thresholds once ~6 weeks of signal data exists — the 4-week flat window is an educated guess, not a measured one.
+4. Revisit the plateau thresholds once ~6 weeks of signal data exists — the 4-week flat window and the per-week sample floor are educated guesses, not measured ones. Daily sampling should make this data arrive faster than the old weekly cadence would have.
 
 ## Deliberately partial — grows later (scope ledger)
 
 | Area | What shipped now | Intended full shape | Grows in |
 | --- | --- | --- | --- |
 | Outage annotation | `annotateOutage` action exists; no UI to call it | Tap an outage in `/history` to label it ("knee", "finals") | After real outages exist |
-| Weekly signal prompt | In-app card on `/proof` only | Telegram prompt each Sunday, reply inline | With bot setup |
+| Daily signal prompt | In-app card on `/proof` only | Telegram prompt, reply inline | With bot setup |
 | Undo | Undo link under a logged lever, today only | Long-press any grid cell to edit that day | Low priority |
 | Playbook editing | Pin + archive | Rename inline, reorder | When the list gets long |
 | Timezone | Fixed to Europe/Istanbul in DB | Editable in `/settings` | If travelling |
@@ -95,6 +103,9 @@ Framing throughout: this is not fitness tracking. It's **uptime monitoring for o
 - **Dev scripts read `DEV_EMAIL` / `DEV_PASSWORD` from `.env.local`.** Never hardcode credentials — this repo is public.
 - **Two credentials were exposed in a chat transcript on 2026-07-19 and should be rotated:** the Supabase account password, and the Telegram bot token (revoke via BotFather `/revoke`, then update `.env.local` and the Vercel env var).
 - `getUpdates` delivers each Telegram update **once** — if the chat id lookup comes back empty, call it with `?offset=-1` rather than assuming no message was sent.
+- **Signals are sampled daily but must be read weekly.** Both readers (`evaluatePlateau` and the `/proof` trend) fold days into ISO weeks via `isoWeekKey`. Comparing raw days would make a plateau fire after four quiet days, which is a mood, not a trend. If you add a third reader, fold it too.
+- **`/proof` fetches a row limit, not a date range.** Daily sampling writes up to 3 rows a day, so the 280-row limit is what backs the 12-week window. Adding a fourth signal `kind` shortens that window silently.
+- `scripts/shoot.mjs` waits on `domcontentloaded`, not `networkidle` — Turbopack's HMR socket keeps the network busy forever in dev, so `networkidle` times out on every navigation. Set `BASE=http://localhost:3001` when Next has bumped to a spare port.
 - `scratch/` is gitignored and holds screenshots; safe to delete.
 
 ## Running it

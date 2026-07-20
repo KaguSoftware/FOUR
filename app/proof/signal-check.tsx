@@ -4,10 +4,15 @@ import { useState, useTransition } from "react";
 import { logSignals } from "@/app/actions";
 
 /**
- * The weekly check. Three taps, ~10 seconds, fully skippable.
+ * The daily check. Three taps, ~10 seconds, fully skippable.
  *
- * Weekly and not daily on purpose: a daily obligation is the first thing that
- * gets cut in a busy week, and nothing here may ever affect uptime.
+ * Daily rather than weekly because a week is too coarse to see a fade in: by
+ * the time a weekly sample moves, the run is already going. Denser samples make
+ * the plateau check read a real trend instead of four scattered points.
+ *
+ * The obligation risk is real, and the answer is that skipping stays free and
+ * says so. Nothing here may ever affect uptime — a skipped check costs nothing,
+ * and the copy states that rather than implying it.
  */
 export function SignalCheck() {
   const [energy, setEnergy] = useState<number | null>(null);
@@ -30,7 +35,10 @@ export function SignalCheck() {
         });
       }}
     >
-      <p className="label mb-4">Weekly check — 3 taps</p>
+      <p className="label mb-1">Daily check — 3 taps</p>
+      <p className="text-ink-dim mb-4 text-xs">
+        Skipping costs nothing. This never affects uptime.
+      </p>
 
       <Scale label="energy" value={energy} onChange={setEnergy} />
       <Scale label="sleep" value={sleep} onChange={setSleep} />
@@ -60,7 +68,7 @@ export function SignalCheck() {
           onClick={() => setDone(true)}
           className="text-ink-mute hover:text-ink-dim active:text-ink min-h-11 rounded px-3 text-xs transition-colors"
         >
-          skip this week
+          skip today
         </button>
       </div>
     </form>

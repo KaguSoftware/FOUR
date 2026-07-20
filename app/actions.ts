@@ -133,7 +133,7 @@ export async function updatePlaybook(
   revalidatePath("/", "layout");
 }
 
-/** Weekly felt-state sample. Skippable, and it never touches uptime. */
+/** Daily felt-state sample. Skippable, and it never touches uptime. */
 export async function logSignals(input: {
   energy?: number | null;
   sleep?: number | null;

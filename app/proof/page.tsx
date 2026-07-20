@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getStatus, getSupabase } from "@/lib/system";
+import { isoWeekKey } from "@/lib/monitor";
 import { SignalCheck } from "./signal-check";
 import { BackLink } from "@/app/components/nav-link";
 import { Wordmark } from "@/app/components/wordmark";
@@ -24,7 +25,9 @@ export default async function ProofPage() {
     .select("observed_on, kind, value, detail")
     .eq("user_id", status.user.id)
     .order("observed_on", { ascending: false })
-    .limit(120);
+    // Daily sampling writes up to 3 rows a day (energy, sleep, note), so the
+    // 12-week trend window needs ~250 rows, not the 120 weekly sampling used.
+    .limit(280);
 
   const rows = signals ?? [];
   const notes = rows.filter((s) => s.detail);
@@ -91,15 +94,19 @@ function Trend({
 }: {
   points: { observed_on: string; kind: string; value: number | null }[];
 }) {
-  const byDate = new Map<string, number[]>();
+  // Samples arrive daily; the trend still reads in weeks. A daily line is too
+  // noisy to see a direction in — the question here is "is this going
+  // anywhere", which is a question about weeks.
+  const byWeek = new Map<string, number[]>();
   for (const p of points) {
     if (p.value === null) continue;
-    const list = byDate.get(p.observed_on) ?? [];
+    const key = isoWeekKey(p.observed_on);
+    const list = byWeek.get(key) ?? [];
     list.push(p.value);
-    byDate.set(p.observed_on, list);
+    byWeek.set(key, list);
   }
 
-  const series = [...byDate.entries()]
+  const series = [...byWeek.entries()]
     .sort((a, b) => a[0].localeCompare(b[0]))
     .slice(-12)
     .map(([date, vals]) => ({

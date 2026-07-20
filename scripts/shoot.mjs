@@ -33,6 +33,9 @@ const payload = Buffer.from(
 ).toString("base64");
 
 const FULL = process.env.FULL === "1";
+// Next picks the next free port when 3000 is taken, so make the target
+// overridable rather than silently shooting whatever else is on 3000.
+const BASE = (process.env.BASE ?? "http://localhost:3000").replace(/\/+$/, "");
 const browser = await chromium.launch();
 const ctx = await browser.newContext({
   viewport: { width: 390, height: 844 }, // iPhone-ish
@@ -54,7 +57,11 @@ page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
 page.on("pageerror", (e) => errors.push(String(e)));
 
 for (const p of PATHS) {
-  await page.goto(`http://localhost:3000${p}`, { waitUntil: "networkidle" });
+  // Not networkidle: Turbopack's HMR socket stays open in dev, so the network
+  // never goes idle and every navigation times out. Wait for the DOM, then for
+  // fonts, which is what actually decides whether the shot looks right.
+  await page.goto(`${BASE}${p}`, { waitUntil: "domcontentloaded" });
+  await page.evaluate(() => document.fonts.ready);
   const name = p === "/" ? "status" : p.replace(/\//g, "");
   await page.screenshot({ path: `scratch/${OUT}-${name}.png`, fullPage: FULL });
   console.log(`shot: scratch/${OUT}-${name}.png`);

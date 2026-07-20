@@ -148,12 +148,32 @@ export function pickMilestone(pending: string[]): string | null {
 export type SignalPoint = { observed_on: string; kind: string; value: number | null };
 
 /**
+ * A week is only a data point if it was actually sampled. Below this, the week
+ * is treated as unknown and dropped — one stray Tuesday is not a week's mood.
+ */
+const MIN_DAYS_PER_WEEK = 3;
+
+/**
+ * How many consecutive sampled weeks must go nowhere before this pages.
+ *
+ * SCOPE(v1): an educated guess, not a measured one. GROWS LATER → retune once
+ * ~6 weeks of real signal data exists.
+ */
+const PLATEAU_WEEKS = 4;
+
+/**
  * The plateau check.
  *
  * Detects "UP, but flat": high uptime while felt-state signals stop moving.
- * Absence of data is NOT a flat line — a skipped weekly check means we know
- * nothing, and inventing a downward trend from silence would be both wrong
- * and demoralising.
+ * Absence of data is NOT a flat line — a skipped check means we know nothing,
+ * and inventing a downward trend from silence would be both wrong and
+ * demoralising.
+ *
+ * The check reads daily samples but still reasons in weeks. Comparing raw days
+ * would make a plateau fire after four quiet days, which is a mood, not a
+ * trend; the thing worth paging about is a month that went nowhere. So days are
+ * folded into real ISO weeks, and a week needs MIN_DAYS_PER_WEEK samples before
+ * it counts at all.
  */
 export function evaluatePlateau(opts: {
   signals: SignalPoint[];
@@ -162,7 +182,7 @@ export function evaluatePlateau(opts: {
   lastPlateauOn: string | null;
   weeks?: number;
 }): { flat: boolean; reason: string } {
-  const { signals, uptimePct, today, lastPlateauOn, weeks = 4 } = opts;
+  const { signals, uptimePct, today, lastPlateauOn, weeks = PLATEAU_WEEKS } = opts;
 
   if (uptimePct < 70) return { flat: false, reason: "uptime too low; fade owns this" };
 
@@ -174,16 +194,19 @@ export function evaluatePlateau(opts: {
     .filter((s) => s.value !== null && (s.kind === "energy" || s.kind === "sleep"))
     .sort((a, b) => a.observed_on.localeCompare(b.observed_on));
 
-  // Group by week of observation.
+  // Group by the ISO week the day falls in, not by the day itself.
   const byWeek = new Map<string, number[]>();
   for (const s of scalar) {
-    const list = byWeek.get(s.observed_on) ?? [];
+    const key = isoWeekKey(s.observed_on);
+    const list = byWeek.get(key) ?? [];
     list.push(s.value!);
-    byWeek.set(s.observed_on, list);
+    byWeek.set(key, list);
   }
 
   const weekAvgs = [...byWeek.entries()]
     .sort((a, b) => a[0].localeCompare(b[0]))
+    // energy + sleep both land on a sampled day, so require days, not rows.
+    .filter(([, vals]) => vals.length >= MIN_DAYS_PER_WEEK)
     .map(([, vals]) => vals.reduce((x, y) => x + y, 0) / vals.length);
 
   if (weekAvgs.length < weeks) {
@@ -208,7 +231,7 @@ export function plateauText(weekNo: number, suggestions: string[]): string {
   return [
     `WEEK ${weekNo} — UP, BUT FLAT`,
     "",
-    "uptime fine. signals flat 4 weeks.",
+    `uptime fine. signals flat ${PLATEAU_WEEKS} weeks.`,
     "this is where it usually stops.",
     "",
     "change one variable:",
@@ -217,6 +240,29 @@ export function plateauText(weekNo: number, suggestions: string[]): string {
 }
 
 // --- util -------------------------------------------------------------------
+
+/**
+ * The ISO week a `YYYY-MM-DD` date belongs to, as a sortable `YYYY-Www` key.
+ *
+ * Weeks start Monday. The date is already a logical date (04:00 boundary
+ * applied upstream by `logicalDate`), so this is pure calendar arithmetic —
+ * never build a `Date` from a bare date string anywhere else.
+ */
+export function isoWeekKey(date: string): string {
+  const [y, m, d] = date.split("-").map(Number);
+  const t = new Date(Date.UTC(y, m - 1, d));
+  // Shift to the Thursday of this week; the ISO year is whatever year that
+  // Thursday lands in, which is what makes year boundaries come out right.
+  const dow = (t.getUTCDay() + 6) % 7; // Mon = 0
+  t.setUTCDate(t.getUTCDate() - dow + 3);
+  const isoYear = t.getUTCFullYear();
+  const firstThursday = new Date(Date.UTC(isoYear, 0, 4));
+  const firstDow = (firstThursday.getUTCDay() + 6) % 7;
+  firstThursday.setUTCDate(firstThursday.getUTCDate() - firstDow + 3);
+  const week =
+    1 + Math.round((t.getTime() - firstThursday.getTime()) / (7 * 86_400_000));
+  return `${isoYear}-W${String(week).padStart(2, "0")}`;
+}
 
 function daysBetweenISO(a: string, b: string): number {
   const pa = a.split("-").map(Number);

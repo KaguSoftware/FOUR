@@ -1,21 +1,39 @@
 import { createClient } from "@supabase/supabase-js";
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 
 /**
  * Shared sign-in for the local dev scripts.
  *
  * Credentials come from .env.local (gitignored) — never hardcoded, because
  * these scripts live in a public repo.
+ *
+ * The env file lives at apps/web/.env.local, which is where Next.js natively
+ * looks for it. Resolving from this file rather than process.cwd() keeps one
+ * copy of the secrets instead of one per workspace, and lets the scripts run
+ * from anywhere in the tree.
  */
+const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+
+const ENV_CANDIDATES = [
+  join(REPO_ROOT, "apps", "web", ".env.local"),
+  join(REPO_ROOT, ".env.local"),
+];
+
 function env() {
   const out = { ...process.env };
-  try {
-    for (const line of readFileSync(".env.local", "utf8").split("\n")) {
+  for (const path of ENV_CANDIDATES) {
+    let contents;
+    try {
+      contents = readFileSync(path, "utf8");
+    } catch {
+      continue; // Not there — try the next candidate, then the real environment.
+    }
+    for (const line of contents.split("\n")) {
       const m = line.match(/^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(.*)\s*$/i);
       if (m && !line.trimStart().startsWith("#")) out[m[1]] ??= m[2];
     }
-  } catch {
-    // No .env.local — fall back to the real environment.
   }
   return out;
 }

@@ -21,15 +21,27 @@ import { createClient } from "@supabase/supabase-js";
  */
 
 const url = process.env.EXPO_PUBLIC_SUPABASE_URL;
-const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
-if (!url || !anonKey) {
+/**
+ * The publishable key (`sb_publishable_…`), matching the name `apps/web` uses.
+ * Falls back to the older `ANON_KEY` name so a project on legacy keys still
+ * works — they occupy the same position in `createClient`.
+ *
+ * Public by design, and inlined into the bundle either way. RLS
+ * (`auth.uid() = user_id`, on all eight tables) is what actually protects the
+ * data. The SERVICE ROLE key bypasses RLS and must never appear in this app.
+ */
+const publishableKey =
+  process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+
+if (!url || !publishableKey) {
   // Loud and early. A client built without these fails on the first request
   // with an opaque network error, which is a miserable thing to debug on a
   // device.
   throw new Error(
-    "Missing EXPO_PUBLIC_SUPABASE_URL or EXPO_PUBLIC_SUPABASE_ANON_KEY. " +
-      "Add them to apps/mobile/.env.local — see the README.",
+    "Missing EXPO_PUBLIC_SUPABASE_URL or EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY. " +
+      "Copy apps/mobile/.env.example to .env.local and fill it in.",
   );
 }
 
@@ -105,7 +117,7 @@ const secureStorage = {
   },
 };
 
-export const supabase = createClient(url, anonKey, {
+export const supabase = createClient(url, publishableKey, {
   auth: {
     storage: secureStorage,
     autoRefreshToken: true,

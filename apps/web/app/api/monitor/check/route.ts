@@ -11,10 +11,19 @@ import {
   plateauText,
   uptimeWindow,
   MILESTONE_COPY,
+  isPushToken,
   type Entry,
 } from "@uptime/core";
 import { sendPage } from "@/lib/telegram";
+import { sendPush } from "@/lib/push";
 import { DEFAULT_TZ } from "@/lib/system";
+
+/**
+ * Where a tapped notification lands. The app resolves `uptime://` to the
+ * dashboard, which becomes the takeover on its own when down >= 3 — so the
+ * page that says DOWN 4 DAYS opens on the screen for getting back up.
+ */
+const APP_DEEP_LINK = "uptime://";
 
 export const dynamic = "force-dynamic";
 
@@ -55,7 +64,7 @@ export async function GET(request: NextRequest) {
 
   const { data: states } = await supabase
     .from("system_state")
-    .select("user_id, timezone, slammed_until, telegram_chat_id, last_paged_on, last_paged_level, last_plateau_on");
+    .select("user_id, timezone, slammed_until, telegram_chat_id, push_token, last_paged_on, last_paged_level, last_plateau_on");
 
   const results = [];
 
@@ -104,6 +113,49 @@ export async function GET(request: NextRequest) {
     const siteUrl =
       process.env.NEXT_PUBLIC_SITE_URL ?? request.nextUrl.origin;
 
+    /**
+     * Deliver one page over whichever channel this account has.
+     *
+     * Push first — it is the real channel now. Telegram stays as a fallback
+     * through the transition and disappears once every account carries a
+     * token; `monitor.ts` never learns which one it is talking to, so the
+     * escalation ladder is untouched by any of this.
+     *
+     * Returns a human-readable suffix for the `monitor_runs` row rather than
+     * throwing. "Why didn't it page me" must always have an answer, and
+     * "the token was dead" is one of the answers worth recording.
+     */
+    const deliver = async (text: string): Promise<string> => {
+      if (isPushToken(state.push_token)) {
+        const result = await sendPush(state.push_token, text, APP_DEEP_LINK);
+        if (result.ok) return "";
+
+        if (result.deviceUnregistered) {
+          // The app was uninstalled or the OS rotated the token. Clearing it
+          // stops every later pass retrying something that can never succeed.
+          await supabase
+            .from("system_state")
+            .update({ push_token: null, push_platform: null })
+            .eq("user_id", state.user_id);
+        }
+
+        // Fall through to Telegram if it is still configured, so a transient
+        // push failure does not swallow the page entirely.
+        if (!state.telegram_chat_id) return ` (push failed: ${result.error})`;
+        const sent = await sendPage(state.telegram_chat_id, text, siteUrl);
+        return sent.ok
+          ? " (push failed; sent via telegram)"
+          : ` (push and telegram both failed: ${result.error})`;
+      }
+
+      if (state.telegram_chat_id) {
+        const sent = await sendPage(state.telegram_chat_id, text, siteUrl);
+        return sent.ok ? "" : ` (send failed: ${sent.error})`;
+      }
+
+      return " (no channel; not delivered)";
+    };
+
     let action = "none";
     let detail = "";
 
@@ -122,12 +174,7 @@ export async function GET(request: NextRequest) {
       detail = fade.text.split("\n")[0];
 
       if (!dryRun) {
-        if (state.telegram_chat_id) {
-          const sent = await sendPage(state.telegram_chat_id, fade.text, siteUrl);
-          if (!sent.ok) detail += ` (send failed: ${sent.error})`;
-        } else {
-          detail += " (no chat id; not delivered)";
-        }
+        detail += await deliver(fade.text);
 
         // Record the decision regardless of delivery. If this only ran on a
         // successful send, an unconfigured or failing channel would re-page
@@ -160,10 +207,9 @@ export async function GET(request: NextRequest) {
             .from("milestones")
             .upsert(rows, { onConflict: "user_id,kind", ignoreDuplicates: true });
 
-          if (state.telegram_chat_id) {
-            const text = `${MILESTONE_COPY[pick].toUpperCase()}\nuptime ${up}/${total}`;
-            await sendPage(state.telegram_chat_id, text);
-          }
+          await deliver(
+            `${MILESTONE_COPY[pick].toUpperCase()}\nuptime ${up}/${total}`,
+          );
         }
         detail = `run ${run}d, uptime ${up}/${total}`;
       } else {
@@ -183,8 +229,11 @@ export async function GET(request: NextRequest) {
             "machines up one notch",
             "swap the session type",
           ]);
-          if (!dryRun && state.telegram_chat_id) {
-            await sendPage(state.telegram_chat_id, text, siteUrl);
+          if (!dryRun) {
+            detail += await deliver(text);
+            // Recorded regardless of delivery, for the same reason the fade
+            // dedupe is: a guard that depends on a side effect re-fires
+            // forever against an unconfigured channel.
             await supabase
               .from("system_state")
               .update({ last_plateau_on: today })

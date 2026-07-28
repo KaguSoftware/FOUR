@@ -26,6 +26,13 @@
       "expo-secure-store",
       "expo-localization",
       [
+        "expo-notifications",
+        {
+          "color": "#f2ab35",
+          "defaultChannel": "monitor"
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "backgroundColor": "#0d1013",

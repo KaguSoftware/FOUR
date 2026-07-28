@@ -44,6 +44,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "3570cebf-a9dd-458f-a2ce-14093600c025"
+      }
+    },
+    "owner": "parsa-mansouri"
   }
 }

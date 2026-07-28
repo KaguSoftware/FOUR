@@ -68,6 +68,58 @@ export function logicalDate(now: Date, timeZone: string): string {
   }).format(shifted);
 }
 
+/**
+ * The same logical date, computed from the runtime's OWN clock, with no Intl.
+ *
+ * This exists because `logicalDate` cannot be trusted on React Native. Hermes
+ * delegates Intl to platform ICU, and the results vary by Android version:
+ * `Intl.DateTimeFormat` has been observed throwing `RangeError: Invalid
+ * timezone name!` for valid IANA zones (hermes#572), ignoring the options
+ * object entirely on API 21-23 (hermes#776), and reporting `UTC` from
+ * `resolvedOptions().timeZone` because the device zone is never exposed.
+ *
+ * A silently wrong date is the worst failure this product has. Every screen,
+ * the run length, the down count and the pager all key off it, and a one-day
+ * shift is invisible until it has corrupted a month of history. So the mobile
+ * client does not ask for a timezone at all: a phone's `Date` is already in the
+ * user's local time, which is the timezone the day boundary actually means.
+ *
+ * Keep the two in agreement by writing the device's zone back to
+ * `system_state.timezone`, so the server-side monitor pages on the same day
+ * the phone is showing.
+ */
+export function logicalDateLocal(now: Date): string {
+  const shifted = new Date(now.getTime() - DAY_BOUNDARY_HOUR * 3_600_000);
+  const y = shifted.getFullYear();
+  const m = String(shifted.getMonth() + 1).padStart(2, "0");
+  const d = String(shifted.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+/**
+ * Whether this runtime can be trusted with an explicit IANA `timeZone`.
+ *
+ * Deliberately strict: it checks that the engine echoes the zone back and that
+ * the output actually parses as YYYY-MM-DD, because the observed Hermes
+ * failure modes are silent-wrong rather than throwing. Use it to decide whether
+ * to trust `logicalDate`, never to decide whether to show a date at all —
+ * `logicalDateLocal` always works.
+ */
+export function hasTimeZoneSupport(timeZone: string): boolean {
+  try {
+    const fmt = new Intl.DateTimeFormat("en-CA", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+    if (fmt.resolvedOptions().timeZone !== timeZone) return false;
+    return /^\d{4}-\d{2}-\d{2}$/.test(fmt.format(new Date(0)));
+  } catch {
+    return false;
+  }
+}
+
 // --- core derivation --------------------------------------------------------
 
 /** The set of dates that are "up" — at least one entry logged. */

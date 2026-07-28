@@ -11,7 +11,7 @@ The **active step** is marked `← ACTIVE` in *Roadmap* below. Do that. Before y
 start:
 
 1. Check *Blocked / needs the owner* — do not re-do work that is waiting on them.
-2. Run `npm test`. **55 tests must be green.** They encode the invariants the
+2. Run `npm test`. **62 tests must be green.** They encode the invariants the
    product rests on; if they are red, stop and fix that first.
 3. Skim *Gotchas*. Several are traps that have already cost time once.
 
@@ -61,6 +61,7 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 | **Weight** | **Opt-in, off by default.** Never affects uptime |
 | **Proof trend** | **Daily points.** Plateau detection stays **weekly** |
 | Adaptive scope | One visual system, **two interaction layers** |
+| **Native components** | **Binding.** Use the platform's component wherever one exists — back, sheets, switches, pickers, alerts, list rows, tab bars. Custom only for the day grid, hero readout, lever buttons and takeover |
 
 **Why Expo, in one line:** widgets are native in *every* scenario (WidgetKit is SwiftUI-only; Android widgets are Kotlin/Glance), so the real choice was 1 app codebase + 1 derivation engine versus 2 app codebases + 3 derivation engines.
 
@@ -108,9 +109,8 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 
 **Blocked / needs the owner:**
 
-- **Vercel Root Directory must be saved as `apps/web`.** A deploy on 2026-07-28 failed with *"No Output Directory named public"* — Vercel ran the **root** build script, so it never found `apps/web/.next`. The build itself compiled all 12 routes fine. Also keep *"Include files outside the root directory"* **enabled**, or `packages/core` never reaches the build.
-- **Recommended:** turn *"Skip deployments when there are no changes"* **off**. If its workspace detection ever misses, a change to the derivation engine would silently not deploy.
-- **Rotate two credentials** — see Gotchas.
+- **Rotate two credentials** — see Gotchas. The only outstanding owner item.
+- Note for a fresh chat: `apps/web/.env.local` is **not** on this machine, so the dev server and the dev scripts cannot run here until it is recreated. Tests, typecheck, lint and build all work without it.
 
 ## File map (key files)
 
@@ -137,13 +137,10 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 2. ~~Monorepo restructure, `@uptime/core` extracted~~ — 2026-07-28, fully verified.
 3. ~~Design foundation: PRODUCT.md, DESIGN.md, token port~~ — 2026-07-28.
 4. ~~Apply the three product changes decided 2026-07-28~~ — done. Day-grid ramp (`packages/core/grid.ts`, 11 new tests), daily proof trend, optional weight. 55 tests green, tsc/eslint clean, build succeeds.
-5. **← ACTIVE: push, then run the weight migration BEFORE the deploy finishes.**
-   `npx supabase db push` applies `20260728000000_optional_weight.sql`.
-   The reads are written to survive an unmigrated database (see Gotchas), so
-   the ordering is forgiving rather than fatal — but weight stays invisible
-   until the migration lands.
-6. **Spike the risks** in parallel: Hermes `Intl` timezone on a physical Android device; Supabase session persistence in Expo; one real push notification delivered.
-7. `Lever = string` in `packages/core` (`levers.ts` already exists as the seam). **The 44 tests staying green is the gate for the whole custom-lever feature.**
+5. ~~Push, run the weight migration, set the Vercel root directory~~ — done by the owner 2026-07-28.
+
+6. ~~Spike the Hermes `Intl` timezone risk~~ — done 2026-07-28, answered by research plus `logicalDateLocal`. Two spikes remain and both need a device: Supabase session persistence in Expo, and one real push notification delivered.
+7. **← ACTIVE: `Lever = string`** in `packages/core` (`levers.ts` already exists as the seam). **The 62 tests staying green is the gate for the whole custom-lever feature.**
 8. Schema migration: `levers` table, drop the `gym`/`food` CHECKs, backfill, `push_token`, `posture`, `weight_enabled`, account deletion.
 9. Build the Expo app · push replaces Telegram · offline outbox · store prep.
 
@@ -166,7 +163,9 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 ## Gotchas / open issues
 
 - **Day boundary is 04:00 local, not midnight.** A 01:30 session counts for the day that just ended. `logicalDate()` handles this; don't bypass it.
-- **`logicalDate()` depends on `Intl.DateTimeFormat("en-CA", { timeZone })`.** This is the **highest-risk unknown for mobile** — if Hermes lacks full ICU on Android, every date silently shifts by a day. Verify on a physical device. Fallback: compute `today` server-side via `public.logical_date(tz)`.
+- **RESOLVED 2026-07-28 — do not use `logicalDate()` on mobile.** Hermes delegates Intl to platform ICU and the behaviour varies by Android version. Documented failures: `RangeError: Invalid timezone name!` for valid IANA zones (hermes#572), the options object ignored entirely on API 21-23 (hermes#776), and `resolvedOptions().timeZone` reporting `UTC` because the device zone is never exposed. It can pass on a test device and fail on a user's.
+  **Use `logicalDateLocal(now)` instead** — no Intl at all. A phone's `Date` is already in the user's local time, which is the timezone the 04:00 boundary actually means. `hasTimeZoneSupport(tz)` probes the engine if you need to know. A test cross-checks the two implementations agree under Node, so a divergence fails CI rather than silently corrupting a month of history.
+  **The mobile client must write the device's zone back to `system_state.timezone`**, or the server-side monitor will page on a different day than the phone is showing.
 - **The proof trend and `evaluatePlateau` are two different readers of the same data.** The trend becomes **daily**; plateau detection stays **weekly**. This already caused one bug: `evaluatePlateau` claimed to group by week but keyed on the raw date, so with daily input the 4-week window collapsed to 4 days and would have paged constantly. **Do not "fix" plateau to match the trend.** A plateau judged on raw days is a mood, not a trend.
 - **The day-grid ramp floor is `L 0.51`, and the binding constraint is the DOWN cell, not the background.** At `L 0.49` the dimmest up-day measured 2.83:1 against a down cell — up-versus-down is the most important read in the grid. Check against the wrong reference and the dimmest up-day vanishes into a gap.
 - **`--color-line-hi` was raised 0.42 → 0.51 on 2026-07-28.** At 0.42 it measured 2.27:1 and failed WCAG 1.4.11's 3:1 non-text floor while drawing the ring that marks *today*. Now 3.33:1. Don't revert it for aesthetics.
@@ -189,7 +188,7 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 ```bash
 npm install          # installs every workspace
 npm run dev          # apps/web on http://localhost:3000
-npm test             # packages/core — 55 tests, the gate for everything
+npm test             # packages/core — 62 tests, the gate for everything
 npm run typecheck    # both workspaces
 npm run lint
 npm run build

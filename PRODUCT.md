@@ -27,6 +27,25 @@ per platform; only the interaction layer is.
 system back, scalable type (Dynamic Type / `sp`), reduced-motion, and touch
 target minimums (≥44pt iOS, ≥48dp Android).
 
+### Native by default (confirmed 2026-07-28, binding)
+
+**Where the platform provides a component, use the platform's component.** Not a
+lookalike, not a re-implementation. This covers: the back gesture and back
+button, navigation bars and tab bars, sheets and modals, switches, pickers,
+alerts and action sheets, list rows, text inputs, snackbars/toasts, refresh
+controls, haptics, and share sheets. They are themed with this product's
+palette and type — theming is the layer the platform leaves open — but their
+behaviour, gestures and accessibility come from the OS.
+
+**Custom is reserved for what has no native equivalent:** the day grid, the hero
+readout, the lever buttons, and the takeover. Those are the product; everything
+around them is the platform.
+
+The test is the one both platform guides state: would a fluent user of this OS
+trust the app, or pause at an off-spec control? A re-implemented back gesture or
+a Cupertino-shaped switch on Android is the "ported from a website" tell, and it
+is not acceptable here.
+
 ## Users
 
 Anyone trying to keep something going, in any domain. The levers are

@@ -9,6 +9,8 @@ import {
   logicalDate,
   uptimeWindow,
   type Entry,
+  logicalDateLocal,
+  hasTimeZoneSupport,
 } from "./uptime";
 
 const entry = (logged_for: string, lever: "gym" | "food" = "gym"): Entry => ({
@@ -213,5 +215,60 @@ describe("anti-shame invariants", () => {
     const { runs, outages } = deriveIntervals(entries, "2026-07-19");
     expect(runs.some((r) => r.days === 31 && r.ended_on !== null)).toBe(true);
     expect(outages.some((o) => o.days === 4)).toBe(true);
+  });
+});
+
+describe("logicalDateLocal — the Intl-free path used on mobile", () => {
+  // Node's Intl is reliable, so this asserts the two implementations agree.
+  // If they ever diverge, the mobile client and the server-side monitor would
+  // disagree about what day it is, which is the worst failure in the product.
+  const runtimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+  it("agrees with logicalDate for the runtime's own zone, across a full day", () => {
+    for (let hour = 0; hour < 24; hour++) {
+      const at = new Date(2026, 6, 15, hour, 30, 0);
+      expect(logicalDateLocal(at)).toBe(logicalDate(at, runtimeZone));
+    }
+  });
+
+  it("agrees across a month boundary", () => {
+    for (const at of [
+      new Date(2026, 6, 31, 23, 59, 0),
+      new Date(2026, 7, 1, 0, 30, 0),
+      new Date(2026, 7, 1, 3, 59, 0),
+      new Date(2026, 7, 1, 4, 1, 0),
+    ]) {
+      expect(logicalDateLocal(at)).toBe(logicalDate(at, runtimeZone));
+    }
+  });
+
+  it("puts a 01:30 session on the day that just ended", () => {
+    const lateNight = new Date(2026, 6, 15, 1, 30, 0);
+    expect(logicalDateLocal(lateNight)).toBe("2026-07-14");
+  });
+
+  it("rolls over at 04:00, not midnight", () => {
+    expect(logicalDateLocal(new Date(2026, 6, 15, 3, 59, 0))).toBe("2026-07-14");
+    expect(logicalDateLocal(new Date(2026, 6, 15, 4, 0, 0))).toBe("2026-07-15");
+  });
+
+  it("always produces a parseable YYYY-MM-DD", () => {
+    for (const at of [
+      new Date(2026, 0, 1, 0, 0, 0),
+      new Date(2026, 11, 31, 23, 59, 59),
+      new Date(2024, 1, 29, 12, 0, 0), // leap day
+    ]) {
+      expect(logicalDateLocal(at)).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    }
+  });
+});
+
+describe("hasTimeZoneSupport — the Hermes probe", () => {
+  it("passes on a runtime with real ICU", () => {
+    expect(hasTimeZoneSupport("Europe/Istanbul")).toBe(true);
+  });
+
+  it("fails closed on a bogus zone rather than throwing", () => {
+    expect(hasTimeZoneSupport("Not/AZone")).toBe(false);
   });
 });

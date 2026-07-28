@@ -15,7 +15,12 @@
   --color-surface: oklch(0.21 0.009 250);
   --color-surface-hi: oklch(0.25 0.01 250);
   --color-line: oklch(0.31 0.011 250);
-  --color-line-hi: oklch(0.42 0.013 250);
+  /* 0.51, not 0.42. This token draws the ring marking TODAY in the day grid,
+     and "which cell is today" is state carried by that stroke alone — so it
+     owes WCAG 1.4.11's 3:1 non-text floor. At 0.42 it measured 2.27:1 and
+     failed. 0.51 measures 3.33:1 against --color-bg. It stays a mid-grey; the
+     panel does not brighten, and the lever buttons read as buttons. */
+  --color-line-hi: oklch(0.51 0.013 250);
 
   /* Ink — verified ≥4.5:1 on --color-bg. */
   --color-ink: oklch(0.95 0.004 250);

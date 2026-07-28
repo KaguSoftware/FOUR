@@ -1,7 +1,6 @@
 import { useState } from "react";
-import { Alert, Pressable, ScrollView, View } from "react-native";
+import { Alert, Pressable, ScrollView, Switch, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Host, Switch } from "@expo/ui";
 import {
   addDays,
   POSTURE_CHOICES,
@@ -88,8 +87,9 @@ export default function SettingsScreen() {
         <Rule />
       </View>
 
-      {/* A real UISwitch / Material Switch, not a lookalike — the platform owns
-          its gesture, its animation and its accessibility. */}
+      {/* React Native's Switch IS the platform control — a real UISwitch on
+          iOS and a Material switch on Android, with the OS owning its gesture,
+          animation and accessibility. Only the track and thumb are themed. */}
       <Row
         title="Slammed mode"
         note={
@@ -98,16 +98,15 @@ export default function SettingsScreen() {
             : "For genuinely overloaded stretches. Raises the alert thresholds; never pauses the system. Auto-expires after 14 days."
         }
       >
-        <Host matchContents>
-          <Switch
-            value={slammed}
-            onValueChange={(on) =>
-              update({
-                slammed_until: on ? addDays(status.today, 14) : null,
-              })
-            }
-          />
-        </Host>
+        <Switch
+          value={slammed}
+          disabled={busy}
+          onValueChange={(on) =>
+            update({ slammed_until: on ? addDays(status.today, 14) : null })
+          }
+          trackColor={{ false: color.line, true: color.lineHi }}
+          thumbColor={color.ink}
+        />
       </Row>
 
       <View style={{ marginVertical: space[6] }}>
@@ -118,12 +117,13 @@ export default function SettingsScreen() {
         title="Track weight"
         note="Off by default. Recorded and plotted, and that is the whole feature — it never affects uptime, there is no goal and no interpretation. Switching it off hides it without deleting anything."
       >
-        <Host matchContents>
-          <Switch
-            value={state.weight_enabled}
-            onValueChange={(on) => update({ weight_enabled: on })}
-          />
-        </Host>
+        <Switch
+          value={state.weight_enabled}
+          disabled={busy}
+          onValueChange={(on) => update({ weight_enabled: on })}
+          trackColor={{ false: color.line, true: color.lineHi }}
+          thumbColor={color.ink}
+        />
       </Row>
 
       <View style={{ marginVertical: space[6] }}>

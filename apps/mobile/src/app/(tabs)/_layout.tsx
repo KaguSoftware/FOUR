@@ -1,5 +1,12 @@
 import { useEffect } from "react";
-import { NativeTabs } from "expo-router/unstable-native-tabs";
+import { Platform } from "react-native";
+import {
+  NativeTabs,
+  Icon,
+  Label,
+  VectorIcon,
+} from "expo-router/unstable-native-tabs";
+import { MaterialIcons } from "@expo/vector-icons";
 import * as Notifications from "expo-notifications";
 import { useRouter } from "expo-router";
 import { registerForPush } from "@/lib/push";
@@ -14,10 +21,15 @@ import { color, size } from "@/theme";
  * Android. Not a lookalike: the blur, the selection animation, the haptics, the
  * accessibility tree and the scroll-edge behaviour all come from the OS.
  *
- * That is the whole point of `sf` versus `md` below. The same tab carries an SF
- * Symbol on iOS and a Material Symbol on Android, because iconography is part
- * of the interaction layer that adapts per OS. The palette, the type and the
- * copy are identical on both — those belong to the brand, not the platform.
+ * **Icons are per-platform by design**, because iconography belongs to the
+ * interaction layer that adapts per OS. On iOS that is an SF Symbol by name.
+ * On Android, expo-router 6 offers `drawable` (a native resource, which needs a
+ * prebuild and so does not work in Expo Go) or an image — so we hand it a
+ * Material icon rendered by `@expo/vector-icons`, which works in Expo Go and is
+ * still the correct Material glyph.
+ *
+ * The palette, the type and the copy are identical on both. Those belong to the
+ * brand, not the platform.
  */
 export default function TabsLayout() {
   const { session } = useSession();
@@ -52,35 +64,49 @@ export default function TabsLayout() {
       // and returns the moment you scroll back up.
       minimizeBehavior="onScrollDown"
       tintColor={color.ink}
-      iconColor={{ default: color.inkMute, selected: color.ink }}
+      iconColor={color.inkMute}
       labelStyle={{
-        default: {
-          fontFamily: "Inter_400Regular",
-          fontSize: size["2xs"],
-          color: color.inkMute,
-        },
-        selected: { fontFamily: "Inter_500Medium", color: color.ink },
+        fontFamily: "Inter_400Regular",
+        fontSize: size["2xs"],
+        color: color.inkMute,
       }}
     >
       <NativeTabs.Trigger name="index">
-        <NativeTabs.Trigger.Label>Status</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon sf="waveform.path.ecg" md="monitor_heart" />
+        <Label>Status</Label>
+        <TabIcon sf="waveform.path.ecg" md="monitor-heart" />
       </NativeTabs.Trigger>
 
       <NativeTabs.Trigger name="history">
-        <NativeTabs.Trigger.Label>History</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon sf="clock.arrow.circlepath" md="history" />
+        <Label>History</Label>
+        <TabIcon sf="clock.arrow.circlepath" md="history" />
       </NativeTabs.Trigger>
 
       <NativeTabs.Trigger name="proof">
-        <NativeTabs.Trigger.Label>Proof</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon sf="chart.xyaxis.line" md="show_chart" />
+        <Label>Proof</Label>
+        <TabIcon sf="chart.xyaxis.line" md="show-chart" />
       </NativeTabs.Trigger>
 
       <NativeTabs.Trigger name="settings">
-        <NativeTabs.Trigger.Label>Settings</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon sf="gearshape" md="settings" />
+        <Label>Settings</Label>
+        <TabIcon sf="gearshape" md="settings" />
       </NativeTabs.Trigger>
     </NativeTabs>
   );
+}
+
+/**
+ * One tab icon, expressed once per platform.
+ *
+ * `Icon` and `VectorIcon` are different components in expo-router 6, so the
+ * branch is here rather than repeated at every call site.
+ */
+function TabIcon({
+  sf,
+  md,
+}: {
+  sf: React.ComponentProps<typeof Icon>["sf"];
+  md: React.ComponentProps<typeof MaterialIcons>["name"];
+}) {
+  if (Platform.OS === "ios") return <Icon sf={sf} />;
+  return <VectorIcon family={MaterialIcons} name={md} />;
 }

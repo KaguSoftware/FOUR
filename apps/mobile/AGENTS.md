@@ -1,45 +1,73 @@
 # Expo HAS CHANGED
 
-Read the exact versioned docs at https://docs.expo.dev/versions/v57.0.0/ before writing any code.
+**This app targets Expo SDK 54.** Read the exact versioned docs at
+https://docs.expo.dev/versions/v54.0.0/ before writing any code.
 
 **And trust the installed type definitions over the docs.** The prose docs and
-any summary of them lag the package. Every API below was confirmed by reading
-`node_modules/expo-router/**/*.d.ts` after a doc answer turned out to be wrong.
+any summary of them lag the package, and a doc lookup has already handed back a
+confidently wrong API on this project. Every fact below was confirmed by
+reading `apps/mobile/node_modules/expo-router/**/*.d.ts`.
 
-## SDK 57 facts that contradict older knowledge
+## Why 54 and not the newest
 
-- **`Stack` is not exported from `expo-router`.** It is `import { Stack } from
-  "expo-router/stack"`. It is the *native* stack, so native back buttons,
-  native headers and the edge-swipe / predictive-back gesture come free —
-  do not re-implement any of them.
-- **`Tabs` from `expo-router` is deprecated** in favour of
-  `expo-router/js-tabs`. We use neither: the tab bar is
-  `NativeTabs` from `expo-router/unstable-native-tabs`, which renders a real
-  `UITabBar` (the iOS 26 glass bar, via `minimizeBehavior`) and a real Material 3
-  navigation bar.
-- **Icons are per-platform by design.** `<NativeTabs.Trigger.Icon sf="…" md="…" />`
-  takes an SF Symbol and a Material Symbol. Valid `md` names are the keys of
-  `expo-symbols/build/android/symbols.json` (4055 of them) — check before
-  guessing.
+The owner's phone runs **Expo Go SDK 54**, and Expo Go ships exactly one SDK at
+a time. The app was originally built on SDK 57 and deliberately moved back on
+2026-07-28 so it can run on real hardware today. Being able to open it on a
+phone beats a newer API.
+
+**Do not bump the SDK without checking what Expo Go the owner has.** If you do
+bump it, the notes below all need re-verifying — several of these APIs moved
+between 54 and 57.
+
+## Versions are not hand-picked
+
+`package.json` versions are transcribed from `expo@54`'s own
+`bundledNativeModules.json`. SDK 54 does **not** use one version number across
+all packages the way 57 does — `expo-router` is `~6.0.24`, `expo-constants` is
+`~18.0.13`. Guessing produces an unresolvable peer tree.
+
+To change a dependency: `cd apps/mobile && npx expo install --fix`.
+
+## SDK 54 facts
+
+- **`Stack` comes from `expo-router/stack`.** It is the *native* stack, so
+  native back buttons, native headers and the edge-swipe / predictive-back
+  gesture come free — do not re-implement any of them. `Stack.Protected
+  guard={…}` removes a branch from the navigation state entirely, which is the
+  auth/onboarding gate.
+- **`expo-router` does NOT export `ThemeProvider` / `Theme` in v6.** Native
+  chrome is themed through the navigator's `screenOptions` instead, which is
+  what `src/app/_layout.tsx` does.
+- **Native tabs:** `NativeTabs`, plus `Icon` / `Label` / `Badge` / `VectorIcon`
+  as **top-level exports** of `expo-router/unstable-native-tabs` — they are not
+  `NativeTabs.Trigger.Icon` sub-components the way they are in 57.
+  `minimizeBehavior` and `blurEffect` do exist here, so the iOS 26 glass tab bar
+  works.
+- **Tab icons are per-platform.** `Icon` takes `sf` (SF Symbol by name) for iOS.
+  For Android it offers `drawable` — a native resource, which needs a prebuild
+  and therefore does **not** work in Expo Go — so we use `VectorIcon` with
+  `MaterialIcons` from `@expo/vector-icons`. There is no Material-Symbol-by-name
+  prop in 54; that (`md`) arrived in 57.
+- **`@expo/ui` on SDK 54 is `0.2.0-beta.9`** and has no universal components.
+  We do not use it. React Native's own `Switch` **is** the platform control —
+  a real `UISwitch` / Material switch — so nothing is lost.
+- **`expo-glass-effect` does not exist in SDK 54.**
 - **Sheets are navigator-presented, not hand-drawn.** A route with
   `presentation: "formSheet"` + `sheetAllowedDetents: "fitToContents"` is a real
   `UISheetPresentationController`. See `src/app/log.tsx`.
-- **`Stack.Protected guard={…}`** removes a branch from the navigation state
-  entirely. That is the auth/onboarding gate — there is no redirect flash and no
-  deep link that bypasses it.
-- **`@expo/ui` components must live inside a `<Host>`.** Their children are
-  SwiftUI / Compose views, not RN views; to put RN content back inside one you
-  need `RNHostView`. Prefer navigator-presented native chrome over hosting
-  SwiftUI by hand.
 - Routes live in **`src/app/`**, not `app/`.
 
 ## This app's own rules
 
 - **Never `logicalDate()` — always `logicalDateLocal()`.** Hermes delegates
   `Intl` to platform ICU and it varies by Android version. See HANDOFF gotchas.
-- **`@uptime/core` is the only place a number is derived.** If you find
-  yourself writing date maths or a colour ramp in this app, import it instead.
+- **`@uptime/core` is the only place a number is derived.** If you find yourself
+  writing date maths or a colour ramp in this app, import it instead.
 - **Metro needs no monorepo config** — Expo detects workspaces since SDK 52.
-- Verify with `npx tsc --noEmit -p apps/mobile` and then
-  `npx expo export --platform ios` / `--platform android`, which is the only
+- **A stale hoisted package will silently break the bundler.** After any SDK
+  change, delete `node_modules` and `package-lock.json` at the repo root and
+  reinstall; a leftover `react-native` at the root gets resolved in preference
+  to the workspace's own and fails with an unrelated-looking syntax error.
+- Verify with `npm run typecheck` and then, from `apps/mobile`,
+  `npx expo export --platform ios --platform android`. That export is the only
   proof the module graph actually resolves.

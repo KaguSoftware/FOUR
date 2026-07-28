@@ -1,6 +1,5 @@
 import { useEffect } from "react";
 import { Stack } from "expo-router/stack";
-import { ThemeProvider, type Theme } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import {
@@ -20,29 +19,11 @@ import { color } from "@/theme";
 SplashScreen.preventAutoHideAsync();
 
 /**
- * The app's theme, handed to the navigator so NATIVE chrome — headers, back
- * buttons, sheet backgrounds, the tab bar — is drawn in this palette rather
- * than the system default. Theming is the layer the platform leaves open;
- * behaviour, gestures and accessibility still come from the OS.
+ * Native chrome — headers, back buttons, sheet and screen backgrounds — is
+ * themed through the navigator's `screenOptions` below rather than a
+ * ThemeProvider, which expo-router 6 does not export. Every surface this app
+ * shows is set explicitly there, so nothing falls back to a system default.
  */
-const theme: Theme = {
-  dark: true,
-  colors: {
-    primary: color.ink,
-    background: color.bg,
-    card: color.bg,
-    text: color.ink,
-    border: color.line,
-    notification: color.down,
-  },
-  fonts: {
-    regular: { fontFamily: "Inter_400Regular", fontWeight: "400" },
-    medium: { fontFamily: "Inter_500Medium", fontWeight: "500" },
-    bold: { fontFamily: "Inter_500Medium", fontWeight: "600" },
-    heavy: { fontFamily: "ArchivoBlack_400Regular", fontWeight: "700" },
-  },
-};
-
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
     Inter_400Regular,
@@ -54,10 +35,8 @@ export default function RootLayout() {
 
   return (
     <SessionProvider>
-      <ThemeProvider value={theme}>
-        <StatusBar style="light" />
-        <RootNavigator fontsLoaded={fontsLoaded} />
-      </ThemeProvider>
+      <StatusBar style="light" />
+      <RootNavigator fontsLoaded={fontsLoaded} />
     </SessionProvider>
   );
 }

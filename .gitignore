@@ -51,6 +51,10 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# ...except the templates, which carry no secrets and document which variables
+# each app needs. `.env*` swallowed them, which made the contract invisible.
+!.env.example
+!.env*.example
 
 # vercel
 .vercel

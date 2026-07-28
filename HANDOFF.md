@@ -105,6 +105,7 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 
 **Written but NOT verified end-to-end:**
 
+- **The entire mobile app has never run.** It typechecks and `expo export` bundles it for iOS and Android, which proves the module graph resolves and nothing more. No screen has rendered, no tap has been handled, no session has been stored. Treat every mobile behaviour as unproven until it runs on hardware.
 - **Vercel cron has never run.** The route works locally; the schedule is unproven.
 - Plateau thresholds pass unit tests but have no longitudinal data behind them. `PLATEAU_WEEKS` (4) and `MIN_DAYS_PER_WEEK` (3) are educated guesses.
 
@@ -133,6 +134,11 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 | `apps/web/app/globals.css` | Tailwind v4 `@theme` tokens. Normative in oklch. |
 | `apps/web/proxy.ts` | Session refresh + route protection (Next 16 name for middleware). |
 | `apps/web/vercel.ts` | Cron schedule. Inside the app dir because Vercel's Root Directory points there. |
+| `apps/mobile/AGENTS.md` | **Read before touching mobile.** SDK 57 moved several APIs; this records which, and that the installed `.d.ts` files beat the docs. |
+| `apps/mobile/src/lib/supabase.ts` | Keychain-backed session storage. Chunks the session because SecureStore caps a value at 2048 bytes on Android. |
+| `apps/mobile/src/lib/status.ts` | The client-side port of `getStatus()`. Three queries, everything else derived by core. |
+| `apps/mobile/src/app/_layout.tsx` | The auth + onboarding gate, via `Stack.Protected`. |
+| `apps/mobile/src/app/(tabs)/_layout.tsx` | The native tab bar — real `UITabBar` / Material 3, SF Symbols and Material Symbols per platform. |
 | `supabase/migrations/` | Schema. `db push` to apply. |
 | `scripts/seed.mjs` | Seed synthetic history: `npm run seed -- 31 11`. |
 
@@ -149,7 +155,9 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 8. ~~Schema migration — `levers` table, drop the `gym`/`food` CHECKs, backfill, `push_token`, `posture`~~ — written and verified 2026-07-28 via `npm run test:migrations` (15 checks). **Not yet applied — needs `npx supabase db push`.**
 9. ~~Wire lever CRUD~~ — done 2026-07-28. Actions, a Settings manager, and `getStatus` reads levers from the table.
 10. ~~Onboarding + posture~~ — done 2026-07-28. `/onboarding` states the rule, takes 1–4 levers and a posture, then sets `onboarded_at`. `requireStatus()` gates every signed-in screen. Posture is wired into the two places it is allowed to reach (takeover sentence, milestone panel) and is changeable in Settings. Web also grew an explicit **create-account** path, without which none of this was reachable.
-11. **← ACTIVE: the Expo app.** Two spikes still need a device: Supabase session persistence in Expo, and one real push notification delivered. Then: push replaces Telegram · offline outbox · store prep.
+11. ~~Expo app scaffold + the core screens~~ — done 2026-07-28. `apps/mobile` on **SDK 57**: native tab bar, native stack, native sheet, session gate, dashboard, takeover, day grid, levers, onboarding, sign-in, history, settings. **Typechecks and bundles for both platforms; never run on a device.**
+12. **← ACTIVE: run it on a device.** Nothing in `apps/mobile` has executed. Needs `apps/mobile/.env.local` (see `.env.example`), then `npm run mobile`. The three things to confirm first: the SecureStore chunked-session adapter round-trips, `logicalDateLocal` gives the right day in a non-Istanbul zone, and the native tab bar/sheet look right.
+13. Then: `/proof` on mobile · lever CRUD on mobile · push replaces Telegram · offline outbox · store prep.
 
 ## Deliberately partial — grows later (scope ledger)
 
@@ -162,6 +170,10 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 | Proof trend | Daily points, 60-day window | Unchanged | Done |
 | Weight | Opt-in toggle, field, and line — **migration not yet applied** | Unchanged | Needs `db push` |
 | Posture | Chosen at onboarding, changeable in Settings, wired into the takeover sentence and the milestone panel | Same two touchpoints on mobile | Done on web |
+| Mobile `/proof` | A screen that says the check-in is not ported yet | The daily check-in + 60-day trend + optional weight, as on web | Step 13 |
+| Mobile levers | Read-only list in Settings | Create/rename/archive via a native list with swipe actions | Step 13 |
+| Mobile auth | Email + password | Sign in with Apple (**required by review once any third-party sign-in ships**) + Google | Before submission |
+| App icon | Expo's default artwork | Real icon + splash | Before submission |
 | Widgets | None | Interactive Home/Lock Screen widget: tap a lever without opening the app | v1.1 — SwiftUI + Glance, App Groups |
 | Alerts | Telegram | Native push, same escalation ladder | Step 8 |
 | Outage annotation | `annotateOutage` action exists; no UI | Tap an outage in `/history` to label it | After real outages exist |
@@ -197,6 +209,10 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 - **"Food first" is gone.** The takeover and the monitor used to rank the food lever first, on the principle that coming back must be lighter than starting. That cannot survive user-defined levers — we cannot know which of someone's levers is the light one — so both now rank by what has actually worked (pinned, then use_count). If you want the old behaviour back, it needs a user-nominated "lightest" lever, which is new product scope.
 - **A migration is not done until `npm run test:migrations` passes.** There is no Docker here, so PGlite is the only pre-flight check, and `supabase db push` is not reversible. That harness already caught an `on delete restrict` that would have broken Apple-mandated account deletion.
 - **The old `handle_new_user()` seeded gym AND food playbook rows for every signup**, so every pre-existing account carries both levers and the backfill covers everyone through `playbook` even if they never logged. The new trigger seeds nothing — onboarding writes the levers.
+- **Expo SDK 57 moved things.** `Stack` is `expo-router/stack`, not `expo-router`; root `Tabs` is deprecated; the tab bar is `NativeTabs` from `expo-router/unstable-native-tabs`. A doc lookup gave me the old, wrong answer for `Stack` — **read the installed `.d.ts` files**, which is what `apps/mobile/AGENTS.md` now says.
+- **SecureStore caps a value at 2048 bytes on Android and a Supabase session is bigger.** `apps/mobile/src/lib/supabase.ts` chunks it across keys with a manifest written last. Get this wrong and it presents as "the app randomly logs me out", which is miserable to debug on a device. **Untested on hardware.**
+- **`npx expo export` must run from `apps/mobile`**, not the repo root, or it resolves the wrong entry point. There is no root script for it on purpose — `npm run typecheck` covers the cheap check.
+- **`.gitignore` had `.env*` with no exception**, so `.env.example` files were invisible and the env contract was undocumented. Negations added; don't drop them.
 - **Playwright's browser binary needs `npx playwright install chromium`.** npm 11's `allow-scripts` gate blocks its postinstall, which silently breaks `scripts/shoot.mjs`.
 - `scripts/shoot.mjs` waits on `domcontentloaded`, not `networkidle` — Turbopack's HMR socket keeps the network busy forever in dev. Set `BASE=http://localhost:3001` when Next bumps to a spare port.
 - `scratch/` is gitignored and holds screenshots and throwaway scripts; safe to delete.
@@ -211,6 +227,12 @@ npm run typecheck    # both workspaces
 npm run lint
 npm run test:migrations  # runs every migration against real Postgres (WASM)
 npm run check:contrast   # measures every colour pair against its WCAG floor
+
+# Mobile (needs apps/mobile/.env.local — copy .env.example)
+npm run mobile           # Expo dev server; scan the QR with Expo Go or a dev build
+npm run mobile:ios
+npm run mobile:android
+cd apps/mobile && npx expo export --platform ios   # proves the module graph resolves
 npm run build
 npx supabase db push # apply migrations (link once with --project-ref)
 

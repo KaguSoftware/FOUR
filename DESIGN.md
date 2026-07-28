@@ -76,9 +76,6 @@ components:
   day-cell-up:
     backgroundColor: "{colors.ink-dim}"
     rounded: "{rounded.cell}"
-  day-cell-up-multi:
-    backgroundColor: "{colors.ink}"
-    rounded: "{rounded.cell}"
   day-cell-down:
     backgroundColor: "{colors.surface}"
     rounded: "{rounded.cell}"
@@ -269,6 +266,15 @@ step. If three steps are not enough separation, the layout is too dense — fix
 the spacing, not the lighting. Glassmorphism, blur, glow, and drop shadows are
 all outside the system.
 
+**The System-Chrome Exception.** One carve-out, and only one: **the platform's
+own materials are permitted on the platform's own chrome** — the iOS tab bar
+and sheets may use the system translucent material, because on iOS that
+material *is* the native affordance and hand-rolling an opaque substitute is
+the "ported from a website" tell. Content never gets glass. Android gets no
+blur at all, since Material conveys elevation tonally, which is what this
+system already does. The prohibition above remains aimed exactly where it was
+written: hand-rolled decorative glass in content.
+
 ## Shapes
 
 Corners are tight and mechanical. A 4px radius (`rounded.md`) on buttons,
@@ -330,16 +336,31 @@ never flashes an indicator.
 ### The Day Grid (signature component)
 
 The product's most distinctive element. Thirty (or ninety) square cells, 15 per
-row, 3px apart.
+row, 3px apart. **Binary — a day is up, or it is not.**
 
 - **Down:** resting surface with a hairline border — present but unlit.
-- **Up, one lever:** dimmed ink fill.
-- **Up, more than one lever:** readout white fill.
+- **Up:** dimmed ink fill. Identical whether one lever fired or all four.
 - **Today:** a 1px live-edge ring at 1px offset.
 
-Fill intensity encodes *how many* levers fired, never *which* — the grid is
-never colour-coded by lever. Because intensity alone would fail a colour-only
-test, down cells additionally carry a border that up cells do not.
+### Named Rules
+
+**The No-Remainder Rule.** The grid may never depict how much of something was
+left undone. Encodings that subdivide a cell — segmented level meters,
+quadrants, filled fractions — draw the *absence* as a visible hole, and a hole
+reads as *you did not finish*. The product's thesis is that one lever is
+enough, so an encoding that shows a remainder contradicts it however elegant it
+looks.
+
+This is why the grid is binary rather than counting levers, and why the earlier
+dim-for-one / bright-for-both treatment was retired: with four levers it would
+have turned thirty days into thirty progress bars. Lever detail belongs to
+*tapping a day* in History — a deliberate inspection, where curiosity is the
+motive, rather than a glance, where comparison is.
+
+**Up is set at `ink-dim`, not `ink`.** Thirty cells at full readout white
+become a slab brighter than the hero metric, and exactly one element per screen
+is allowed to be the readout. Down cells also carry a border that up cells do
+not, so state never rests on fill alone.
 
 ## Do's and Don'ts
 
@@ -360,6 +381,11 @@ test, down cells additionally carry a border that up cells do not.
 ### Don't:
 
 - **Don't** add a shadow. Anywhere. At any elevation.
+- **Don't** subdivide a day cell — no segments, quadrants, or fractional fills.
+  Anything that draws a remainder says "you did not finish", which is the one
+  thing the grid must never say.
+- **Don't** put blur or translucency on content. System materials are permitted
+  on system chrome only (see The System-Chrome Exception).
 - **Don't** give the healthy state a colour — quiet is the signal.
 - **Don't** colour-code levers, or introduce a third status hue.
 - **Don't** use a status colour decoratively: not on a border, an icon, or a

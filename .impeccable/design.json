@@ -8,98 +8,244 @@
         "role": "neutral",
         "displayName": "Panel Black",
         "canonical": "oklch(0.17 0.008 250)",
-        "tonalRamp": ["#090b0e", "#212428", "#3d4044", "#5d6165", "#7d8185", "#a1a5a9", "#c3c8cc", "#ebeff4"]
+        "tonalRamp": [
+          "#090b0e",
+          "#212428",
+          "#3d4044",
+          "#5d6165",
+          "#7d8185",
+          "#a1a5a9",
+          "#c3c8cc",
+          "#ebeff4"
+        ]
       },
       "surface": {
         "role": "neutral",
         "displayName": "Raised Slate",
         "canonical": "oklch(0.21 0.009 250)",
-        "tonalRamp": ["#080b0f", "#212428", "#3c4044", "#5d6165", "#7c8185", "#a0a5aa", "#c3c8cd", "#eaeff4"]
+        "tonalRamp": [
+          "#080b0f",
+          "#212428",
+          "#3c4044",
+          "#5d6165",
+          "#7c8185",
+          "#a0a5aa",
+          "#c3c8cd",
+          "#eaeff4"
+        ]
       },
       "surface-hi": {
         "role": "neutral",
         "displayName": "Lifted Slate",
         "canonical": "oklch(0.25 0.01 250)",
-        "tonalRamp": ["#080c0f", "#202429", "#3c4045", "#5c6166", "#7c8186", "#a0a5ab", "#c3c8ce", "#eaeff5"]
+        "tonalRamp": [
+          "#080c0f",
+          "#202429",
+          "#3c4045",
+          "#5c6166",
+          "#7c8186",
+          "#a0a5ab",
+          "#c3c8ce",
+          "#eaeff5"
+        ]
       },
       "line": {
         "role": "neutral",
         "displayName": "Hairline",
         "canonical": "oklch(0.31 0.011 250)",
-        "tonalRamp": ["#080c10", "#202529", "#3b4045", "#5c6167", "#7b8187", "#a0a5ab", "#c2c8ce", "#e9eff6"]
+        "tonalRamp": [
+          "#080c10",
+          "#202529",
+          "#3b4045",
+          "#5c6167",
+          "#7b8187",
+          "#a0a5ab",
+          "#c2c8ce",
+          "#e9eff6"
+        ]
       },
       "line-hi": {
         "role": "neutral",
         "displayName": "Live Edge",
         "canonical": "oklch(0.51 0.013 250)",
         "note": "Raised from 0.42 on 2026-07-28. At 0.42 it measured 2.27:1 and failed WCAG 1.4.11's 3:1 non-text floor while carrying the today-ring state. Now 3.33:1.",
-        "tonalRamp": ["#070c10", "#1f252a", "#3b4047", "#5b6168", "#7b8188", "#9fa5ad", "#c1c8d0", "#e8eff7"]
+        "tonalRamp": [
+          "#070c10",
+          "#1f252a",
+          "#3b4047",
+          "#5b6168",
+          "#7b8188",
+          "#9fa5ad",
+          "#c1c8d0",
+          "#e8eff7"
+        ]
       },
       "ink": {
         "role": "primary",
         "displayName": "Readout White",
         "canonical": "oklch(0.95 0.004 250)",
         "contrastOnBg": "16.52:1",
-        "tonalRamp": ["#0a0b0d", "#232426", "#3e4042", "#5f6163", "#7e8082", "#a3a5a7", "#c5c7ca", "#eceff1"]
+        "tonalRamp": [
+          "#0a0b0d",
+          "#232426",
+          "#3e4042",
+          "#5f6163",
+          "#7e8082",
+          "#a3a5a7",
+          "#c5c7ca",
+          "#eceff1"
+        ]
       },
       "ink-dim": {
         "role": "primary",
         "displayName": "Dimmed Ink",
         "canonical": "oklch(0.78 0.008 250)",
         "contrastOnBg": "9.56:1",
-        "tonalRamp": ["#090b0e", "#212428", "#3d4044", "#5d6165", "#7d8185", "#a1a5a9", "#c3c8cc", "#ebeff4"]
+        "tonalRamp": [
+          "#090b0e",
+          "#212428",
+          "#3d4044",
+          "#5d6165",
+          "#7d8185",
+          "#a1a5a9",
+          "#c3c8cc",
+          "#ebeff4"
+        ]
       },
       "ink-mute": {
         "role": "primary",
         "displayName": "Muted Ink",
         "canonical": "oklch(0.63 0.01 250)",
         "contrastOnBg": "5.48:1",
-        "tonalRamp": ["#080c0f", "#202429", "#3c4045", "#5c6166", "#7c8186", "#a0a5ab", "#c3c8ce", "#eaeff5"]
+        "tonalRamp": [
+          "#080c0f",
+          "#202429",
+          "#3c4045",
+          "#5c6166",
+          "#7c8186",
+          "#a0a5ab",
+          "#c3c8ce",
+          "#eaeff5"
+        ]
       },
       "degraded": {
         "role": "secondary",
         "displayName": "Signal Amber",
         "canonical": "oklch(0.79 0.15 75)",
         "contrastOnBg": "9.68:1",
-        "tonalRamp": ["#290000", "#4a0800", "#6b2c00", "#904f00", "#b37000", "#da950b", "#ffb846", "#ffdf71"]
+        "tonalRamp": [
+          "#290000",
+          "#4a0800",
+          "#6b2c00",
+          "#904f00",
+          "#b37000",
+          "#da950b",
+          "#ffb846",
+          "#ffdf71"
+        ]
       },
       "degraded-dim": {
         "role": "secondary",
         "displayName": "Amber Shadow",
         "canonical": "oklch(0.42 0.08 75)",
-        "tonalRamp": ["#1d0300", "#3a1c00", "#583800", "#7b5927", "#9c7947", "#c29e6b", "#e6c08d", "#ffe8b3"]
+        "tonalRamp": [
+          "#1d0300",
+          "#3a1c00",
+          "#583800",
+          "#7b5927",
+          "#9c7947",
+          "#c29e6b",
+          "#e6c08d",
+          "#ffe8b3"
+        ]
       },
       "down": {
         "role": "secondary",
         "displayName": "Alarm Red",
         "canonical": "oklch(0.66 0.19 25)",
         "contrastOnBg": "5.60:1",
-        "tonalRamp": ["#3d0000", "#630000", "#890000", "#b31220", "#db4241", "#ff6a65", "#ff8f87", "#ffb7ac"]
+        "tonalRamp": [
+          "#3d0000",
+          "#630000",
+          "#890000",
+          "#b31220",
+          "#db4241",
+          "#ff6a65",
+          "#ff8f87",
+          "#ffb7ac"
+        ]
       },
       "down-dim": {
         "role": "secondary",
         "displayName": "Alarm Shadow",
         "canonical": "oklch(0.38 0.1 25)",
-        "tonalRamp": ["#290000", "#490308", "#6b2523", "#914743", "#b46762", "#dc8c85", "#ffaea7", "#ffd5cd"]
+        "tonalRamp": [
+          "#290000",
+          "#490308",
+          "#6b2523",
+          "#914743",
+          "#b46762",
+          "#dc8c85",
+          "#ffaea7",
+          "#ffd5cd"
+        ]
       }
     },
     "typographyMeta": {
-      "wordmark": { "displayName": "Wordmark", "purpose": "Archivo Black, lowercase 'uptime'. Appears exactly once per screen, in the header. Never used for anything else." },
-      "display": { "displayName": "Readout", "purpose": "The uptime metric only. One per screen, ever. Monospaced and tabular so it cannot jitter as it counts." },
-      "headline": { "displayName": "Headline", "purpose": "Screen-level figures on History." },
-      "title": { "displayName": "Title", "purpose": "Section headings." },
-      "body": { "displayName": "Body", "purpose": "All reading text." },
-      "label": { "displayName": "Label", "purpose": "The connective vocabulary of the product — status pills, captions, lever names, metric subtitles. Uppercase, tracked out." }
+      "wordmark": {
+        "displayName": "Wordmark",
+        "purpose": "Archivo Black, lowercase 'uptime'. Appears exactly once per screen, in the header. Never used for anything else."
+      },
+      "display": {
+        "displayName": "Readout",
+        "purpose": "The uptime metric only. One per screen, ever. Monospaced and tabular so it cannot jitter as it counts."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Screen-level figures on History."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Section headings."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "All reading text."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "The connective vocabulary of the product — status pills, captions, lever names, metric subtitles. Uppercase, tracked out."
+      }
     },
     "shadows": [],
     "motion": [
-      { "name": "ease-out-quart", "value": "cubic-bezier(0.25, 1, 0.5, 1)", "purpose": "The system's only easing curve. Decisive out, no overshoot." },
-      { "name": "state-change", "value": "150ms", "purpose": "Default for any state transition — press, log, recede." },
-      { "name": "grid-fill", "value": "200ms", "purpose": "A day cell filling when its day goes up. The one moment allowed to be slower than a press." },
-      { "name": "nav-pending-delay", "value": "120ms", "purpose": "A pending-navigation indicator fades in only after this delay, so a fast transition never flashes one." }
+      {
+        "name": "ease-out-quart",
+        "value": "cubic-bezier(0.25, 1, 0.5, 1)",
+        "purpose": "The system's only easing curve. Decisive out, no overshoot."
+      },
+      {
+        "name": "state-change",
+        "value": "150ms",
+        "purpose": "Default for any state transition — press, log, recede."
+      },
+      {
+        "name": "grid-fill",
+        "value": "200ms",
+        "purpose": "A day cell filling when its day goes up. The one moment allowed to be slower than a press."
+      },
+      {
+        "name": "nav-pending-delay",
+        "value": "120ms",
+        "purpose": "A pending-navigation indicator fades in only after this delay, so a fast transition never flashes one."
+      }
     ],
     "breakpoints": [
-      { "name": "column", "value": "28rem", "purpose": "The single column's max width. There is no second breakpoint — the product does not gain a column on a large display." }
+      {
+        "name": "column",
+        "value": "28rem",
+        "purpose": "The single column's max width. There is no second breakpoint — the product does not gain a column on a large display."
+      }
     ]
   },
   "components": [
@@ -123,9 +269,9 @@
       "name": "Day Grid",
       "kind": "custom",
       "refersTo": "day-cell-up",
-      "description": "The signature component. 15 cells per row, 3px apart. Fill intensity encodes how many levers fired, never which. Down cells carry a border so state never rests on fill alone.",
-      "html": "<ul class=\"ds-grid\"><li class=\"up-multi\"></li><li class=\"up\"></li><li class=\"up-multi\"></li><li class=\"down\"></li><li class=\"up\"></li><li class=\"up-multi\"></li><li class=\"up\"></li><li class=\"down\"></li><li class=\"up-multi\"></li><li class=\"up\"></li><li class=\"up\"></li><li class=\"up-multi\"></li><li class=\"down\"></li><li class=\"up\"></li><li class=\"today\"></li></ul>",
-      "css": ".ds-grid { display: grid; grid-template-columns: repeat(15, minmax(0, 1fr)); gap: 3px; list-style: none; margin: 0; padding: 0; max-width: 320px; } .ds-grid li { aspect-ratio: 1; border-radius: 1px; transition: background 200ms cubic-bezier(0.25,1,0.5,1); } .ds-grid .up-multi { background: #eceff1; } .ds-grid .up { background: #b4b8bc; } .ds-grid .down { background: #15191c; border: 1px solid #2c3136; } .ds-grid .today { background: #15191c; border: 1px solid #2c3136; box-shadow: 0 0 0 1px #0d1013, 0 0 0 2px #61676d; }"
+      "description": "The signature component. 15 cells per row, 3px apart. Binary — a day is up or it is not. Never subdivided, because a partly-filled cell draws the absence and reads as \"you did not finish\". Down cells carry a border so state never rests on fill alone.",
+      "html": "<ul class=\"ds-grid\"><li class=\"up\"></li><li class=\"up\"></li><li class=\"up\"></li><li class=\"down\"></li><li class=\"up\"></li><li class=\"up\"></li><li class=\"up\"></li><li class=\"down\"></li><li class=\"up\"></li><li class=\"up\"></li><li class=\"up\"></li><li class=\"up\"></li><li class=\"down\"></li><li class=\"up\"></li><li class=\"today\"></li></ul>",
+      "css": ".ds-grid { display: grid; grid-template-columns: repeat(15, minmax(0, 1fr)); gap: 3px; list-style: none; margin: 0; padding: 0; max-width: 320px; } .ds-grid li { aspect-ratio: 1; border-radius: 1px; transition: background 200ms cubic-bezier(0.25,1,0.5,1); } .ds-grid .up { background: #b4b8bc; } .ds-grid .down { background: #15191c; border: 1px solid #2c3136; } .ds-grid .today { background: #15191c; border: 1px solid #2c3136; box-shadow: 0 0 0 1px #0d1013, 0 0 0 2px #61676d; }"
     },
     {
       "name": "Status Pill",
@@ -172,13 +318,51 @@
       "Single narrow column, phone-first, at every viewport"
     ],
     "rules": [
-      { "name": "The Quiet-Is-Good Rule", "body": "UP gets no colour. Status colour exists only to mark degraded and down. Giving the healthy state its own hue would make the absence of alarm indistinguishable from the presence of one at a glance, which is the entire job of the panel.", "section": "colors" },
-      { "name": "The Two-Hue Ceiling", "body": "Amber and red are the only saturated hues the system owns. No third status colour, no accent, no category colours for levers. Colour is reserved for status, never for identity.", "section": "colors" },
-      { "name": "The Measured-Not-Assumed Rule", "body": "The web source is normative in oklch; the hex is its exact sRGB rendering and is what React Native consumes, since RN cannot parse oklch. When any value changes, re-measure the contrast rather than assuming it held.", "section": "colors" },
-      { "name": "The One Readout Rule", "body": "Exactly one element per screen is set at Display scale, and it is always the number that answers the screen's question. If a second element competes with it, the screen has two subjects and needs splitting.", "section": "typography" },
-      { "name": "The Tabular Rule", "body": "Every numeral that can change is monospaced and set with tabular figures. A number that reflows as it counts reads as unstable, and this product's whole claim is that the readout is trustworthy.", "section": "typography" },
-      { "name": "The Scalable-Type Rule", "body": "On native the ramp maps onto Dynamic Type and sp units, never hard-coded points. The exception is Display: the hero metric is capped so it cannot overflow, and degrades by reducing its own size before it wraps. A wrapped hero metric is a broken screen.", "section": "typography" },
-      { "name": "The No-Cast Rule", "body": "A surface that needs to feel raised gets the next tonal step. If three steps are not enough separation, the layout is too dense — fix the spacing, not the lighting. Glassmorphism, blur, glow, and drop shadows are all outside the system.", "section": "elevation" }
+      {
+        "name": "The Quiet-Is-Good Rule",
+        "body": "UP gets no colour. Status colour exists only to mark degraded and down. Giving the healthy state its own hue would make the absence of alarm indistinguishable from the presence of one at a glance, which is the entire job of the panel.",
+        "section": "colors"
+      },
+      {
+        "name": "The Two-Hue Ceiling",
+        "body": "Amber and red are the only saturated hues the system owns. No third status colour, no accent, no category colours for levers. Colour is reserved for status, never for identity.",
+        "section": "colors"
+      },
+      {
+        "name": "The Measured-Not-Assumed Rule",
+        "body": "The web source is normative in oklch; the hex is its exact sRGB rendering and is what React Native consumes, since RN cannot parse oklch. When any value changes, re-measure the contrast rather than assuming it held.",
+        "section": "colors"
+      },
+      {
+        "name": "The One Readout Rule",
+        "body": "Exactly one element per screen is set at Display scale, and it is always the number that answers the screen's question. If a second element competes with it, the screen has two subjects and needs splitting.",
+        "section": "typography"
+      },
+      {
+        "name": "The Tabular Rule",
+        "body": "Every numeral that can change is monospaced and set with tabular figures. A number that reflows as it counts reads as unstable, and this product's whole claim is that the readout is trustworthy.",
+        "section": "typography"
+      },
+      {
+        "name": "The Scalable-Type Rule",
+        "body": "On native the ramp maps onto Dynamic Type and sp units, never hard-coded points. The exception is Display: the hero metric is capped so it cannot overflow, and degrades by reducing its own size before it wraps. A wrapped hero metric is a broken screen.",
+        "section": "typography"
+      },
+      {
+        "name": "The No-Cast Rule",
+        "body": "A surface that needs to feel raised gets the next tonal step. If three steps are not enough separation, the layout is too dense — fix the spacing, not the lighting. Glassmorphism, blur, glow, and drop shadows are all outside the system.",
+        "section": "elevation"
+      },
+      {
+        "name": "The No-Remainder Rule",
+        "body": "The grid may never depict how much was left undone. Segmented meters, quadrants and fractional fills draw the absence as a visible hole, and a hole reads as \"you did not finish\". The thesis is that one lever is enough, so any encoding showing a remainder contradicts it. Lever detail belongs to tapping a day in History.",
+        "section": "components"
+      },
+      {
+        "name": "The System-Chrome Exception",
+        "body": "The platform's own materials are permitted on the platform's own chrome — the iOS tab bar and sheets may use the system translucent material, because there that material IS the native affordance. Content never gets glass. Android gets no blur; Material conveys elevation tonally.",
+        "section": "elevation"
+      }
     ],
     "dos": [
       "Do reserve amber (#f2ab35) and red (#f05653) exclusively for degraded and down states.",
@@ -191,6 +375,8 @@
     ],
     "donts": [
       "Don't add a shadow. Anywhere. At any elevation.",
+      "Don't subdivide a day cell — no segments, quadrants, or fractional fills. Anything that draws a remainder says 'you did not finish'.",
+      "Don't put blur or translucency on content. System materials are permitted on system chrome only.",
       "Don't give the healthy state a colour — quiet is the signal.",
       "Don't colour-code levers, or introduce a third status hue.",
       "Don't use a status colour decoratively: not on a border, an icon, or a heading that isn't reporting a state.",

@@ -129,9 +129,13 @@ export default async function StatusPage() {
           tap rather than a row of small words. */}
       <nav className="border-line mt-10 flex justify-between border-t pt-2">
         {[
+          // No playbook tab. It still exists and still fills itself from what
+          // you log — it just isn't a place you visit. Its whole job is to be
+          // there in the lever sheet and on the takeover, which is where you
+          // actually need it; browsing it was a screen that asked for upkeep
+          // and gave nothing back.
           ["/history", "history"],
           ["/proof", "proof"],
-          ["/playbook", "playbook"],
           ["/settings", "settings"],
         ].map(([href, label]) => (
           <NavLink key={href} href={href} className="flex-1 justify-center">

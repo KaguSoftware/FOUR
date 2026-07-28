@@ -55,6 +55,13 @@ export default async function ProofPage() {
 
   const alreadyToday = rows.some((s) => s.observed_on === status.today);
 
+  // The note upserts on (user_id, observed_on, kind), so a second write the
+  // same day REPLACES the first. Loading it back is what turns that from data
+  // loss into an edit.
+  const todayNote =
+    rows.find((s) => s.observed_on === status.today && s.kind === "note")
+      ?.detail ?? "";
+
   return (
     <main className="mx-auto w-full max-w-md px-5 pt-[max(2rem,calc(env(safe-area-inset-top)+0.75rem))] pb-[max(3rem,env(safe-area-inset-bottom))]">
       <header className="mb-8 flex items-baseline justify-between">
@@ -62,17 +69,23 @@ export default async function ProofPage() {
         <BackLink />
       </header>
 
-      {!alreadyToday && (
-        <section className="border-line mb-8 border-b pb-8">
-          <SignalCheck
-            weight={
-              status.state.weight_enabled
-                ? { unit: status.state.weight_unit }
-                : undefined
-            }
-          />
-        </section>
-      )}
+      {/* Always shown, even once something is logged today.
+          It used to disappear after the first entry, which was fine when the
+          note was a one-line observation — but people write these as a diary,
+          and "you already checked in this morning" is not a reason to refuse
+          what happened this evening. Today's note is loaded back in so adding
+          to it edits the entry instead of silently replacing it. */}
+      <section className="border-line mb-8 border-b pb-8">
+        <SignalCheck
+          initialDetail={todayNote}
+          loggedToday={alreadyToday}
+          weight={
+            status.state.weight_enabled
+              ? { unit: status.state.weight_unit }
+              : undefined
+          }
+        />
+      </section>
 
       {scalars.length > 0 && (
         <section className="mb-8">
@@ -89,24 +102,32 @@ export default async function ProofPage() {
       )}
 
       <section>
-        <p className="label mb-3">What changed</p>
+        <p className="label mb-3">The log</p>
         {notes.length === 0 ? (
           <p className="text-ink-mute text-sm leading-relaxed">
-            Nothing logged yet. When something moves — incline up, stairs
-            easier, sleeping through — note it here. This list only grows, and
-            it is what you read on the way back after a break.
+            Nothing written yet. Anything you want to remember about a day goes
+            here — what moved, what didn&apos;t, what it felt like. This list
+            only grows, and it is what you read on the way back after a break.
           </p>
         ) : (
           <ul className="flex flex-col">
             {notes.map((n) => (
               <li
                 key={`${n.observed_on}-${n.kind}`}
-                className="border-line flex items-baseline gap-3 border-b py-3 last:border-0"
+                className="border-line border-b py-4 last:border-0"
               >
-                <span className="tabular text-ink-mute shrink-0 text-xs">
+                {/* The date sits ABOVE the entry now rather than beside it.
+                    These are paragraphs, not one-liners, and a fixed-width
+                    date column squeezed them into a gutter. */}
+                <p className="tabular text-ink-mute mb-1.5 text-xs">
                   {n.observed_on}
-                </span>
-                <span className="text-ink-dim text-sm">{n.detail}</span>
+                </p>
+                {/* `whitespace-pre-wrap` keeps the paragraph breaks someone
+                    typed. Without it a page of writing collapses into one
+                    block, which is not what they wrote. */}
+                <p className="text-ink-dim text-sm leading-relaxed whitespace-pre-wrap">
+                  {n.detail}
+                </p>
               </li>
             ))}
           </ul>

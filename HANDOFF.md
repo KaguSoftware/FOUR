@@ -176,6 +176,8 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 | App icon | Expo's default artwork | Real icon + splash | Before submission |
 | Widgets | None | Interactive Home/Lock Screen widget: tap a lever without opening the app | v1.1 — SwiftUI + Glance, App Groups |
 | Alerts | Telegram | Native push, same escalation ladder | Step 8 |
+| Playbook | **No tab.** Still exists, still self-populates from logging, still feeds the lever sheet and the takeover | Unchanged — browsing it is not coming back | Decided 2026-07-28 |
+| Daily note | A journal: auto-growing box, 6000 chars, today's entry loaded back for editing | Same on mobile | With mobile `/proof` |
 | Outage annotation | `annotateOutage` action exists; no UI | Tap an outage in `/history` to label it | After real outages exist |
 | Undo | Under a logged lever, today only | Long-press any grid cell to edit that day | Low priority |
 | Timezone | Defaults to Europe/Istanbul in DB | Device-detected at signup, editable | With mobile |
@@ -196,6 +198,8 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 - **Weight never affects uptime**, has no goal or target, and is off by default. It is a number the user chose to keep, not a score kept on them.
 - **The monitor records its paging decision regardless of delivery success.** If that write moves back inside the "has a channel" branch, an unconfigured channel re-pages every pass.
 - **Two credentials were exposed in a chat transcript on 2026-07-19 and should be rotated:** the Supabase account password, and the Telegram bot token (BotFather `/revoke`, then update `apps/web/.env.local` and the Vercel env var). Verified 2026-07-28: **no `.env` file was ever committed**, so git history is clean — the exposure was transcript-only.
+- **The daily note is a journal, and that changed two things.** The owner had been using it as a diary, so as of 2026-07-28 it is one: `NOTE_MAX` is 6000, the box auto-grows, and the prompt is "what's up?" rather than "anything moving?". The consequences: (1) the note **upserts on `(user_id, observed_on, kind)`**, so a second write the same day REPLACES the first — `/proof` loads today's note back into the field so that is an edit, not data loss; (2) the check-in **no longer hides itself once something is logged today**, because "you already checked in this morning" is not a reason to refuse what happened this evening. Keep both properties.
+- **The playbook has no tab, on purpose (2026-07-28), but the playbook is NOT gone.** It still self-populates from logging and still feeds the lever sheet and the takeover — those are where it earns its keep. Only the browse/manage screen was removed, along with `updatePlaybook`. Do not "restore" the tab; do not delete the table.
 - **`/proof` fetches a row limit, not a date range.** Daily sampling writes up to 3 rows a day, so the 280-row limit backs the 12-week window. **Adding weight as a fourth kind shortens that window silently** — raise the limit when weight ships.
 - **`.env.local` lives at `apps/web/.env.local`, not the repo root.** `scripts/_session.mjs` resolves that path relative to its own location so there is one copy of the secrets.
 - **`.gitignore` patterns are deliberately un-anchored.** A root-anchored `/node_modules` would silently stop ignoring `apps/web/.next`.

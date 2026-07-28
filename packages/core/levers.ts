@@ -28,6 +28,17 @@ export const leverCount = (): number =>
 export const LEVER_KEY_MAX = 32;
 export const LEVER_LABEL_MAX = 24;
 
+/**
+ * How much someone may write in a day's note.
+ *
+ * It was 160 characters, on the assumption the field was for a one-line
+ * observation like "incline 8 → 10". In practice it gets used as a journal, so
+ * the ceiling is now a generous one rather than a shape imposed on what people
+ * write — roughly a thousand words. It exists to bound a runaway paste, not to
+ * ration the entry.
+ */
+export const NOTE_MAX = 6000;
+
 /** A key is lowercase, alphanumeric plus single hyphens, never edge-hyphenated. */
 const KEY_SHAPE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 

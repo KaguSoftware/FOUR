@@ -10,6 +10,7 @@ import {
   uniqueLeverKey,
   validateLeverLabel,
   MAX_LEVERS,
+  NOTE_MAX,
   type Lever,
   type Posture,
 } from "@uptime/core";
@@ -130,19 +131,6 @@ export async function annotateOutage(startedOn: string, note: string) {
   revalidatePath("/history");
 }
 
-export async function updatePlaybook(
-  id: string,
-  patch: { label?: string; is_pinned?: boolean; archived?: boolean },
-) {
-  const { supabase, user } = await requireUser();
-  await supabase
-    .from("playbook")
-    .update(patch)
-    .eq("id", id)
-    .eq("user_id", user.id);
-  revalidatePath("/", "layout");
-}
-
 /** Daily felt-state sample. Skippable, and it never touches uptime. */
 export async function logSignals(input: {
   energy?: number | null;
@@ -177,7 +165,10 @@ export async function logSignals(input: {
       observed_on: today,
       kind: "note",
       value: null,
-      detail: input.detail.trim().slice(0, 160),
+      // Was 160, which silently truncated anything longer than a sentence.
+      // People write these as a journal, so the cap is now a runaway-paste
+      // guard rather than a limit on what a day can be worth saying.
+      detail: input.detail.trim().slice(0, NOTE_MAX),
     });
 
   // Only recorded when the feature is on, so a stale client cannot write

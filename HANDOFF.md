@@ -85,6 +85,8 @@ Framing throughout: this is not fitness tracking. It's **uptime monitoring for o
 - **Proof signal check moved weekly → daily, 2026-07-20.** Sampling is daily; the unit of *meaning* is still a week. This also fixed a latent bug — `evaluatePlateau` claimed to group by week but keyed on the raw date, so with daily input the 4-week window would have collapsed to 4 days and paged constantly.
 - All palette tokens pass WCAG AA (ink 16.5:1, ink-dim 9.6:1, ink-mute 5.5:1, amber 9.7:1, red 5.6:1).
 - **Monorepo restructure, 2026-07-28.** `lib/uptime.ts` + `lib/monitor.ts` → `packages/core` as `@uptime/core`; Next app → `apps/web`. Verified after the move: **44/44 tests green, `tsc` clean in both workspaces, production build emits an identical route table, eslint clean.**
+- **Design foundation, 2026-07-28.** `PRODUCT.md`, `DESIGN.md` and `.impeccable/design.json` written. Palette ported oklch → RN-safe hex with **every ratio re-measured against the converted values** (zero gamut clipping; all reproduce within 0.04). Design detector reports no findings.
+- **Mobile surface spec, 2026-07-28** — [claude.ai/code/artifact/68c1c6a8-26ee-41ba-acde-37fd303bb3c3](https://claude.ai/code/artifact/68c1c6a8-26ee-41ba-acde-37fd303bb3c3). Every v1 screen at 390×844: dashboard at 1/2/3/4 levers, takeover and milestone in both postures, onboarding, lever sheet, and the iOS/Android adaptation table. **Design specimens, not a running build.** Its section 06 lists four open questions that need answering before the Expo build starts.
 
 **Written but NOT yet verified end-to-end:**
 

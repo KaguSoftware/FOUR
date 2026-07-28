@@ -19,6 +19,27 @@ import { color } from "@/theme";
 SplashScreen.preventAutoHideAsync();
 
 /**
+ * A real native sheet, presented by the navigator rather than drawn by us:
+ * `UISheetPresentationController` on iOS with its own detents and
+ * drag-to-dismiss, the platform equivalent on Android. `fitToContents` means
+ * it is exactly as tall as what it holds.
+ *
+ * **`contentStyle` must be the sheet's own surface, not the app background.**
+ * The screen paints the full sheet including the strip behind the home
+ * indicator, and inheriting the darker page background left a black bar under
+ * the content — the sheet looked like it stopped early. Each sheet also pads
+ * its own bottom inset so nothing sits under the indicator.
+ */
+const SHEET = {
+  presentation: "formSheet",
+  sheetAllowedDetents: "fitToContents",
+  sheetGrabberVisible: true,
+  sheetCornerRadius: 16,
+  headerShown: false,
+  contentStyle: { backgroundColor: color.surface },
+} as const;
+
+/**
  * Native chrome — headers, back buttons, sheet and screen backgrounds — is
  * themed through the navigator's `screenOptions` below rather than a
  * ThemeProvider, which expo-router 6 does not export. Every surface this app
@@ -97,16 +118,9 @@ function RootNavigator({ fontsLoaded }: { fontsLoaded: boolean }) {
             Android. `fitToContents` means it is exactly as tall as the
             playbook it holds — a fixed detent would leave dead space for
             someone with one item and clip someone with three. */}
-        <Stack.Screen
-          name="log"
-          options={{
-            presentation: "formSheet",
-            sheetAllowedDetents: "fitToContents",
-            sheetGrabberVisible: true,
-            sheetCornerRadius: 16,
-            headerShown: false,
-          }}
-        />
+        <Stack.Screen name="log" options={SHEET} />
+        <Stack.Screen name="add-lever" options={SHEET} />
+        <Stack.Screen name="edit-note" options={SHEET} />
       </Stack.Protected>
     </Stack>
   );

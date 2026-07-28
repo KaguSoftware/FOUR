@@ -1,5 +1,46 @@
 import { describe, expect, it } from "vitest";
-import { DAILY_TREND_DAYS, dailyTrend, trendPath } from "./signals";
+import { DAILY_TREND_DAYS, appendNote, dailyTrend, trendPath } from "./signals";
+
+describe("appendNote", () => {
+  const MAX = 100;
+
+  it("uses the addition when the day is empty", () => {
+    expect(appendNote(null, "went anyway", MAX)).toEqual({
+      text: "went anyway",
+      truncated: false,
+    });
+  });
+
+  it("appends rather than replacing, separated by a blank line", () => {
+    // THE case. The field opens blank, so a save would otherwise overwrite
+    // what was written this morning.
+    expect(appendNote("morning entry", "evening entry", MAX).text).toBe(
+      "morning entry\n\nevening entry",
+    );
+  });
+
+  it("leaves the day untouched when there is nothing to add", () => {
+    expect(appendNote("morning", "   ", MAX)).toEqual({
+      text: "morning",
+      truncated: false,
+    });
+  });
+
+  it("reports truncation instead of silently swallowing writing", () => {
+    const long = "x".repeat(MAX);
+    const result = appendNote(long, "y".repeat(20), MAX);
+    expect(result.truncated).toBe(true);
+    expect(result.text).toHaveLength(MAX);
+    // The newest writing survives — it is what the user is watching land.
+    expect(result.text.endsWith("y".repeat(20))).toBe(true);
+  });
+
+  it("does not double up whitespace already around an entry", () => {
+    expect(appendNote("  morning  ", "  evening  ", MAX).text).toBe(
+      "morning\n\nevening",
+    );
+  });
+});
 
 const s = (observed_on: string, value: number | null) => ({ observed_on, value });
 

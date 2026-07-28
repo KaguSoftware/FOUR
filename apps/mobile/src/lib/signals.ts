@@ -1,6 +1,6 @@
 import { supabase } from "./supabase";
 import { today } from "./status";
-import { NOTE_MAX } from "@uptime/core";
+import { appendNote, NOTE_MAX } from "@uptime/core";
 
 /**
  * Signals — the felt-state check and the journal.
@@ -80,14 +80,26 @@ export async function logSignals(
     rows.push({ user_id: userId, observed_on: day, kind: "energy", value: input.energy });
   if (input.sleep)
     rows.push({ user_id: userId, observed_on: day, kind: "sleep", value: input.sleep });
-  if (input.detail?.trim())
+  if (input.detail?.trim()) {
+    // Appended, never replaced. The field opens blank every time — being
+    // handed back this morning's text is not how a journal is used — so a
+    // plain upsert here would quietly overwrite it.
+    const { data: existing } = await supabase
+      .from("signals")
+      .select("detail")
+      .eq("user_id", userId)
+      .eq("observed_on", day)
+      .eq("kind", "note")
+      .maybeSingle();
+
     rows.push({
       user_id: userId,
       observed_on: day,
       kind: "note",
       value: null,
-      detail: input.detail.trim().slice(0, NOTE_MAX),
+      detail: appendNote(existing?.detail, input.detail, NOTE_MAX).text,
     });
+  }
   if (input.weight != null && Number.isFinite(input.weight))
     rows.push({
       user_id: userId,
@@ -102,4 +114,34 @@ export async function logSignals(
   return supabase
     .from("signals")
     .upsert(rows, { onConflict: "user_id,observed_on,kind" });
+}
+
+/**
+ * Rewrite one day's entry wholesale.
+ *
+ * The explicit edit path, reached by tapping a day in the log. This one DOES
+ * replace, because that is what editing means — the user is looking at the
+ * text they are changing. An empty result deletes the entry rather than
+ * leaving a blank row in the log.
+ */
+export async function rewriteNote(
+  userId: string,
+  observedOn: string,
+  text: string,
+) {
+  const detail = text.trim().slice(0, NOTE_MAX);
+
+  if (!detail) {
+    return supabase
+      .from("signals")
+      .delete()
+      .eq("user_id", userId)
+      .eq("observed_on", observedOn)
+      .eq("kind", "note");
+  }
+
+  return supabase.from("signals").upsert(
+    { user_id: userId, observed_on: observedOn, kind: "note", value: null, detail },
+    { onConflict: "user_id,observed_on,kind" },
+  );
 }

@@ -8,7 +8,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { DAILY_TREND_DAYS, NOTE_MAX } from "@uptime/core";
 
 import { Body, Label, Mono, Rule, Wordmark } from "@/components/ui";
@@ -35,6 +35,7 @@ import { color, radius, size, space, TAP } from "@/theme";
  */
 export default function ProofScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const { status } = useStatus();
   const [rows, setRows] = useState<SignalRow[]>([]);
   const [weights, setWeights] = useState<WeightRow[]>([]);
@@ -61,9 +62,6 @@ export default function ProofScreen() {
 
   const notes = rows.filter((r) => r.detail);
   const scalars = rows.filter((r) => r.value !== null);
-  const todayNote =
-    rows.find((r) => r.observed_on === status.today && r.kind === "note")
-      ?.detail ?? "";
   const loggedToday = rows.some((r) => r.observed_on === status.today);
 
   return (
@@ -84,9 +82,7 @@ export default function ProofScreen() {
         </View>
 
         <DailyCheck
-          key={todayNote}
           userId={status.state.user_id}
-          initialNote={todayNote}
           loggedToday={loggedToday}
           weightUnit={weightOn ? status.state.weight_unit : null}
           onSaved={load}
@@ -118,7 +114,27 @@ export default function ProofScreen() {
           ) : (
             notes.map((n) => (
               <View key={`${n.observed_on}-${n.kind}`}>
-                <View style={{ paddingVertical: space[4] }}>
+                {/* Tap any day to edit it. This is the ONLY place a note is
+                    shown prefilled — the daily field stays blank, so editing
+                    is something you choose rather than something you are
+                    handed every time you open the screen. */}
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Edit the entry for ${n.observed_on}`}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/edit-note",
+                      params: { date: n.observed_on, text: n.detail ?? "" },
+                    })
+                  }
+                  style={({ pressed }) => ({
+                    paddingVertical: space[4],
+                    paddingHorizontal: pressed ? space[2] : 0,
+                    marginHorizontal: pressed ? -space[2] : 0,
+                    borderRadius: radius.md,
+                    backgroundColor: pressed ? color.surface : "transparent",
+                  })}
+                >
                   {/* The date sits ABOVE the entry. These are paragraphs, not
                       one-liners, and a fixed-width date column squeezed them
                       into a gutter. */}
@@ -132,7 +148,7 @@ export default function ProofScreen() {
                     {n.observed_on}
                   </Mono>
                   <Body tone="dim">{n.detail}</Body>
-                </View>
+                </Pressable>
                 <Rule />
               </View>
             ))
@@ -151,26 +167,28 @@ export default function ProofScreen() {
  * observation — but people write these as a journal, and "you already checked
  * in this morning" is not a reason to refuse what happened this evening.
  *
- * Today's note is loaded back in, because the write upserts on
- * `(user_id, observed_on, kind)` — without it, writing again would silently
- * replace what was already there.
+ * The note field opens BLANK every time. Being handed back this morning's text
+ * to edit is not how a journal is used. Writing again the same day appends
+ * instead of replacing (`appendNote` in core), so nothing is lost — and editing
+ * what is already there is a separate, deliberate act: tap the day in the log.
  */
 function DailyCheck({
   userId,
-  initialNote,
   loggedToday,
   weightUnit,
   onSaved,
 }: {
   userId: string;
-  initialNote: string;
   loggedToday: boolean;
   weightUnit: "kg" | "lb" | null;
   onSaved: () => void;
 }) {
   const [energy, setEnergy] = useState<number | null>(null);
   const [sleep, setSleep] = useState<number | null>(null);
-  const [note, setNote] = useState(initialNote);
+  // Always blank. Writing again the same day APPENDS (see core's appendNote),
+  // so nothing is lost — editing what is already there is a separate, explicit
+  // act, reached by tapping the day in the log.
+  const [note, setNote] = useState("");
   const [weight, setWeight] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);

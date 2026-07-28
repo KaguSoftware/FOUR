@@ -1,36 +1,34 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { RefreshControl, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import * as Localization from "expo-localization";
-import { MILESTONE_COPY, milestonePanel } from "@uptime/core";
+import { applyToDay, MILESTONE_COPY, milestonePanel } from "@uptime/core";
 
 import { Body, Label, Mono, Wordmark } from "@/components/ui";
 import { DayGrid } from "@/components/day-grid";
 import { LeverButtons } from "@/components/lever-buttons";
 import { Takeover } from "@/components/takeover";
 import { useStatus } from "@/lib/use-status";
-import { logEntry, syncTimeZone, undoEntry } from "@/lib/status";
+import { useOutbox } from "@/lib/use-outbox";
+import { syncTimeZone } from "@/lib/status";
 import { color, radius, size, space } from "@/theme";
 
 export default function StatusScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { status, loading, error, refresh } = useStatus();
-  const [busy, setBusy] = useState(false);
+
   /**
-   * Levers logged on this screen but not yet confirmed by a reload.
+   * Every lever tap goes through the outbox, online or not.
    *
-   * The grid and the button fill the instant you tap, which matters more here
-   * than anywhere else: this is used in a gym basement on bad signal, and every
-   * second where a tap looks like it did nothing is a reason to tap again or
-   * to give up. The write is idempotent — the unique constraint on
-   * `(user_id, logged_for, lever)` makes a retry an update — so being ahead of
-   * the server cannot corrupt the day.
+   * There is no separate "offline path" to get wrong: the tap is written
+   * locally, the screen updates from the queue, and sending is something that
+   * happens afterwards whenever it can. That is what makes a tap in a gym
+   * basement indistinguishable from one on wifi — and it is only safe because
+   * every write is idempotent, so a retry is an update, never a duplicate.
    */
-  const [justLogged, setJustLogged] = useState<string[]>([]);
-  /** The same, for undo — a mistake should also cost nothing to see fixed. */
-  const [justUndone, setJustUndone] = useState<string[]>([]);
+  const { queue, write } = useOutbox(status?.state.user_id, refresh);
 
   // The phone derives its own logical day and never reads `timezone`, but the
   // server-side monitor does. If it drifts, the pager fires on a different day
@@ -68,47 +66,22 @@ export default function StatusScreen() {
     state,
   } = status;
 
-  async function log(lever: string, detail: string | null) {
-    setJustUndone((l) => l.filter((k) => k !== lever));
-    setJustLogged((l) => [...l, lever]);
-    setBusy(true);
-    await logEntry(state.user_id, lever, detail);
-    await refresh();
-    setJustLogged((l) => l.filter((k) => k !== lever));
-    setBusy(false);
-  }
-
-  async function undo(lever: string) {
-    setJustLogged((l) => l.filter((k) => k !== lever));
-    setJustUndone((l) => [...l, lever]);
-    setBusy(true);
-    await undoEntry(state.user_id, lever);
-    await refresh();
-    setJustUndone((l) => l.filter((k) => k !== lever));
-    setBusy(false);
-  }
-
-  // Merged, not replaced: the reload is the source of truth and the optimistic
-  // set only adds to it, so a lever logged on another device still shows.
-  const shownAsLogged = [...new Set([...todayLevers, ...justLogged])].filter(
-    (k) => !justUndone.includes(k),
-  );
+  // The server's view with the queue laid on top. `applyToDay` is in core and
+  // tested: the server list is the base and the queue only overrides the levers
+  // it mentions, so one logged on another device still shows.
+  const shownAsLogged = applyToDay(todayLevers, queue, today);
 
   // The grid reads entries, not the lever list, so it needs the same treatment
   // or the cell stays dark while the button says done — which reads as the tap
   // half-working.
-  const shownEntries = justLogged.length
-    ? [
-        ...entries,
-        ...justLogged.map((lever) => ({
-          logged_for: today,
-          lever,
-          detail: null,
-        })),
-      ]
-    : entries.filter(
-        (e) => !(e.logged_for === today && justUndone.includes(e.lever)),
-      );
+  const shownEntries = [
+    ...entries.filter(
+      (e) => !(e.logged_for === today && !shownAsLogged.includes(e.lever)),
+    ),
+    ...shownAsLogged
+      .filter((lever) => !todayLevers.includes(lever))
+      .map((lever) => ({ logged_for: today, lever, detail: null })),
+  ];
 
   // Down 3+ days: the dashboard is REPLACED, not annotated. A system with no
   // history has never been down, so a first run gets the normal empty state
@@ -123,8 +96,8 @@ export default function StatusScreen() {
         lastRun={lastRun}
         lastDetail={lastDetail(entries)}
         posture={state.posture}
-        busy={busy}
-        onLog={log}
+        busy={false}
+        onLog={(lever, detail) => write(lever, "log", detail)}
       />
     );
   }
@@ -218,13 +191,16 @@ export default function StatusScreen() {
       <LeverButtons
         levers={levers}
         todayLevers={shownAsLogged}
-        busy={busy}
+        busy={false}
         // Opens the native sheet to attach WHAT you did. Optional, always —
         // the sheet's own "just mark it up" logs with no detail.
         onPress={(lever) =>
           router.push({ pathname: "/log", params: { lever: lever.key } })
         }
-        onUndo={(lever) => undo(lever.key)}
+        onUndo={(lever) => write(lever.key, "undo", null)}
+        // Adding is offered here because this is the screen where you notice a
+        // lever is missing. Settings keeps the full manager.
+        onAdd={() => router.push("/add-lever")}
       />
 
       {slammed && (

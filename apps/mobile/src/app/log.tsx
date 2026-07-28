@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Pressable, TextInput, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
 import { Body, Label } from "@/components/ui";
@@ -22,6 +23,7 @@ import { color, radius, size, space, TAP } from "@/theme";
  */
 export default function LogSheet() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { lever } = useLocalSearchParams<{ lever: string }>();
   /**
    * Read once from the cache, deliberately NOT `useStatus()`.
@@ -57,7 +59,10 @@ export default function LogSheet() {
         backgroundColor: color.surface,
         paddingHorizontal: space[5],
         paddingTop: space[5],
-        paddingBottom: space[8],
+        // The strip behind the home indicator belongs to the sheet. Padding it
+        // here keeps the last button clear of the indicator; the screen's own
+        // contentStyle is what actually paints it.
+        paddingBottom: Math.max(insets.bottom, space[4]) + space[3],
         gap: space[2],
       }}
     >

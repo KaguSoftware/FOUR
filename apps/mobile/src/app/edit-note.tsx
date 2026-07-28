@@ -1,0 +1,115 @@
+import { useState } from "react";
+import { KeyboardAvoidingView, Platform, Pressable, TextInput, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { NOTE_MAX } from "@uptime/core";
+
+import { Body, Label, Mono } from "@/components/ui";
+import { rewriteNote } from "@/lib/signals";
+import { cachedStatus } from "@/lib/use-status";
+import { color, radius, size, space, TAP } from "@/theme";
+
+/**
+ * Edit one day's entry.
+ *
+ * The only place a note is shown prefilled. The daily field opens blank — being
+ * handed back this morning's text every time is not how a journal is used — so
+ * editing is an explicit act, reached by tapping the day in the log. Here the
+ * text IS what you are changing, so replacing it is what save means.
+ *
+ * Clearing it deletes the entry rather than leaving a blank row in the log.
+ */
+export default function EditNoteSheet() {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { date, text } = useLocalSearchParams<{ date: string; text: string }>();
+  const [status] = useState(cachedStatus);
+  const [draft, setDraft] = useState(text ?? "");
+  const [busy, setBusy] = useState(false);
+
+  async function save() {
+    const userId = status?.state.user_id;
+    if (!userId || busy) return;
+    setBusy(true);
+    await rewriteNote(userId, date, draft);
+    setBusy(false);
+    router.back();
+  }
+
+  return (
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+    >
+      <View
+        style={{
+          backgroundColor: color.surface,
+          paddingHorizontal: space[5],
+          paddingTop: space[5],
+          paddingBottom: Math.max(insets.bottom, space[4]) + space[3],
+          gap: space[3],
+        }}
+      >
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "baseline",
+            justifyContent: "space-between",
+          }}
+        >
+          <Label>edit entry</Label>
+          <Mono style={{ fontSize: size.xs, color: color.inkMute }}>{date}</Mono>
+        </View>
+
+        <TextInput
+          autoFocus
+          value={draft}
+          onChangeText={setDraft}
+          multiline
+          maxLength={NOTE_MAX}
+          textAlignVertical="top"
+          placeholder="Empty this to delete the entry."
+          placeholderTextColor={color.inkMute}
+          style={{
+            minHeight: 160,
+            maxHeight: 320,
+            borderRadius: radius.md,
+            borderWidth: 1,
+            borderColor: color.line,
+            backgroundColor: color.surfaceHi,
+            paddingHorizontal: space[4],
+            paddingTop: space[3],
+            paddingBottom: space[3],
+            color: color.ink,
+            fontFamily: "Inter_400Regular",
+            fontSize: 16,
+            lineHeight: 24,
+          }}
+        />
+
+        <Pressable
+          accessibilityRole="button"
+          disabled={busy}
+          onPress={save}
+          style={({ pressed }) => ({
+            minHeight: TAP,
+            borderRadius: radius.md,
+            borderWidth: 1,
+            borderColor: color.lineHi,
+            backgroundColor: pressed ? color.line : color.surfaceHi,
+            alignItems: "center",
+            justifyContent: "center",
+            opacity: busy ? 0.5 : 1,
+          })}
+        >
+          <Label style={{ color: color.ink }}>
+            {busy ? "…" : draft.trim() ? "save" : "delete entry"}
+          </Label>
+        </Pressable>
+
+        <Body tone="mute" style={{ fontSize: size.xs, textAlign: "center" }}>
+          Nothing here affects uptime.
+        </Body>
+      </View>
+    </KeyboardAvoidingView>
+  );
+}

@@ -14,6 +14,43 @@
 /** How many days the trend shows. 60 keeps every point ~5px at phone width. */
 export const DAILY_TREND_DAYS = 60;
 
+/**
+ * Add a new piece of writing to a day that may already have some.
+ *
+ * The note field is a blank page every time you open it — being handed back
+ * this morning's text to edit is not how a journal is used. But the write
+ * upserts on `(user_id, observed_on, kind)`, so an empty field plus a save
+ * would REPLACE what is already there. Appending is what makes both true: a
+ * fresh place to write, and nothing lost.
+ *
+ * Separated by a blank line, so a day reads as the entries it actually was
+ * rather than one run-on paragraph.
+ *
+ * `truncated` is returned rather than silently swallowed — losing writing
+ * without saying so is the failure this whole function exists to avoid. In
+ * practice a 6000-character day is far outside normal use.
+ */
+export function appendNote(
+  existing: string | null | undefined,
+  addition: string,
+  max: number,
+): { text: string; truncated: boolean } {
+  const before = (existing ?? "").trim();
+  const next = addition.trim();
+
+  if (!next) return { text: before, truncated: false };
+  if (!before) {
+    return { text: next.slice(0, max), truncated: next.length > max };
+  }
+
+  const joined = `${before}\n\n${next}`;
+  // Keeps the NEWEST writing when a day somehow overflows, because the thing
+  // just typed is the thing the user is watching land.
+  return joined.length <= max
+    ? { text: joined, truncated: false }
+    : { text: joined.slice(joined.length - max), truncated: true };
+}
+
 export type SignalSample = { observed_on: string; value: number | null };
 
 export type TrendPoint = { date: string; avg: number };

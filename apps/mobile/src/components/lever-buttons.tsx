@@ -1,5 +1,6 @@
 import { Pressable, Text, View } from "react-native";
 import * as Haptics from "expo-haptics";
+import { MAX_LEVERS } from "@uptime/core";
 import { color, radius, size, LEVER_HEIGHT, TAP } from "@/theme";
 import type { LeverRow } from "@/lib/status";
 
@@ -20,6 +21,7 @@ export function LeverButtons({
   busy,
   onPress,
   onUndo,
+  onAdd,
   compact = false,
 }: {
   levers: LeverRow[];
@@ -27,15 +29,23 @@ export function LeverButtons({
   busy: boolean;
   onPress: (lever: LeverRow) => void;
   onUndo?: (lever: LeverRow) => void;
+  /** Offered while under the ceiling. Omitted on the takeover. */
+  onAdd?: () => void;
   compact?: boolean;
 }) {
+  const canAdd = onAdd && levers.length < MAX_LEVERS;
+
   return (
     <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
       {levers.map((lever, i) => {
         const done = todayLevers.includes(lever.key);
         // One lever spans the row; the third of three goes full-width rather
         // than leaving a hole, because an empty cell reads as a missing lever.
-        const full = levers.length === 1 || (levers.length === 3 && i === 2);
+        // With the add button present it fills that hole instead, so the odd
+        // lever only stretches when nothing follows it.
+        const full =
+          (levers.length === 1 && !canAdd) ||
+          (levers.length === 3 && i === 2 && !canAdd);
 
         return (
           <View
@@ -115,6 +125,45 @@ export function LeverButtons({
           </View>
         );
       })}
+
+      {/* Adding is offered where you notice it is missing — while looking at
+          the buttons. Settings still has the full manager; this is only the
+          one action people want from here. Deliberately quieter than a lever:
+          it is not a thing you press to keep the day up. */}
+      {canAdd && (
+        <View
+          style={{
+            flexBasis: levers.length === 1 ? "47%" : "100%",
+            flexGrow: 1,
+          }}
+        >
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Add a lever"
+            onPress={onAdd}
+            style={({ pressed }) => ({
+              minHeight: compact ? TAP : LEVER_HEIGHT,
+              borderRadius: radius.md,
+              borderWidth: 1,
+              borderStyle: "dashed",
+              borderColor: color.line,
+              backgroundColor: pressed ? color.surface : "transparent",
+              alignItems: "center",
+              justifyContent: "center",
+            })}
+          >
+            <Text
+              style={{
+                fontFamily: "Inter_400Regular",
+                fontSize: size.xs,
+                color: color.inkMute,
+              }}
+            >
+              + add a lever
+            </Text>
+          </Pressable>
+        </View>
+      )}
     </View>
   );
 }

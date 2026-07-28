@@ -11,7 +11,7 @@ The **active step** is marked `← ACTIVE` in *Roadmap* below. Do that. Before y
 start:
 
 1. Check *Blocked / needs the owner* — do not re-do work that is waiting on them.
-2. Run `npm test`. **44 tests must be green.** They encode the invariants the
+2. Run `npm test`. **55 tests must be green.** They encode the invariants the
    product rests on; if they are red, stop and fix that first.
 3. Skim *Gotchas*. Several are traps that have already cost time once.
 
@@ -189,7 +189,7 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 ```bash
 npm install          # installs every workspace
 npm run dev          # apps/web on http://localhost:3000
-npm test             # packages/core — 44 tests, the gate for everything
+npm test             # packages/core — 55 tests, the gate for everything
 npm run typecheck    # both workspaces
 npm run lint
 npm run build

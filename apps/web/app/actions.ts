@@ -138,6 +138,9 @@ export async function logSignals(input: {
   energy?: number | null;
   sleep?: number | null;
   detail?: string | null;
+  /** Optional, opt-in. Stored in `signals`, never in `entries`, so it is
+      structurally incapable of affecting uptime. */
+  weight?: number | null;
 }) {
   const { supabase, user } = await requireUser();
   const state = await getSystemState(user.id);
@@ -166,6 +169,19 @@ export async function logSignals(input: {
       value: null,
       detail: input.detail.trim().slice(0, 160),
     });
+
+  // Only recorded when the feature is on, so a stale client cannot write
+  // weight into an account that never enabled it.
+  if (state.weight_enabled && input.weight != null && Number.isFinite(input.weight)) {
+    const amount = Math.round(Math.min(Math.max(input.weight, 1), 999) * 100) / 100;
+    rows.push({
+      user_id: user.id,
+      observed_on: today,
+      kind: "weight",
+      value: null,
+      amount,
+    });
+  }
 
   if (rows.length) {
     await supabase
@@ -204,4 +220,20 @@ export async function signOut() {
   const supabase = await getSupabase();
   await supabase.auth.signOut();
   revalidatePath("/", "layout");
+}
+
+/**
+ * The weight opt-in.
+ *
+ * Switching it off hides the field and the chart but deletes nothing, so
+ * switching back on restores the history rather than starting from zero.
+ */
+export async function setWeightEnabled(on: boolean) {
+  const { supabase, user } = await requireUser();
+  await supabase
+    .from("system_state")
+    .update({ weight_enabled: on })
+    .eq("user_id", user.id);
+  revalidatePath("/settings");
+  revalidatePath("/proof");
 }

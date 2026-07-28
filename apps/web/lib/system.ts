@@ -26,6 +26,8 @@ export type SystemState = {
   timezone: string;
   slammed_until: string | null;
   telegram_chat_id: string | null;
+  weight_enabled: boolean;
+  weight_unit: "kg" | "lb";
 };
 
 export const DEFAULT_TZ = "Europe/Istanbul";
@@ -45,20 +47,40 @@ export async function getSupabase() {
  * trigger existed (or after a db reset) would otherwise have no row — a lazy
  * upsert makes that case invisible rather than a crash.
  */
+const BASE_COLUMNS = "user_id, timezone, slammed_until, telegram_chat_id";
+const WEIGHT_COLUMNS = "weight_enabled, weight_unit";
+
+/** Defaults for a database that has not run the optional-weight migration. */
+const WEIGHT_DEFAULTS = { weight_enabled: false, weight_unit: "kg" as const };
+
 export async function getSystemState(userId: string): Promise<SystemState> {
   const supabase = await getSupabase();
-  const { data } = await supabase
-    .from("system_state")
-    .select("user_id, timezone, slammed_until, telegram_chat_id")
-    .eq("user_id", userId)
-    .maybeSingle();
 
-  if (data) return data as SystemState;
+  // Selected optimistically, then retried without the weight columns if they
+  // are not there. Deploys and migrations do not land at the same instant, and
+  // a column that does not exist yet should not take the whole app down for
+  // the minutes in between.
+  const read = async (columns: string) =>
+    supabase
+      .from("system_state")
+      .select(columns)
+      .eq("user_id", userId)
+      .maybeSingle<Record<string, unknown>>();
+
+  const full = await read(`${BASE_COLUMNS}, ${WEIGHT_COLUMNS}`);
+  const migrated = !full.error;
+  const row = migrated ? full.data : (await read(BASE_COLUMNS)).data;
+
+  if (row) {
+    // Defaults first so a pre-migration row still satisfies the type; a
+    // migrated row overrides them with its real values.
+    return { ...WEIGHT_DEFAULTS, ...row } as unknown as SystemState;
+  }
 
   const { data: created } = await supabase
     .from("system_state")
     .upsert({ user_id: userId }, { onConflict: "user_id" })
-    .select("user_id, timezone, slammed_until, telegram_chat_id")
+    .select(migrated ? `${BASE_COLUMNS}, ${WEIGHT_COLUMNS}` : BASE_COLUMNS)
     .single();
 
   // Seed the playbook too, so re-entry is never a blank page.
@@ -75,12 +97,14 @@ export async function getSystemState(userId: string): Promise<SystemState> {
     { onConflict: "user_id,lever,label", ignoreDuplicates: true },
   );
 
-  return (created ?? {
+  const createdRow = (created ?? {
     user_id: userId,
     timezone: DEFAULT_TZ,
     slammed_until: null,
     telegram_chat_id: null,
-  }) as SystemState;
+  }) as Record<string, unknown>;
+
+  return { ...WEIGHT_DEFAULTS, ...createdRow } as unknown as SystemState;
 }
 
 export function isSlammed(state: Pick<SystemState, "slammed_until">, today: string) {

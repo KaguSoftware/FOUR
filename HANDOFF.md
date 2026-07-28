@@ -136,24 +136,25 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 1. ~~Telegram bot connected, delivery verified~~ — 2026-07-19.
 2. ~~Monorepo restructure, `@uptime/core` extracted~~ — 2026-07-28, fully verified.
 3. ~~Design foundation: PRODUCT.md, DESIGN.md, token port~~ — 2026-07-28.
-4. **← ACTIVE: apply the three product changes decided 2026-07-28.**
-   - **Day grid → lightness ramp.** Replace the two-state fill in `day-grid.tsx`. Ramp is generated per lever count, floor `L 0.51`, top `ink`. Exact values and rationale in `DESIGN.md` → *The Day Grid*.
-   - **Proof trend → daily points.** `apps/web/app/proof/page.tsx` currently folds into ISO weeks via `isoWeekKey`. The **trend** becomes daily; **`evaluatePlateau` stays weekly** (see Gotchas — this is a trap).
-   - **Optional weight.** New signal kind + a Settings toggle, off by default. Recorded and plotted only — no goal, no target, no interpretation, never affects uptime.
-   - Re-publish the surface spec artifact to match.
-5. **Spike the risks** in parallel: Hermes `Intl` timezone on a physical Android device; Supabase session persistence in Expo; one real push notification delivered.
-6. `Lever = string` in `packages/core` + `levers.ts`. **The 44 tests staying green is the gate for the whole custom-lever feature.**
-7. Schema migration: `levers` table, drop the `gym`/`food` CHECKs, backfill, `push_token`, `posture`, `weight_enabled`, account deletion.
-8. Build the Expo app · push replaces Telegram · offline outbox · store prep.
+4. ~~Apply the three product changes decided 2026-07-28~~ — done. Day-grid ramp (`packages/core/grid.ts`, 11 new tests), daily proof trend, optional weight. 55 tests green, tsc/eslint clean, build succeeds.
+5. **← ACTIVE: push, then run the weight migration BEFORE the deploy finishes.**
+   `npx supabase db push` applies `20260728000000_optional_weight.sql`.
+   The reads are written to survive an unmigrated database (see Gotchas), so
+   the ordering is forgiving rather than fatal — but weight stays invisible
+   until the migration lands.
+6. **Spike the risks** in parallel: Hermes `Intl` timezone on a physical Android device; Supabase session persistence in Expo; one real push notification delivered.
+7. `Lever = string` in `packages/core` (`levers.ts` already exists as the seam). **The 44 tests staying green is the gate for the whole custom-lever feature.**
+8. Schema migration: `levers` table, drop the `gym`/`food` CHECKs, backfill, `push_token`, `posture`, `weight_enabled`, account deletion.
+9. Build the Expo app · push replaces Telegram · offline outbox · store prep.
 
 ## Deliberately partial — grows later (scope ledger)
 
 | Area | What ships now | Intended full shape | Grows in |
 | --- | --- | --- | --- |
 | Levers | Hardcoded `gym`/`food`, CHECK-constrained in SQL and a TS union | Up to 4 user-defined; stable key + renameable label | Step 6–7 — the headline feature |
-| Day grid | Two-state fill (one lever vs both) | Lightness ramp, one step per lever | **Step 4 — active** |
-| Proof trend | Weekly averaged points | Daily points | **Step 4 — active** |
-| Weight | Not present | Opt-in, recorded and plotted, never scored | **Step 4 — active** |
+| Day grid | Lightness ramp, generated per lever count | Unchanged; steps grow with user-defined levers | Done |
+| Proof trend | Daily points, 60-day window | Unchanged | Done |
+| Weight | Opt-in toggle, field, and line — **migration not yet applied** | Unchanged | Needs `db push` |
 | Posture | Not present | `STRICT` / `SOFT`, chosen at onboarding | With mobile |
 | Widgets | None | Interactive Home/Lock Screen widget: tap a lever without opening the app | v1.1 — SwiftUI + Glance, App Groups |
 | Alerts | Telegram | Native push, same escalation ladder | Step 8 |
@@ -178,6 +179,7 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 - **`/proof` fetches a row limit, not a date range.** Daily sampling writes up to 3 rows a day, so the 280-row limit backs the 12-week window. **Adding weight as a fourth kind shortens that window silently** — raise the limit when weight ships.
 - **`.env.local` lives at `apps/web/.env.local`, not the repo root.** `scripts/_session.mjs` resolves that path relative to its own location so there is one copy of the secrets.
 - **`.gitignore` patterns are deliberately un-anchored.** A root-anchored `/node_modules` would silently stop ignoring `apps/web/.next`.
+- **Reads in `getSystemState` and `/proof` tolerate an unmigrated database.** The weight columns are selected optimistically and retried without them on error, and `amount` is only touched when the opt-in is on. This exists because a deploy and a migration never land at the same instant, and a missing column should not take the whole app down for the minutes in between. Keep that property when touching either read.
 - **Playwright's browser binary needs `npx playwright install chromium`.** npm 11's `allow-scripts` gate blocks its postinstall, which silently breaks `scripts/shoot.mjs`.
 - `scripts/shoot.mjs` waits on `domcontentloaded`, not `networkidle` — Turbopack's HMR socket keeps the network busy forever in dev. Set `BASE=http://localhost:3001` when Next bumps to a spare port.
 - `scratch/` is gitignored and holds screenshots and throwaway scripts; safe to delete.

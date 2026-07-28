@@ -40,6 +40,20 @@ export default async function ProofPage() {
   const rows = signals ?? [];
   const notes = rows.filter((s) => s.detail);
   const scalars = rows.filter((s) => s.value !== null);
+  // Fetched separately, and only when the opt-in is on. That keeps `amount`
+  // out of the main query entirely — an account with weight off never touches
+  // the column, so this page still renders on a database that has not run the
+  // optional-weight migration.
+  const { data: weightRows } = status.state.weight_enabled
+    ? await supabase
+        .from("signals")
+        .select("observed_on, amount")
+        .eq("user_id", status.user.id)
+        .eq("kind", "weight")
+        .order("observed_on", { ascending: false })
+        .limit(DAILY_TREND_DAYS)
+    : { data: null };
+  const weights = (weightRows ?? []).filter((w) => w.amount !== null);
 
   const alreadyToday = rows.some((s) => s.observed_on === status.today);
 
@@ -52,7 +66,13 @@ export default async function ProofPage() {
 
       {!alreadyToday && (
         <section className="border-line mb-8 border-b pb-8">
-          <SignalCheck />
+          <SignalCheck
+            weight={
+              status.state.weight_enabled
+                ? { unit: status.state.weight_unit }
+                : undefined
+            }
+          />
         </section>
       )}
 
@@ -60,6 +80,13 @@ export default async function ProofPage() {
         <section className="mb-8">
           <p className="label mb-3">Trend</p>
           <Trend points={scalars} />
+        </section>
+      )}
+
+      {weights.length > 1 && (
+        <section className="mb-8">
+          <p className="label mb-3">Weight</p>
+          <WeightTrend points={weights} unit={status.state.weight_unit} />
         </section>
       )}
 
@@ -172,6 +199,75 @@ function Trend({
       </svg>
       <p className="text-ink-mute mt-1 text-xs">
         energy + sleep, daily · {series.length} days
+      </p>
+    </div>
+  );
+}
+
+/**
+ * The weight line.
+ *
+ * Deliberately the plainest chart in the product: no goal line, no target
+ * band, no colour for a direction, no delta callout. It plots what was
+ * recorded. Reading anything into the shape is the user's business, not the
+ * product's — the moment this draws a target it has become a scoreboard.
+ */
+function WeightTrend({
+  points,
+  unit,
+}: {
+  points: { observed_on: string; amount: number | null }[];
+  unit: "kg" | "lb";
+}) {
+  const series = [...points]
+    .filter((p) => p.amount !== null)
+    .sort((a, b) => a.observed_on.localeCompare(b.observed_on))
+    .slice(-DAILY_TREND_DAYS)
+    .map((p) => ({ date: p.observed_on, value: p.amount as number }));
+
+  if (series.length < 2) return null;
+
+  const values = series.map((s) => s.value);
+  const lo = Math.min(...values);
+  const hi = Math.max(...values);
+  // A flat series would divide by zero; a 1-unit band keeps it centred.
+  const span = hi - lo || 1;
+
+  const w = 320;
+  const h = 64;
+  const step = w / (series.length - 1);
+  const y = (v: number) => h - ((v - lo) / span) * h;
+  const d = series
+    .map((s, i) => `${i === 0 ? "M" : "L"} ${i * step} ${y(s.value)}`)
+    .join(" ");
+  const latest = series[series.length - 1];
+
+  return (
+    <div className="overflow-x-auto">
+      <svg
+        viewBox={`0 -4 ${w} ${h + 8}`}
+        className="h-20 w-full"
+        role="img"
+        aria-label={`Weight across ${series.length} days, most recent ${latest.value} ${unit}`}
+      >
+        <path
+          d={d}
+          fill="none"
+          stroke="var(--color-ink-dim)"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <circle
+          cx={(series.length - 1) * step}
+          cy={y(latest.value)}
+          r="2.5"
+          fill="var(--color-ink)"
+        />
+      </svg>
+      <p className="text-ink-mute mt-1 text-xs">
+        <span className="tabular">{latest.value}</span> {unit} · {series.length}{" "}
+        days
       </p>
     </div>
   );

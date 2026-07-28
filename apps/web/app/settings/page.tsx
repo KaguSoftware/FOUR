@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getStatus } from "@/lib/system";
 import { signOut } from "@/app/actions";
 import { SlammedToggle } from "./slammed-toggle";
+import { WeightToggle } from "./weight-toggle";
 import { TelegramSetup } from "./telegram-setup";
 import { BackLink } from "@/app/components/nav-link";
 import { Wordmark } from "@/app/components/wordmark";
@@ -23,6 +24,10 @@ export default async function SettingsPage() {
 
       <section className="border-line mb-6 border-b pb-6">
         <SlammedToggle on={slammed} until={state.slammed_until} />
+      </section>
+
+      <section className="border-line border-b py-6">
+        <WeightToggle on={state.weight_enabled} />
       </section>
 
       <Row label="timezone" value={state.timezone} />

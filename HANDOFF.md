@@ -51,8 +51,13 @@ Framing throughout: this is not fitness tracking. It's **uptime monitoring for o
 - Supabase (Postgres 17, Auth, RLS) — project `yqphirnsvcqzstwjfshs` ("parsa-system", eu-west-1)
 - Vercel (cron via `apps/web/vercel.ts`) · Vitest · Playwright (dev screenshots only)
 - Node 24.15, npm 11.16, Windows 11 + Git Bash
-- Repo: **`github.com/KaguSoftware/uptime-app`** (`origin`)
-- Old repo `github.com/ParSaMnSS/personal-system` kept as remote `personal-system` — **still the one Vercel deploys from**, untouched and live
+- Repo: **`github.com/KaguSoftware/uptime`** (`origin`, and the only remote)
+  — this is `ParSaMnSS/personal-system` **transferred** to the Kagu org on
+  2026-07-28, not a new repo, so the full history came with it and GitHub
+  redirects the old URL.
+- **Vercel: Root Directory must be `apps/web`**, and *"Include files outside the
+  root directory in the Build Step"* must stay **enabled** — without it Vercel
+  uploads only `apps/web` and the build dies on `@uptime/core` not resolving.
 - Timezone: **Europe/Istanbul** (UTC+3, no DST) — becomes device-detected for public users
 
 **No secrets in this file.** Env vars live in `apps/web/.env.local` (gitignored) — see README for the table.

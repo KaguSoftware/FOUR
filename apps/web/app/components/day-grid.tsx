@@ -1,4 +1,4 @@
-import { addDays, type Entry } from "@/lib/uptime";
+import { addDays, type Entry } from "@uptime/core";
 
 /**
  * 30 cells, one per day. Filled = up, hollow = down, ring = today.

@@ -1,22 +1,20 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import {
+  currentRun,
+  downDays,
   evaluateFade,
   evaluatePlateau,
+  logicalDate,
   pendingMilestones,
   pickMilestone,
   plateauText,
+  uptimeWindow,
   MILESTONE_COPY,
-} from "@/lib/monitor";
+  type Entry,
+} from "@uptime/core";
 import { sendPage } from "@/lib/telegram";
 import { DEFAULT_TZ } from "@/lib/system";
-import {
-  currentRun,
-  downDays,
-  logicalDate,
-  uptimeWindow,
-  type Entry,
-} from "@/lib/uptime";
 
 export const dynamic = "force-dynamic";
 

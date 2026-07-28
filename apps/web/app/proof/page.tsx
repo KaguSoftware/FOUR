@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getStatus, getSupabase } from "@/lib/system";
-import { isoWeekKey } from "@/lib/monitor";
+import { isoWeekKey } from "@uptime/core";
 import { SignalCheck } from "./signal-check";
 import { BackLink } from "@/app/components/nav-link";
 import { Wordmark } from "@/app/components/wordmark";

@@ -1,7 +1,7 @@
 import { NavLink } from "./components/nav-link";
 import { redirect } from "next/navigation";
 import { getStatus } from "@/lib/system";
-import { MILESTONE_COPY } from "@/lib/monitor";
+import { MILESTONE_COPY } from "@uptime/core";
 import { DayGrid } from "./components/day-grid";
 import { Levers } from "./components/levers";
 import { Takeover } from "./components/takeover";

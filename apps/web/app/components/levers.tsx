@@ -3,7 +3,7 @@
 import { useOptimistic, useState, useTransition } from "react";
 import { logEntry, undoEntry } from "@/app/actions";
 import type { PlaybookItem } from "@/lib/system";
-import type { Lever } from "@/lib/uptime";
+import type { Lever } from "@uptime/core";
 
 /**
  * The whole logging path: tap a lever, tap a chip. Two taps, no typing.

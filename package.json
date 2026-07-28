@@ -1,33 +1,26 @@
 {
-  "name": "personal-system",
+  "name": "uptime-app",
   "version": "0.1.0",
   "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint",
-    "test": "vitest run",
-    "test:watch": "vitest"
-  },
-  "dependencies": {
-    "@supabase/ssr": "^0.12.3",
-    "@supabase/supabase-js": "^2.110.7",
-    "next": "16.2.10",
-    "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "dev": "npm run dev -w @uptime/web",
+    "build": "npm run build -w @uptime/web",
+    "start": "npm run start -w @uptime/web",
+    "lint": "npm run lint -w @uptime/web",
+    "test": "npm run test -w @uptime/core",
+    "test:watch": "npm run test:watch -w @uptime/core",
+    "typecheck": "npm run typecheck -w @uptime/core && npm run typecheck -w @uptime/web",
+    "seed": "node scripts/seed.mjs",
+    "reset": "node scripts/reset-account.mjs",
+    "shoot": "node scripts/shoot.mjs"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "@vercel/config": "^0.5.5",
-    "eslint": "^9",
-    "eslint-config-next": "16.2.10",
+    "@supabase/supabase-js": "^2.110.7",
     "playwright": "^1.61.1",
-    "tailwindcss": "^4",
-    "typescript": "^5",
-    "vitest": "^4.1.10"
+    "typescript": "^5"
   }
 }

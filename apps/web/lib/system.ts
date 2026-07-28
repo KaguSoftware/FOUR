@@ -10,7 +10,7 @@ import {
   uptimeWindow,
   type Entry,
   type Lever,
-} from "./uptime";
+} from "@uptime/core";
 
 export type PlaybookItem = {
   id: string;

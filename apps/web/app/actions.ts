@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getSupabase, getSystemState } from "@/lib/system";
-import { addDays, logicalDate, type Lever } from "@/lib/uptime";
+import { addDays, logicalDate, type Lever } from "@uptime/core";
 
 /**
  * Every action re-checks auth. Server Functions are reachable via direct POST,

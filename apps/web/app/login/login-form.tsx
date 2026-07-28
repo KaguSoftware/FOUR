@@ -4,6 +4,21 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 
+type Mode = "in" | "up";
+
+/**
+ * Sign in, or create an account.
+ *
+ * Both modes are on one form because they are the same two fields — a separate
+ * page for the second would be two routes to maintain and one more thing to
+ * get lost in. The magic link works for either: Supabase creates the account
+ * if the address is new, which is why it stays offered in both modes.
+ *
+ * A new account lands on `/onboarding` rather than the dashboard. That is not
+ * this component's business — `requireStatus()` on the server decides it, so a
+ * session created any other way (magic link, and later Apple or Google) goes
+ * the same route without this file knowing about it.
+ */
 export function LoginForm({
   next,
   error: initialError,
@@ -14,28 +29,49 @@ export function LoginForm({
   sent?: boolean;
 }) {
   const router = useRouter();
+  const [mode, setMode] = useState<Mode>("in");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(initialError ?? null);
   const [sent, setSent] = useState(initialSent ?? false);
+  const [confirm, setConfirm] = useState(false);
   const [pending, startTransition] = useTransition();
 
-  async function signInWithPassword(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    if (error) {
-      setError(error.message.toLowerCase());
-      return;
-    }
+  function enter() {
     startTransition(() => {
       router.push(next);
       router.refresh();
     });
+  }
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    const supabase = createClient();
+
+    if (mode === "in") {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (error) return setError(error.message.toLowerCase());
+      return enter();
+    }
+
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
+      },
+    });
+    if (error) return setError(error.message.toLowerCase());
+
+    // With email confirmation on, signUp returns a user but no session. Saying
+    // "check your inbox" is the honest answer; pushing to the app would land on
+    // the login screen again with no explanation.
+    if (!data.session) return setConfirm(true);
+    enter();
   }
 
   async function sendMagicLink() {
@@ -55,10 +91,10 @@ export function LoginForm({
     else setSent(true);
   }
 
-  if (sent) {
+  if (sent || confirm) {
     return (
       <p className="text-ink-dim text-sm leading-relaxed">
-        Link sent to{" "}
+        {confirm ? "Confirmation sent to " : "Link sent to "}
         <span className="tabular text-ink">{email || "your inbox"}</span>. Open
         it on this device.
       </p>
@@ -66,7 +102,7 @@ export function LoginForm({
   }
 
   return (
-    <form onSubmit={signInWithPassword} className="flex flex-col gap-3">
+    <form onSubmit={submit} className="flex flex-col gap-3">
       <label className="sr-only" htmlFor="email">
         Email
       </label>
@@ -87,7 +123,9 @@ export function LoginForm({
       <input
         id="password"
         type="password"
-        autoComplete="current-password"
+        // Tells a password manager to offer a generated password on sign-up and
+        // the saved one on sign-in — the wrong hint here is a real annoyance.
+        autoComplete={mode === "up" ? "new-password" : "current-password"}
         value={password}
         onChange={(e) => setPassword(e.target.value)}
         placeholder="password"
@@ -105,7 +143,18 @@ export function LoginForm({
         disabled={pending}
         className="bg-surface-hi border-line-hi text-ink hover:bg-line active:bg-line-hi min-h-12 rounded border px-3 text-sm font-medium transition-colors disabled:opacity-50"
       >
-        {pending ? "..." : "Sign in"}
+        {pending ? "..." : mode === "in" ? "Sign in" : "Create account"}
+      </button>
+
+      <button
+        type="button"
+        onClick={() => {
+          setMode(mode === "in" ? "up" : "in");
+          setError(null);
+        }}
+        className="text-ink-mute hover:text-ink-dim active:text-ink min-h-11 rounded text-xs transition-colors"
+      >
+        {mode === "in" ? "or create an account" : "or sign in"}
       </button>
 
       <button

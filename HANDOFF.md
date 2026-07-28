@@ -11,7 +11,7 @@ The **active step** is marked `← ACTIVE` in *Roadmap* below. Do that. Before y
 start:
 
 1. Check *Blocked / needs the owner* — do not re-do work that is waiting on them.
-2. Run `npm test`. **77 tests must be green.** They encode the invariants the
+2. Run `npm test`. **91 tests must be green.** They encode the invariants the
    product rests on; if they are red, stop and fix that first.
 3. Skim *Gotchas*. Several are traps that have already cost time once.
 
@@ -100,6 +100,7 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 - **Design foundation, 2026-07-28.** `PRODUCT.md`, `DESIGN.md`, `.impeccable/design.json`. Palette ported oklch → RN-safe hex with **every ratio re-measured against the converted values** (zero gamut clipping, all reproduce within 0.04). Design detector reports no findings.
 - **Two real contrast defects found and fixed** — see Gotchas.
 - **Mobile surface spec, rev 3** — [claude.ai/code/artifact/68c1c6a8-26ee-41ba-acde-37fd303bb3c3](https://claude.ai/code/artifact/68c1c6a8-26ee-41ba-acde-37fd303bb3c3). Every v1 screen at 390×844: dashboard at 1–4 levers, the day-grid encoding options with the ramp chosen and the rejects shown, per-platform navigation, takeover and milestone in both postures, onboarding, lever sheet, and `/proof` with the daily trend and optional weight. **Design specimens, not a running build.** Source lives in `scratch/spec.html` (gitignored); republish with the same file path to keep the URL.
+- **Onboarding, posture and multi-user sign-up, 2026-07-28.** `/onboarding` (rule + 1–4 levers, then posture), `requireStatus()` gating every signed-in screen, `completeOnboarding` / `setPosture` actions, a Settings posture control, posture wired into the takeover and the milestone panel, "just mark it up" added to the takeover so an empty playbook is not a dead end, and an explicit create-account path on `/login`. Verified: **91 tests green, 15 migration checks, tsc clean, eslint clean, production build emits `/onboarding`.** Contrast measured on all 26 new colour pairs — see Gotchas for the two findings.
 - **Three legibility defects caught by reviewing renders rather than reading code**, all fixed: 6px horizontal overflow from an assumed `box-sizing`; a run length set in the label face instead of tabular mono; and a 1–5 scale whose selected step sat at **1.10:1** against its unselected siblings — effectively invisible. Now 15.31:1. **Screenshot and look at the render; the detector does not catch these.**
 
 **Written but NOT verified end-to-end:**
@@ -120,11 +121,14 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 | `packages/core/uptime.ts` | All derivation: uptime window, current run, down days, runs/outages, all-time figures. The heart of the product. |
 | `packages/core/monitor.ts` | Fade thresholds, milestone selection, plateau detection. Pure functions, fully tested. |
 | `packages/core/index.ts` | Barrel export — the single public surface of the engine. |
-| `apps/web/lib/system.ts` | Loads status in one pass; lazy-creates `system_state` + seeds playbook. Web-local (imports `next/headers`). |
+| `packages/core/posture.ts` | `STRICT` / `SOFT` copy. Returns strings only, never a number — that is the whole safety property. |
+| `packages/core/levers.ts` | Lever key/label rules: slugs, uniqueness, the four-lever ceiling. |
+| `apps/web/lib/system.ts` | Loads status in one pass; `requireStatus()` is the auth + onboarding gate every page uses. |
+| `apps/web/app/onboarding/` | First run: the rule, 1–4 levers, posture. The only screen that may not call `requireStatus()`. |
 | `apps/web/app/page.tsx` | Status dashboard; routes to the takeover when down ≥3 days with history. |
 | `apps/web/app/components/takeover.tsx` | Re-entry screen. The most important UI in the product. |
-| `apps/web/app/components/day-grid.tsx` | The signature component. **Needs updating to the lightness ramp.** |
-| `apps/web/app/proof/page.tsx` | Signal check-in + trend. **Trend needs changing from weekly to daily points.** |
+| `apps/web/app/components/day-grid.tsx` | The signature component — the lightness ramp, driven by `core/grid.ts`. |
+| `apps/web/app/proof/page.tsx` | Signal check-in + daily trend, with the optional weight line. |
 | `apps/web/app/api/monitor/check/route.ts` | Daily cron pass. Service-role, `CRON_SECRET`-authed, logs every run to `monitor_runs`. |
 | `apps/web/app/globals.css` | Tailwind v4 `@theme` tokens. Normative in oklch. |
 | `apps/web/proxy.ts` | Session refresh + route protection (Next 16 name for middleware). |
@@ -144,19 +148,20 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 7. ~~`Lever = string` + lever key/label rules in `packages/core/levers.ts`~~ — done 2026-07-28. The engine was untouched by the widening, which is the gate passing: 77 tests green.
 8. ~~Schema migration — `levers` table, drop the `gym`/`food` CHECKs, backfill, `push_token`, `posture`~~ — written and verified 2026-07-28 via `npm run test:migrations` (15 checks). **Not yet applied — needs `npx supabase db push`.**
 9. ~~Wire lever CRUD~~ — done 2026-07-28. Actions, a Settings manager, and `getStatus` reads levers from the table.
-10. **← ACTIVE: onboarding** — state the rule, pick 1–4 levers, choose posture, then set `onboarded_at`. A new signup now gets NO levers, so without this the dashboard has no buttons.
-11. Build the Expo app · push replaces Telegram · offline outbox · store prep.
+10. ~~Onboarding + posture~~ — done 2026-07-28. `/onboarding` states the rule, takes 1–4 levers and a posture, then sets `onboarded_at`. `requireStatus()` gates every signed-in screen. Posture is wired into the two places it is allowed to reach (takeover sentence, milestone panel) and is changeable in Settings. Web also grew an explicit **create-account** path, without which none of this was reachable.
+11. **← ACTIVE: the Expo app.** Two spikes still need a device: Supabase session persistence in Expo, and one real push notification delivered. Then: push replaces Telegram · offline outbox · store prep.
 
 ## Deliberately partial — grows later (scope ledger)
 
 | Area | What ships now | Intended full shape | Grows in |
 | --- | --- | --- | --- |
 | Levers | Fully user-defined on web: table, CRUD actions, Settings manager, 1–4 layout | Same on mobile | Done on web |
-| Onboarding | None — a new signup lands with no levers | Rule, lever picker, posture | **Step 10 — active, and blocking new signups** |
+| Onboarding | Two screens: rule + 1–4 levers, then posture. Gated by `requireStatus()` | Same on mobile, plus device timezone capture | Done on web |
+| Auth | Email + password, explicit create-account, magic link | Apple · Google · 6-digit code | With mobile |
 | Day grid | Lightness ramp, generated per lever count | Unchanged; steps grow with user-defined levers | Done |
 | Proof trend | Daily points, 60-day window | Unchanged | Done |
 | Weight | Opt-in toggle, field, and line — **migration not yet applied** | Unchanged | Needs `db push` |
-| Posture | Not present | `STRICT` / `SOFT`, chosen at onboarding | With mobile |
+| Posture | Chosen at onboarding, changeable in Settings, wired into the takeover sentence and the milestone panel | Same two touchpoints on mobile | Done on web |
 | Widgets | None | Interactive Home/Lock Screen widget: tap a lever without opening the app | v1.1 — SwiftUI + Glance, App Groups |
 | Alerts | Telegram | Native push, same escalation ladder | Step 8 |
 | Outage annotation | `annotateOutage` action exists; no UI | Tap an outage in `/history` to label it | After real outages exist |
@@ -183,7 +188,12 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 - **`.env.local` lives at `apps/web/.env.local`, not the repo root.** `scripts/_session.mjs` resolves that path relative to its own location so there is one copy of the secrets.
 - **`.gitignore` patterns are deliberately un-anchored.** A root-anchored `/node_modules` would silently stop ignoring `apps/web/.next`.
 - **Reads in `getSystemState` and `/proof` tolerate an unmigrated database.** The weight columns are selected optimistically and retried without them on error, and `amount` is only touched when the opt-in is on. This exists because a deploy and a migration never land at the same instant, and a missing column should not take the whole app down for the minutes in between. Keep that property when touching either read.
-- **A new signup now gets NO levers.** The trigger only creates `system_state`; onboarding is what writes them. Until onboarding ships, a fresh account sees a dashboard with no buttons — `getLevers` falls back to the historical pair only when the table read fails, not when it legitimately returns zero rows for a new user.
+- **A new signup gets NO levers — `/onboarding` is what writes them.** The trigger only creates `system_state`. `requireStatus()` in `lib/system.ts` is the gate that keeps an un-onboarded account off the dashboard, and **every signed-in page must call it rather than `getStatus()`** — a page that skips it renders a dashboard with no buttons. `/onboarding` itself deliberately does not, or it would loop.
+- **`getLevers` treats a failed read and an empty read differently, on purpose.** A *failed* read means the table is not there yet and falls back to the historical gym/food pair. An *empty* read is a real un-onboarded account and returns empty. Collapsing those two back together would hand every new user two levers they never chose.
+- **The takeover must always have a reachable action.** The playbook is empty for every new account now that signup seeds nothing, so "just mark it up" is the floor of that screen, not a nicety — it logs a lever with no detail. With one lever it is a single ghost line; with more it expands into the lever set; with an empty playbook the levers are shown immediately. A takeover with nothing tappable is the worst dead end this product could ship.
+- **Posture may only ever return copy.** `packages/core/posture.ts` has no function that returns a number, a threshold, or a gate — that is the constraint expressed as a type signature. It reaches exactly two screens: one sentence on the takeover and the milestone panel on the dashboard. `posture.test.ts` also scans every string for the vocabulary of gamification (badge, point, score, streak, reward, …), so `SOFT` drifting into that category fails the build rather than a review.
+- **Input borders across the app measure 1.45:1 against the page** (`--color-line` on `--color-bg`), and the fill is 1.08:1. That is below WCAG 1.4.11's 3:1, and it is the shared pattern in login, the lever manager, the playbook sheet and onboarding. Each field is identifiable by its placeholder at 5.08:1, which is the exception 1.4.11 allows — but **this is a live app-wide decision, not a settled one**. Raising resting borders to `line-hi` (3.33:1) would fix it and would need a new focus treatment, since focus currently *is* `line-hi`. Owner's call; flagged rather than changed unilaterally.
+- **`posture · SELECTED detail` sits at 4.60:1**, the tightest text pair in the app — `ink-mute` on `surface-hi`, the lightest ground there is. Any future darkening of ink-mute or lightening of surface-hi breaks it. Re-run `npm run check:contrast` on any palette change.
 - **"Food first" is gone.** The takeover and the monitor used to rank the food lever first, on the principle that coming back must be lighter than starting. That cannot survive user-defined levers — we cannot know which of someone's levers is the light one — so both now rank by what has actually worked (pinned, then use_count). If you want the old behaviour back, it needs a user-nominated "lightest" lever, which is new product scope.
 - **A migration is not done until `npm run test:migrations` passes.** There is no Docker here, so PGlite is the only pre-flight check, and `supabase db push` is not reversible. That harness already caught an `on delete restrict` that would have broken Apple-mandated account deletion.
 - **The old `handle_new_user()` seeded gym AND food playbook rows for every signup**, so every pre-existing account carries both levers and the backfill covers everyone through `playbook` even if they never logged. The new trigger seeds nothing — onboarding writes the levers.
@@ -196,10 +206,11 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 ```bash
 npm install          # installs every workspace
 npm run dev          # apps/web on http://localhost:3000
-npm test             # packages/core — 77 tests, the gate for everything
+npm test             # packages/core — 91 tests, the gate for everything
 npm run typecheck    # both workspaces
 npm run lint
 npm run test:migrations  # runs every migration against real Postgres (WASM)
+npm run check:contrast   # measures every colour pair against its WCAG floor
 npm run build
 npx supabase db push # apply migrations (link once with --project-ref)
 

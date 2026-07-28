@@ -1,7 +1,7 @@
-import { redirect } from "next/navigation";
-import { getStatus } from "@/lib/system";
+import { requireStatus } from "@/lib/system";
 import { signOut } from "@/app/actions";
 import { LeverManager } from "./lever-manager";
+import { PostureSetting } from "./posture-setting";
 import { SlammedToggle } from "./slammed-toggle";
 import { WeightToggle } from "./weight-toggle";
 import { TelegramSetup } from "./telegram-setup";
@@ -11,8 +11,7 @@ import { Wordmark } from "@/app/components/wordmark";
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
-  const status = await getStatus();
-  if (!status) redirect("/login");
+  const status = await requireStatus();
 
   const { state, slammed, user } = status;
 
@@ -25,6 +24,10 @@ export default async function SettingsPage() {
 
       <section className="border-line mb-6 border-b pb-6">
         <LeverManager levers={status.levers} />
+      </section>
+
+      <section className="border-line border-b py-6">
+        <PostureSetting posture={state.posture} />
       </section>
 
       <section className="border-line border-b py-6">

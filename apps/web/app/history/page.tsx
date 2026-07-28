@@ -1,5 +1,4 @@
-import { redirect } from "next/navigation";
-import { getStatus } from "@/lib/system";
+import { requireStatus } from "@/lib/system";
 import { DayGrid } from "../components/day-grid";
 import { BackLink } from "@/app/components/nav-link";
 import { Wordmark } from "@/app/components/wordmark";
@@ -14,8 +13,7 @@ export const dynamic = "force-dynamic";
  * truncated and never reset.
  */
 export default async function HistoryPage() {
-  const status = await getStatus();
-  if (!status) redirect("/login");
+  const status = await requireStatus();
 
   const { entries, today, runs, outages, allTime } = status;
 

@@ -17,7 +17,8 @@
     "seed": "node scripts/seed.mjs",
     "reset": "node scripts/reset-account.mjs",
     "shoot": "node scripts/shoot.mjs",
-    "test:migrations": "node scripts/test-migrations.mjs"
+    "test:migrations": "node scripts/test-migrations.mjs",
+    "check:contrast": "node scripts/check-contrast.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.3.11",

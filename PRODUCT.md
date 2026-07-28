@@ -122,8 +122,11 @@ Stated on its own terms, not against any competitor. Confirmed 2026-07-28.
 - Multi-user accounts, open signup.
 - Native push replacing the current Telegram channel, escalation ladder intact.
 - Daily reminder **off by default**, opt-in only.
-- **Posture (`STRICT` / `SOFT`)** — chosen at onboarding, changeable later. See
-  Brand Commitments for exactly what it may and may not change.
+- **Posture (`STRICT` / `SOFT`)** — chosen at onboarding, changeable in
+  Settings. See Brand Commitments for exactly what it may and may not change.
+  Shipping on web as of 2026-07-28, reaching exactly two screens: one added
+  sentence on the takeover, and whether a milestone is acknowledged in a panel
+  or delivered in the identical flat line an alert would use.
 - **Proof ships in v1** (confirmed 2026-07-28, reversing the earlier cut). The
   daily felt-state check-in and its trend are core, not optional.
 - **The proof trend plots daily points**, matching the daily sampling rate.

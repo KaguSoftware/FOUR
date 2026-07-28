@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import {
   allTime,
@@ -7,10 +8,13 @@ import {
   downDays,
   lastCompletedRun,
   logicalDate,
+  toPosture,
   uptimeWindow,
   ACTIVE_LEVERS,
+  DEFAULT_POSTURE,
   type Entry,
   type Lever,
+  type Posture,
 } from "@uptime/core";
 
 export type PlaybookItem = {
@@ -36,6 +40,17 @@ export type SystemState = {
   telegram_chat_id: string | null;
   weight_enabled: boolean;
   weight_unit: "kg" | "lb";
+  /** How the system talks to you. Never changes a number — see core/posture. */
+  posture: Posture;
+  /**
+   * Whether first-run setup is finished. **Derived, not the raw column.**
+   *
+   * A database that has not run the custom-levers migration has no
+   * `onboarded_at` at all, and on that database every account is onboarded —
+   * there is no flow to send them to, and sending every existing user into one
+   * during a deploy window is precisely the regression this guards against.
+   */
+  onboarded: boolean;
 };
 
 export const DEFAULT_TZ = "Europe/Istanbul";
@@ -47,10 +62,15 @@ export { ACTIVE_LEVERS };
 /**
  * Active levers, in display order.
  *
- * Falls back to the historical pair if the `levers` table is not there yet,
- * for the same reason the weight columns do: a deploy and a migration never
- * land at the same instant, and a missing table should not take the dashboard
- * down for the minutes in between.
+ * A **failed** read falls back to the historical pair, for the same reason the
+ * weight columns do: a deploy and a migration never land at the same instant,
+ * and a missing table should not take the dashboard down for the minutes in
+ * between.
+ *
+ * An **empty** read is a different thing entirely and must not be confused with
+ * it. That is a real account that has not been through onboarding, and handing
+ * it two levers it never chose is exactly what onboarding exists to prevent. It
+ * returns empty; `requireStatus` is what keeps that account off the dashboard.
  */
 export async function getLevers(userId: string): Promise<LeverRow[]> {
   const supabase = await getSupabase();
@@ -61,7 +81,7 @@ export async function getLevers(userId: string): Promise<LeverRow[]> {
     .eq("archived", false)
     .order("position", { ascending: true });
 
-  if (error || !data || data.length === 0) {
+  if (error) {
     return ACTIVE_LEVERS.map((key, i) => ({
       id: `fallback-${key}`,
       key,
@@ -70,7 +90,7 @@ export async function getLevers(userId: string): Promise<LeverRow[]> {
       archived: false,
     }));
   }
-  return data as LeverRow[];
+  return (data ?? []) as LeverRow[];
 }
 
 export async function getSupabase() {
@@ -86,17 +106,50 @@ export async function getSupabase() {
  */
 const BASE_COLUMNS = "user_id, timezone, slammed_until, telegram_chat_id";
 const WEIGHT_COLUMNS = "weight_enabled, weight_unit";
+const ONBOARDING_COLUMNS = "posture, onboarded_at";
 
-/** Defaults for a database that has not run the optional-weight migration. */
-const WEIGHT_DEFAULTS = { weight_enabled: false, weight_unit: "kg" as const };
+/**
+ * Column sets, widest first — one rung per migration that might not have landed.
+ *
+ * Selected optimistically and retried a rung narrower on error. Deploys and
+ * migrations never land at the same instant, and a column that does not exist
+ * yet should not take the whole app down for the minutes in between. The cost
+ * of the fallback is one extra round trip, and only on a database that is
+ * actually behind.
+ */
+const COLUMN_LADDER = [
+  { columns: `${BASE_COLUMNS}, ${WEIGHT_COLUMNS}, ${ONBOARDING_COLUMNS}`, onboarding: true },
+  { columns: `${BASE_COLUMNS}, ${WEIGHT_COLUMNS}`, onboarding: false },
+  { columns: BASE_COLUMNS, onboarding: false },
+] as const;
+
+/**
+ * Total, so a row from any rung of the ladder produces a complete state.
+ *
+ * Written out rather than spread over defaults because the raw `onboarded_at`
+ * column must NOT survive into the returned object — the derived `onboarded`
+ * flag is the only correct reading of it, and leaving both in invites the wrong
+ * one being used.
+ */
+function toSystemState(
+  row: Record<string, unknown>,
+  hasOnboarding: boolean,
+): SystemState {
+  return {
+    user_id: String(row.user_id),
+    timezone: (row.timezone as string | null) ?? DEFAULT_TZ,
+    slammed_until: (row.slammed_until as string | null) ?? null,
+    telegram_chat_id: (row.telegram_chat_id as string | null) ?? null,
+    weight_enabled: row.weight_enabled === true,
+    weight_unit: row.weight_unit === "lb" ? "lb" : "kg",
+    posture: hasOnboarding ? toPosture(row.posture) : DEFAULT_POSTURE,
+    onboarded: hasOnboarding ? row.onboarded_at != null : true,
+  };
+}
 
 export async function getSystemState(userId: string): Promise<SystemState> {
   const supabase = await getSupabase();
 
-  // Selected optimistically, then retried without the weight columns if they
-  // are not there. Deploys and migrations do not land at the same instant, and
-  // a column that does not exist yet should not take the whole app down for
-  // the minutes in between.
   const read = async (columns: string) =>
     supabase
       .from("system_state")
@@ -104,20 +157,20 @@ export async function getSystemState(userId: string): Promise<SystemState> {
       .eq("user_id", userId)
       .maybeSingle<Record<string, unknown>>();
 
-  const full = await read(`${BASE_COLUMNS}, ${WEIGHT_COLUMNS}`);
-  const migrated = !full.error;
-  const row = migrated ? full.data : (await read(BASE_COLUMNS)).data;
-
-  if (row) {
-    // Defaults first so a pre-migration row still satisfies the type; a
-    // migrated row overrides them with its real values.
-    return { ...WEIGHT_DEFAULTS, ...row } as unknown as SystemState;
+  let rung = 0;
+  let result = await read(COLUMN_LADDER[rung].columns);
+  while (result.error && rung < COLUMN_LADDER.length - 1) {
+    rung++;
+    result = await read(COLUMN_LADDER[rung].columns);
   }
+  const { columns, onboarding } = COLUMN_LADDER[rung];
+
+  if (result.data) return toSystemState(result.data, onboarding);
 
   const { data: created } = await supabase
     .from("system_state")
     .upsert({ user_id: userId }, { onConflict: "user_id" })
-    .select(migrated ? `${BASE_COLUMNS}, ${WEIGHT_COLUMNS}` : BASE_COLUMNS)
+    .select(columns)
     .single();
 
   // No playbook seeding. It used to insert a gym and a food row here, which
@@ -125,14 +178,10 @@ export async function getSystemState(userId: string): Promise<SystemState> {
   // pair — and after onboarding, most will not be. An empty playbook is a
   // working screen anyway: the lever sheet always offers "just mark it up".
 
-  const createdRow = (created ?? {
-    user_id: userId,
-    timezone: DEFAULT_TZ,
-    slammed_until: null,
-    telegram_chat_id: null,
-  }) as Record<string, unknown>;
-
-  return { ...WEIGHT_DEFAULTS, ...createdRow } as unknown as SystemState;
+  return toSystemState(
+    (created ?? { user_id: userId }) as Record<string, unknown>,
+    onboarding,
+  );
 }
 
 export function isSlammed(state: Pick<SystemState, "slammed_until">, today: string) {
@@ -194,6 +243,7 @@ export async function getStatus() {
     playbook,
     todayLevers: new Set(todayEntries.map((e) => e.lever)),
     levers,
+    posture: state.posture,
     // Sets how many steps the day-grid ramp has.
     leverCount: levers.length,
     uptime: uptimeWindow(entries, today),
@@ -208,3 +258,23 @@ export async function getStatus() {
 }
 
 export type Status = NonNullable<Awaited<ReturnType<typeof getStatus>>>;
+
+/**
+ * The gate every signed-in screen goes through — except `/onboarding` itself,
+ * which would loop.
+ *
+ * Two redirects, in order. No session goes to sign-in; a session that has never
+ * finished first-run setup goes to onboarding, because the signup trigger
+ * creates `system_state` and nothing else. Without this, a fresh account lands
+ * on a dashboard with no buttons on it.
+ *
+ * It lives here rather than in the proxy deliberately: the proxy runs on every
+ * request including assets, and putting a database read there costs a round
+ * trip on all of them to catch a state that exists exactly once per account.
+ */
+export async function requireStatus(): Promise<Status> {
+  const status = await getStatus();
+  if (!status) redirect("/login");
+  if (!status.state.onboarded) redirect("/onboarding");
+  return status;
+}

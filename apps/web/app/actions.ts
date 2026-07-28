@@ -6,9 +6,12 @@ import {
   addDays,
   canAddLever,
   logicalDate,
+  toPosture,
   uniqueLeverKey,
   validateLeverLabel,
+  MAX_LEVERS,
   type Lever,
+  type Posture,
 } from "@uptime/core";
 
 /**
@@ -337,6 +340,94 @@ export async function archiveLever(id: string): Promise<LeverResult> {
     .eq("id", id)
     .eq("user_id", user.id);
   if (error) return { ok: false, error: "Could not archive that lever." };
+
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
+/**
+ * Finish first-run setup: write the levers, record the posture, open the app.
+ *
+ * One action rather than a step-per-write, because a half-finished account is
+ * the worst state this product can be in — the dashboard is gated behind
+ * `onboarded`, so a partial run would lock the user out of their own app.
+ */
+export async function completeOnboarding(
+  labels: string[],
+  posture: Posture,
+): Promise<LeverResult> {
+  const { supabase, user } = await requireUser();
+
+  const state = await getSystemState(user.id);
+  // Already done. Silently succeed rather than erroring: this is what a
+  // double-submit or a back-button-then-forward looks like, and neither is a
+  // mistake worth showing someone.
+  if (state.onboarded) return { ok: true };
+
+  const cleaned = labels.map((l) => l.trim()).filter((l) => l.length > 0);
+  if (cleaned.length === 0) {
+    return { ok: false, error: "Name at least one lever — one is enough." };
+  }
+  if (cleaned.length > MAX_LEVERS) {
+    return { ok: false, error: "Four levers is the maximum." };
+  }
+  for (const label of cleaned) {
+    const check = validateLeverLabel(label);
+    if (!check.ok) return { ok: false, error: check.reason };
+  }
+
+  // A previous attempt can leave levers behind: the insert landed, the state
+  // update did not. Clearing them makes a retry exact rather than additive.
+  //
+  // Guarded on there being no entries, because a lever with history must never
+  // be deleted — and there cannot be one here, since logging is only reachable
+  // from a dashboard this screen gates. If somehow there is, the delete is
+  // skipped and the insert's unique constraint is the backstop.
+  const { count: entryCount } = await supabase
+    .from("entries")
+    .select("*", { count: "exact", head: true })
+    .eq("user_id", user.id);
+
+  if (!entryCount) {
+    await supabase.from("levers").delete().eq("user_id", user.id);
+  }
+
+  const keys: string[] = [];
+  const rows = cleaned.map((label, i) => {
+    const key = uniqueLeverKey(label, keys);
+    keys.push(key);
+    return { user_id: user.id, key, label, position: i + 1 };
+  });
+
+  const { error: leverError } = await supabase.from("levers").insert(rows);
+  if (leverError) {
+    return { ok: false, error: "Could not save those levers. Try again." };
+  }
+
+  const { error: stateError } = await supabase
+    .from("system_state")
+    .update({ posture: toPosture(posture), onboarded_at: new Date().toISOString() })
+    .eq("user_id", user.id);
+  if (stateError) {
+    return { ok: false, error: "Could not finish setup. Try again." };
+  }
+
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
+/**
+ * Change posture later. Promised on the onboarding screen ("change it any time
+ * in Settings"), so it is part of that screen's contract, not a nice-to-have.
+ */
+export async function setPosture(posture: Posture): Promise<LeverResult> {
+  const { supabase, user } = await requireUser();
+
+  const { error } = await supabase
+    .from("system_state")
+    .update({ posture: toPosture(posture) })
+    .eq("user_id", user.id);
+  if (error) return { ok: false, error: "Could not change that." };
 
   revalidatePath("/", "layout");
   return { ok: true };

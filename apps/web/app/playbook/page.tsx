@@ -1,5 +1,4 @@
-import { redirect } from "next/navigation";
-import { getStatus } from "@/lib/system";
+import { requireStatus } from "@/lib/system";
 import { PlaybookList } from "./playbook-list";
 import { BackLink } from "@/app/components/nav-link";
 import { Wordmark } from "@/app/components/wordmark";
@@ -13,8 +12,7 @@ export const dynamic = "force-dynamic";
  * fading or restarting never opens on a blank page.
  */
 export default async function PlaybookPage() {
-  const status = await getStatus();
-  if (!status) redirect("/login");
+  const status = await requireStatus();
 
   return (
     <main className="mx-auto w-full max-w-md px-5 pt-[max(2rem,calc(env(safe-area-inset-top)+0.75rem))] pb-[max(3rem,env(safe-area-inset-bottom))]">

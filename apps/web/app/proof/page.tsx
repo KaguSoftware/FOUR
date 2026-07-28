@@ -1,5 +1,4 @@
-import { redirect } from "next/navigation";
-import { getStatus, getSupabase } from "@/lib/system";
+import { getSupabase, requireStatus } from "@/lib/system";
 import { SignalCheck } from "./signal-check";
 import { BackLink } from "@/app/components/nav-link";
 import { Wordmark } from "@/app/components/wordmark";
@@ -21,8 +20,7 @@ const DAILY_TREND_DAYS = 60;
  * which is a better argument for restarting than any motivational copy.
  */
 export default async function ProofPage() {
-  const status = await getStatus();
-  if (!status) redirect("/login");
+  const status = await requireStatus();
 
   const supabase = await getSupabase();
   const { data: signals } = await supabase

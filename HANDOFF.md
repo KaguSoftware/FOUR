@@ -11,7 +11,7 @@ The **active step** is marked `← ACTIVE` in *Roadmap* below. Do that. Before y
 start:
 
 1. Check *Blocked / needs the owner* — do not re-do work that is waiting on them.
-2. Run `npm test`. **62 tests must be green.** They encode the invariants the
+2. Run `npm test`. **77 tests must be green.** They encode the invariants the
    product rests on; if they are red, stop and fix that first.
 3. Skim *Gotchas*. Several are traps that have already cost time once.
 
@@ -140,15 +140,15 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 5. ~~Push, run the weight migration, set the Vercel root directory~~ — done by the owner 2026-07-28.
 
 6. ~~Spike the Hermes `Intl` timezone risk~~ — done 2026-07-28, answered by research plus `logicalDateLocal`. Two spikes remain and both need a device: Supabase session persistence in Expo, and one real push notification delivered.
-7. **← ACTIVE: `Lever = string`** in `packages/core` (`levers.ts` already exists as the seam). **The 62 tests staying green is the gate for the whole custom-lever feature.**
-8. Schema migration: `levers` table, drop the `gym`/`food` CHECKs, backfill, `push_token`, `posture`, `weight_enabled`, account deletion.
+7. ~~`Lever = string` + lever key/label rules in `packages/core/levers.ts`~~ — done 2026-07-28. The engine was untouched by the widening, which is the gate passing: 77 tests green.
+8. **← ACTIVE: schema migration** — `levers` table, drop the `gym`/`food` CHECKs, backfill, `push_token`, `posture`, `weight_enabled`, account deletion.
 9. Build the Expo app · push replaces Telegram · offline outbox · store prep.
 
 ## Deliberately partial — grows later (scope ledger)
 
 | Area | What ships now | Intended full shape | Grows in |
 | --- | --- | --- | --- |
-| Levers | Hardcoded `gym`/`food`, CHECK-constrained in SQL and a TS union | Up to 4 user-defined; stable key + renameable label | Step 6–7 — the headline feature |
+| Levers | Type widened to `string`; key/label rules and validation shipped in `packages/core/levers.ts`. Still the hardcoded pair at runtime, still CHECK-constrained in SQL | Up to 4 user-defined, read from a `levers` table | **Step 8 — active** |
 | Day grid | Lightness ramp, generated per lever count | Unchanged; steps grow with user-defined levers | Done |
 | Proof trend | Daily points, 60-day window | Unchanged | Done |
 | Weight | Opt-in toggle, field, and line — **migration not yet applied** | Unchanged | Needs `db push` |
@@ -188,7 +188,7 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 ```bash
 npm install          # installs every workspace
 npm run dev          # apps/web on http://localhost:3000
-npm test             # packages/core — 62 tests, the gate for everything
+npm test             # packages/core — 77 tests, the gate for everything
 npm run typecheck    # both workspaces
 npm run lint
 npm run build

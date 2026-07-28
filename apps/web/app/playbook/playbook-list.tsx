@@ -18,17 +18,24 @@ export function PlaybookList({ items }: { items: PlaybookItem[] }) {
     );
   }
 
-  const grouped = { gym: [] as PlaybookItem[], food: [] as PlaybookItem[] };
-  for (const i of items) grouped[i.lever].push(i);
+  // Keyed by lever rather than a fixed shape: levers are user-defined now, so
+  // an item can arrive under a key this render has never seen — including one
+  // whose lever was archived while its entries survived.
+  const grouped = new Map<string, PlaybookItem[]>();
+  for (const i of items) {
+    const list = grouped.get(i.lever) ?? [];
+    list.push(i);
+    grouped.set(i.lever, list);
+  }
 
   return (
     <div className="flex flex-col gap-8">
       {ACTIVE_LEVERS.map((lever) =>
-        grouped[lever].length ? (
+        grouped.get(lever)?.length ? (
           <section key={lever}>
             <p className="label mb-3">{lever}</p>
             <ul className="flex flex-col">
-              {grouped[lever].map((item) => (
+              {(grouped.get(lever) ?? []).map((item) => (
                 <li
                   key={item.id}
                   className="border-line flex items-center justify-between gap-2 border-b py-2 last:border-0"

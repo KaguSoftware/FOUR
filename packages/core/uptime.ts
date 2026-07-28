@@ -10,7 +10,20 @@
 export const UPTIME_WINDOW = 30;
 export const DAY_BOUNDARY_HOUR = 4;
 
-export type Lever = "gym" | "food";
+/**
+ * A lever's stable key.
+ *
+ * Widened from `"gym" | "food"` on 2026-07-28 for user-defined levers. Nothing
+ * in this module cares what a lever is called: `upDates` keys on distinct
+ * DATES, never on lever identity, so every figure derived here — the window,
+ * the run, the down count, the intervals, the all-time totals — is unchanged by
+ * the widening. That is why custom levers cost one type change rather than a
+ * rewrite.
+ *
+ * The key is a slug and never changes once created; the human-facing label is
+ * separate and freely renameable. See `levers.ts`.
+ */
+export type Lever = string;
 
 export type Entry = {
   logged_for: string; // YYYY-MM-DD

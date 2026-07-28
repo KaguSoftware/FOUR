@@ -16,9 +16,11 @@
     "typecheck": "npm run typecheck -w @uptime/core && npm run typecheck -w @uptime/web",
     "seed": "node scripts/seed.mjs",
     "reset": "node scripts/reset-account.mjs",
-    "shoot": "node scripts/shoot.mjs"
+    "shoot": "node scripts/shoot.mjs",
+    "test:migrations": "node scripts/test-migrations.mjs"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.3.11",
     "@supabase/supabase-js": "^2.110.7",
     "playwright": "^1.61.1",
     "typescript": "^5"

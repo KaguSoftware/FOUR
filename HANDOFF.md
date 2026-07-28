@@ -109,7 +109,8 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 
 **Blocked / needs the owner:**
 
-- **Rotate two credentials** — see Gotchas. The only outstanding owner item.
+- **Run `npx supabase db push`** to apply `20260728010000_custom_levers.sql`. Verified in WASM Postgres but never run against the live database. **The app still reads the hardcoded pair, so the migration is safe to apply ahead of the code.**
+- **Rotate two credentials** — see Gotchas.
 - Note for a fresh chat: `apps/web/.env.local` is **not** on this machine, so the dev server and the dev scripts cannot run here until it is recreated. Tests, typecheck, lint and build all work without it.
 
 ## File map (key files)
@@ -141,8 +142,9 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 
 6. ~~Spike the Hermes `Intl` timezone risk~~ — done 2026-07-28, answered by research plus `logicalDateLocal`. Two spikes remain and both need a device: Supabase session persistence in Expo, and one real push notification delivered.
 7. ~~`Lever = string` + lever key/label rules in `packages/core/levers.ts`~~ — done 2026-07-28. The engine was untouched by the widening, which is the gate passing: 77 tests green.
-8. **← ACTIVE: schema migration** — `levers` table, drop the `gym`/`food` CHECKs, backfill, `push_token`, `posture`, `weight_enabled`, account deletion.
-9. Build the Expo app · push replaces Telegram · offline outbox · store prep.
+8. ~~Schema migration — `levers` table, drop the `gym`/`food` CHECKs, backfill, `push_token`, `posture`~~ — written and verified 2026-07-28 via `npm run test:migrations` (15 checks). **Not yet applied — needs `npx supabase db push`.**
+9. **← ACTIVE: wire lever CRUD** — server actions for create/rename/archive/reorder, a management UI in Settings, and read `ACTIVE_LEVERS` from the table instead of the constant.
+10. Build the Expo app · push replaces Telegram · offline outbox · store prep.
 
 ## Deliberately partial — grows later (scope ledger)
 
@@ -179,6 +181,8 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 - **`.env.local` lives at `apps/web/.env.local`, not the repo root.** `scripts/_session.mjs` resolves that path relative to its own location so there is one copy of the secrets.
 - **`.gitignore` patterns are deliberately un-anchored.** A root-anchored `/node_modules` would silently stop ignoring `apps/web/.next`.
 - **Reads in `getSystemState` and `/proof` tolerate an unmigrated database.** The weight columns are selected optimistically and retried without them on error, and `amount` is only touched when the opt-in is on. This exists because a deploy and a migration never land at the same instant, and a missing column should not take the whole app down for the minutes in between. Keep that property when touching either read.
+- **A migration is not done until `npm run test:migrations` passes.** There is no Docker here, so PGlite is the only pre-flight check, and `supabase db push` is not reversible. That harness already caught an `on delete restrict` that would have broken Apple-mandated account deletion.
+- **The old `handle_new_user()` seeded gym AND food playbook rows for every signup**, so every pre-existing account carries both levers and the backfill covers everyone through `playbook` even if they never logged. The new trigger seeds nothing — onboarding writes the levers.
 - **Playwright's browser binary needs `npx playwright install chromium`.** npm 11's `allow-scripts` gate blocks its postinstall, which silently breaks `scripts/shoot.mjs`.
 - `scripts/shoot.mjs` waits on `domcontentloaded`, not `networkidle` — Turbopack's HMR socket keeps the network busy forever in dev. Set `BASE=http://localhost:3001` when Next bumps to a spare port.
 - `scratch/` is gitignored and holds screenshots and throwaway scripts; safe to delete.
@@ -191,6 +195,7 @@ npm run dev          # apps/web on http://localhost:3000
 npm test             # packages/core — 77 tests, the gate for everything
 npm run typecheck    # both workspaces
 npm run lint
+npm run test:migrations  # runs every migration against real Postgres (WASM)
 npm run build
 npx supabase db push # apply migrations (link once with --project-ref)
 

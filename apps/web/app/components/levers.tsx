@@ -3,7 +3,7 @@
 import { useOptimistic, useState, useTransition } from "react";
 import { logEntry, undoEntry } from "@/app/actions";
 import type { PlaybookItem } from "@/lib/system";
-import type { Lever } from "@uptime/core";
+import { ACTIVE_LEVERS, type Lever } from "@uptime/core";
 
 /**
  * The whole logging path: tap a lever, tap a chip. Two taps, no typing.
@@ -52,7 +52,7 @@ export function Levers({
   return (
     <>
       <div className="grid grid-cols-2 gap-2">
-        {(["gym", "food"] as const).map((lever) => (
+        {ACTIVE_LEVERS.map((lever) => (
           <LeverButton
             key={lever}
             lever={lever}

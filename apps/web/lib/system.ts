@@ -6,6 +6,7 @@ import {
   deriveIntervals,
   downDays,
   lastCompletedRun,
+  leverCount,
   logicalDate,
   uptimeWindow,
   type Entry,
@@ -28,6 +29,10 @@ export type SystemState = {
 };
 
 export const DEFAULT_TZ = "Europe/Istanbul";
+
+// The lever set lives in @uptime/core so client components can read it without
+// pulling next/headers into the browser bundle. Re-exported for server callers.
+export { ACTIVE_LEVERS } from "@uptime/core";
 
 export async function getSupabase() {
   return createClient(await cookies());
@@ -135,6 +140,8 @@ export async function getStatus() {
     entries,
     playbook,
     todayLevers: new Set(todayEntries.map((e) => e.lever)),
+    // Sets how many steps the day-grid ramp has. See ACTIVE_LEVERS.
+    leverCount: leverCount(),
     uptime: uptimeWindow(entries, today),
     run: currentRun(entries, today),
     down: downDays(entries, today),

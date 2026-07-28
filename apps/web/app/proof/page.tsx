@@ -1,11 +1,16 @@
 import { redirect } from "next/navigation";
 import { getStatus, getSupabase } from "@/lib/system";
-import { isoWeekKey } from "@uptime/core";
 import { SignalCheck } from "./signal-check";
 import { BackLink } from "@/app/components/nav-link";
 import { Wordmark } from "@/app/components/wordmark";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * How many days the trend shows. 60 keeps the line legible at phone width:
+ * every point still gets ~5px, and the shape of two months is readable.
+ */
+const DAILY_TREND_DAYS = 60;
 
 /**
  * Proof — the file of what came back.
@@ -25,8 +30,11 @@ export default async function ProofPage() {
     .select("observed_on, kind, value, detail")
     .eq("user_id", status.user.id)
     .order("observed_on", { ascending: false })
-    // Daily sampling writes up to 3 rows a day (energy, sleep, note), so the
-    // 12-week trend window needs ~250 rows, not the 120 weekly sampling used.
+    // This is a row limit, not a date range, so the visible window is however
+    // many days these rows happen to cover. Daily sampling writes up to 3 rows
+    // a day (energy, sleep, note) — 60 days needs ~180. The headroom to 280 is
+    // what absorbs a fourth kind: when optional weight ships it becomes ~240,
+    // still inside. A fifth kind would silently start truncating the trend.
     .limit(280);
 
   const rows = signals ?? [];
@@ -50,7 +58,7 @@ export default async function ProofPage() {
 
       {scalars.length > 0 && (
         <section className="mb-8">
-          <p className="label mb-3">12-week trend</p>
+          <p className="label mb-3">Trend</p>
           <Trend points={scalars} />
         </section>
       )}
@@ -94,21 +102,25 @@ function Trend({
 }: {
   points: { observed_on: string; kind: string; value: number | null }[];
 }) {
-  // Samples arrive daily; the trend still reads in weeks. A daily line is too
-  // noisy to see a direction in — the question here is "is this going
-  // anywhere", which is a question about weeks.
-  const byWeek = new Map<string, number[]>();
+  // Sampling is daily, so the trend plots daily. It is noisier than the weekly
+  // average it replaces, and that noise is real data rather than a rendering
+  // fault — a day that felt like a 2 was a 2.
+  //
+  // This is NOT the reader that decides a plateau. `evaluatePlateau` folds into
+  // ISO weeks and must keep doing so: judged on raw days it fires after four
+  // quiet ones, which is a mood, not a trend. Two readers, same data,
+  // deliberately different cadence. Do not "fix" one to match the other.
+  const byDay = new Map<string, number[]>();
   for (const p of points) {
     if (p.value === null) continue;
-    const key = isoWeekKey(p.observed_on);
-    const list = byWeek.get(key) ?? [];
+    const list = byDay.get(p.observed_on) ?? [];
     list.push(p.value);
-    byWeek.set(key, list);
+    byDay.set(p.observed_on, list);
   }
 
-  const series = [...byWeek.entries()]
+  const series = [...byDay.entries()]
     .sort((a, b) => a[0].localeCompare(b[0]))
-    .slice(-12)
+    .slice(-DAILY_TREND_DAYS)
     .map(([date, vals]) => ({
       date,
       avg: vals.reduce((x, y) => x + y, 0) / vals.length,
@@ -118,7 +130,7 @@ function Trend({
     return (
       <p className="text-ink-mute text-xs">
         {series.length === 1
-          ? "One sample. The trend needs a few weeks."
+          ? "One sample. The trend needs a few days."
           : "No samples yet."}
       </p>
     );
@@ -138,7 +150,7 @@ function Trend({
         viewBox={`0 -4 ${w} ${h + 8}`}
         className="h-20 w-full"
         role="img"
-        aria-label={`Felt-state trend across ${series.length} weeks, most recent ${series[series.length - 1].avg.toFixed(1)} out of 5`}
+        aria-label={`Felt-state trend across ${series.length} days, most recent ${series[series.length - 1].avg.toFixed(1)} out of 5`}
       >
         <path
           d={d}
@@ -148,18 +160,18 @@ function Trend({
           strokeLinecap="round"
           strokeLinejoin="round"
         />
-        {series.map((s, i) => (
-          <circle
-            key={s.date}
-            cx={i * step}
-            cy={y(s.avg)}
-            r="2"
-            fill="var(--color-ink-dim)"
-          />
-        ))}
+        {/* One marker, on the most recent day. Sixty dots is a caterpillar,
+            not a chart — the line carries the shape, the dot says "you are
+            here". */}
+        <circle
+          cx={(series.length - 1) * step}
+          cy={y(series[series.length - 1].avg)}
+          r="2.5"
+          fill="var(--color-ink)"
+        />
       </svg>
       <p className="text-ink-mute mt-1 text-xs">
-        energy + sleep, weekly average · {series.length} weeks
+        energy + sleep, daily · {series.length} days
       </p>
     </div>
   );

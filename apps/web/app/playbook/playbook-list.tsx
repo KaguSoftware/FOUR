@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { updatePlaybook } from "@/app/actions";
 import type { PlaybookItem } from "@/lib/system";
+import { ACTIVE_LEVERS } from "@uptime/core";
 
 export function PlaybookList({ items }: { items: PlaybookItem[] }) {
   const [pending, start] = useTransition();
@@ -22,7 +23,7 @@ export function PlaybookList({ items }: { items: PlaybookItem[] }) {
 
   return (
     <div className="flex flex-col gap-8">
-      {(["gym", "food"] as const).map((lever) =>
+      {ACTIVE_LEVERS.map((lever) =>
         grouped[lever].length ? (
           <section key={lever}>
             <p className="label mb-3">{lever}</p>

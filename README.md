@@ -35,8 +35,10 @@ has a single job: **catch the fade early and make restarting trivial.**
 - **Good news uses the same voice as bad news.** Milestones fire once ever, at
   most one per week, in the same flat register as an alert. No badges, no
   confetti, no coins.
-- **No weight, no calories, no charts** — except one trend on `/proof`, where a
-  trend is the actual information.
+- **No calories, no quality scoring, no charts** — except the trend on `/proof`,
+  where a trend is the actual information. **Weight is opt-in and off by
+  default**: when enabled it is recorded and plotted and nothing else. No goal
+  weight, no target, no interpretation, and it never affects uptime.
 
 ## Repo layout
 

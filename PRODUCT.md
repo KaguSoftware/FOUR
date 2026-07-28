@@ -105,6 +105,13 @@ Stated on its own terms, not against any competitor. Confirmed 2026-07-28.
 - Daily reminder **off by default**, opt-in only.
 - **Posture (`STRICT` / `SOFT`)** — chosen at onboarding, changeable later. See
   Brand Commitments for exactly what it may and may not change.
+- **Proof ships in v1** (confirmed 2026-07-28, reversing the earlier cut). The
+  daily felt-state check-in and its trend are core, not optional.
+- **The proof trend plots daily points**, matching the daily sampling rate.
+  **Plateau detection still reads weekly** — these are two different readers of
+  the same data and they must not be conflated. A plateau judged on raw days
+  fires after four quiet days, which is a mood, not a trend.
+- **Optional weight**, per the constraint below.
 
 **Constraints that future work must preserve:**
 
@@ -115,8 +122,14 @@ Stated on its own terms, not against any competitor. Confirmed 2026-07-28.
   reports the last completed run instead.
 - 30-day uptime must never drop more than 1/30 per elapsed day.
 - Empty history reads as **0 days down**, never a large number.
-- No weight, no calories, no quality scoring, no badges, no confetti, no coins,
-  no leaderboards.
+- No calories, no quality scoring, no badges, no confetti, no coins, no
+  leaderboards.
+- **Weight is opt-in and off by default** (confirmed 2026-07-28, amending the
+  earlier "no weight" rule). When switched on it is recorded and plotted, and
+  that is the whole feature: it **never affects uptime**, there is no goal
+  weight, no target, no "X above/below", no BMI, and no interpretation of the
+  trend. It is a number the user chose to keep, never a score the product keeps
+  on them. Switching it off hides it without deleting history.
 
 **Owner-stated, 2026-07-28 — a technically polished result that breaks either
 of these is wrong:**
@@ -135,8 +148,9 @@ of these is wrong:**
 - Product name. `uptime` is the working name; branding is in progress and the
   bare word is likely unavailable on the App Store.
 - Monetization. Free for v1; model undecided.
-- Whether the felt-state signals and plateau detection ship on mobile at all —
-  cut from v1, revisit once real longitudinal data exists.
+- The plateau thresholds themselves — `PLATEAU_WEEKS` (4) and
+  `MIN_DAYS_PER_WEEK` (3) are educated guesses with no longitudinal data behind
+  them yet. Revisit once roughly six weeks of real signal exists.
 
 ## Brand Commitments
 

@@ -14,6 +14,9 @@ colors:
   degraded-dim: "#664610"
   down: "#f05653"
   down-dim: "#6e2826"
+  # Day-grid ramp floor. Intermediate steps are generated per lever count;
+  # the top step is always `ink`. See The 0.51 Floor.
+  grid-up-floor: "#63666b"
 typography:
   wordmark:
     fontFamily: "Archivo Black, sans-serif"
@@ -74,7 +77,10 @@ components:
     padding: "20px 16px"
     height: "64px"
   day-cell-up:
-    backgroundColor: "{colors.ink-dim}"
+    backgroundColor: "{colors.grid-up-floor}"
+    rounded: "{rounded.cell}"
+  day-cell-up-all:
+    backgroundColor: "{colors.ink}"
     rounded: "{rounded.cell}"
   day-cell-down:
     backgroundColor: "{colors.surface}"
@@ -336,31 +342,43 @@ never flashes an indicator.
 ### The Day Grid (signature component)
 
 The product's most distinctive element. Thirty (or ninety) square cells, 15 per
-row, 3px apart. **Binary — a day is up, or it is not.**
+row, 3px apart. Fill lightness encodes **how many levers fired**, never which.
 
 - **Down:** resting surface with a hairline border — present but unlit.
-- **Up:** dimmed ink fill. Identical whether one lever fired or all four.
+- **Up:** a lightness step. The dimmest up-day is still unmistakably up.
 - **Today:** a 1px live-edge ring at 1px offset.
+
+**The ramp is generated, not a fixed scale**, because the number of levers is
+user-defined. Steps are spaced evenly in OKLCH `L` — already perceptually
+uniform — from a floor of **0.51** to **0.95** (ink), one step per configured
+lever. A single lever gets ink alone.
+
+| Levers | Steps (dimmest → all) |
+| --- | --- |
+| 1 | `#eceff1` |
+| 2 | `#63666b` · `#eceff1` |
+| 3 | `#63666b` · `#a4a8ad` · `#eceff1` |
+| 4 | `#63666b` · `#8f9397` · `#babec3` · `#eceff1` |
 
 ### Named Rules
 
-**The No-Remainder Rule.** The grid may never depict how much of something was
-left undone. Encodings that subdivide a cell — segmented level meters,
-quadrants, filled fractions — draw the *absence* as a visible hole, and a hole
-reads as *you did not finish*. The product's thesis is that one lever is
-enough, so an encoding that shows a remainder contradicts it however elegant it
-looks.
+**The 0.51 Floor.** The ramp bottoms out at `L 0.51` and never lower. The
+binding constraint is **not** the background — it is the **down cell**. At
+`L 0.49` the dimmest up-day measured 2.83:1 against a down cell, and up-versus-
+down is the single most important read in the grid. At 0.51 it measures 3.07:1.
+Any future change to the ramp re-checks against the down cell, not the ground.
 
-This is why the grid is binary rather than counting levers, and why the earlier
-dim-for-one / bright-for-both treatment was retired: with four levers it would
-have turned thirty days into thirty progress bars. Lever detail belongs to
-*tapping a day* in History — a deliberate inspection, where curiosity is the
-motive, rather than a glance, where comparison is.
+**The No-Subdivision Rule.** Lightness may vary; **the cell is never divided.**
+Segmented level meters, quadrants and fractional fills draw the *absence* as a
+visible hole, and a hole reads as *you did not finish*. The product's thesis is
+that one lever is enough. A dim cell is still a whole cell — that is the
+distinction that makes a ramp acceptable where a segmented meter is not.
 
-**Up is set at `ink-dim`, not `ink`.** Thirty cells at full readout white
-become a slab brighter than the hero metric, and exactly one element per screen
-is allowed to be the readout. Down cells also carry a border that up cells do
-not, so state never rests on fill alone.
+**Honest limit at four levers.** Adjacent steps separate by only 1.62:1 at the
+top of the ramp, so a four-lever grid reads as *more or less filled* at a
+glance rather than as an exact count. The important read — up versus down —
+holds at 3:1 or better everywhere. Down cells also carry a border that up cells
+do not, so state never rests on fill alone.
 
 ## Do's and Don'ts
 
@@ -383,7 +401,11 @@ not, so state never rests on fill alone.
 - **Don't** add a shadow. Anywhere. At any elevation.
 - **Don't** subdivide a day cell — no segments, quadrants, or fractional fills.
   Anything that draws a remainder says "you did not finish", which is the one
-  thing the grid must never say.
+  thing the grid must never say. Varying lightness is fine; a dim cell is still
+  a whole cell.
+- **Don't** take the grid ramp below `L 0.51`. The constraint is separation from
+  a **down** cell, not from the background — check against the wrong one and the
+  dimmest up-day disappears into a gap.
 - **Don't** put blur or translucency on content. System materials are permitted
   on system chrome only (see The System-Chrome Exception).
 - **Don't** give the healthy state a colour — quiet is the signal.

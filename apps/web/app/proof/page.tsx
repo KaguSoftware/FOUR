@@ -2,14 +2,9 @@ import { getSupabase, requireStatus } from "@/lib/system";
 import { SignalCheck } from "./signal-check";
 import { BackLink } from "@/app/components/nav-link";
 import { Wordmark } from "@/app/components/wordmark";
+import { DAILY_TREND_DAYS, dailyTrend, trendPath } from "@uptime/core";
 
 export const dynamic = "force-dynamic";
-
-/**
- * How many days the trend shows. 60 keeps the line legible at phone width:
- * every point still gets ~5px, and the shape of two months is readable.
- */
-const DAILY_TREND_DAYS = 60;
 
 /**
  * Proof — the file of what came back.
@@ -148,29 +143,10 @@ function Trend({
 }: {
   points: { observed_on: string; kind: string; value: number | null }[];
 }) {
-  // Sampling is daily, so the trend plots daily. It is noisier than the weekly
-  // average it replaces, and that noise is real data rather than a rendering
-  // fault — a day that felt like a 2 was a 2.
-  //
-  // This is NOT the reader that decides a plateau. `evaluatePlateau` folds into
-  // ISO weeks and must keep doing so: judged on raw days it fires after four
-  // quiet ones, which is a mood, not a trend. Two readers, same data,
-  // deliberately different cadence. Do not "fix" one to match the other.
-  const byDay = new Map<string, number[]>();
-  for (const p of points) {
-    if (p.value === null) continue;
-    const list = byDay.get(p.observed_on) ?? [];
-    list.push(p.value);
-    byDay.set(p.observed_on, list);
-  }
-
-  const series = [...byDay.entries()]
-    .sort((a, b) => a[0].localeCompare(b[0]))
-    .slice(-DAILY_TREND_DAYS)
-    .map(([date, vals]) => ({
-      date,
-      avg: vals.reduce((x, y) => x + y, 0) / vals.length,
-    }));
+  // Computed by @uptime/core, not here. The mobile chart draws the same series
+  // from the same function, so the two clients cannot disagree about the shape
+  // of the same month — which is the reason that package exists.
+  const series = dailyTrend(points);
 
   if (series.length < 2) {
     return (
@@ -184,11 +160,9 @@ function Trend({
 
   const w = 320;
   const h = 64;
-  const step = w / (series.length - 1);
-  const y = (v: number) => h - ((v - 1) / 4) * h;
-  const d = series
-    .map((s, i) => `${i === 0 ? "M" : "L"} ${i * step} ${y(s.avg)}`)
-    .join(" ");
+  const geom = trendPath(series, { width: w, height: h });
+  const d = geom.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
+  const last = geom[geom.length - 1];
 
   return (
     <div className="overflow-x-auto">
@@ -209,12 +183,7 @@ function Trend({
         {/* One marker, on the most recent day. Sixty dots is a caterpillar,
             not a chart — the line carries the shape, the dot says "you are
             here". */}
-        <circle
-          cx={(series.length - 1) * step}
-          cy={y(series[series.length - 1].avg)}
-          r="2.5"
-          fill="var(--color-ink)"
-        />
+        <circle cx={last.x} cy={last.y} r="2.5" fill="var(--color-ink)" />
       </svg>
       <p className="text-ink-mute mt-1 text-xs">
         energy + sleep, daily · {series.length} days

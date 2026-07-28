@@ -8,8 +8,9 @@ import {
   type Posture,
 } from "@uptime/core";
 
-import { Body, Label, Rule, Wordmark } from "@/components/ui";
+import { Body, Rule, Wordmark } from "@/components/ui";
 import { ChoiceCard } from "@/components/choice-card";
+import { LeverManager } from "@/components/lever-manager";
 import { supabase } from "@/lib/supabase";
 import { useStatus } from "@/lib/use-status";
 import { color, size, space, TAP } from "@/theme";
@@ -148,24 +149,11 @@ export default function SettingsScreen() {
         <Rule />
       </View>
 
-      <Label style={{ marginBottom: space[2] }}>levers</Label>
-      <Body tone="mute" style={{ marginBottom: space[3], fontSize: size.xs }}>
-        Renaming is free and archiving keeps every day you already logged.
-      </Body>
-      {levers.map((l) => (
-        <View key={l.key}>
-          <View style={{ paddingVertical: space[3] }}>
-            <Body tone="dim">{l.label}</Body>
-          </View>
-          <Rule />
-        </View>
-      ))}
-      {/* SCOPE(v1-mobile): read-only here. Create, rename and archive all work
-          on the web app and write to the same table.
-          GROWS LATER → the same CRUD via a native list with swipe actions. */}
-      <Body tone="mute" style={{ marginTop: space[3], fontSize: size.xs }}>
-        Add, rename and archive levers on the web app for now.
-      </Body>
+      <LeverManager
+        userId={state.user_id}
+        levers={levers}
+        onChanged={refresh}
+      />
 
       <View style={{ marginVertical: space[6] }}>
         <Rule />

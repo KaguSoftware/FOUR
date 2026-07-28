@@ -1,8 +1,27 @@
-import { ScrollView, View } from "react-native";
+import { useCallback, useEffect, useState } from "react";
+import {
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  TextInput,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Body, Label, Wordmark } from "@/components/ui";
+import { useFocusEffect } from "expo-router";
+import { DAILY_TREND_DAYS, NOTE_MAX } from "@uptime/core";
+
+import { Body, Label, Mono, Rule, Wordmark } from "@/components/ui";
+import { Trend, WeightTrend } from "@/components/trend";
 import { useStatus } from "@/lib/use-status";
-import { color, space } from "@/theme";
+import {
+  loadSignals,
+  loadWeights,
+  logSignals,
+  type SignalRow,
+  type WeightRow,
+} from "@/lib/signals";
+import { color, radius, size, space, TAP } from "@/theme";
 
 /**
  * Proof — the file of what came back.
@@ -12,42 +31,307 @@ import { color, space } from "@/theme";
  * re-entry it is evidence it worked last time, which is a better argument for
  * restarting than any motivational copy.
  *
- * SCOPE(v1-mobile): the daily check-in and the trend are NOT ported yet — this
- * screen currently states what it will hold rather than pretending to be
- * finished. The web version at `apps/web/app/proof/page.tsx` is complete and is
- * the reference: daily points over 60 days, plus the optional weight line.
- * GROWS LATER → port the check-in (energy, sleep, note, optional weight) and
- * the trend chart via react-native-svg.
+ * Nothing on this screen can affect uptime. Skipping is free and says so.
  */
 export default function ProofScreen() {
   const insets = useSafeAreaInsets();
   const { status } = useStatus();
+  const [rows, setRows] = useState<SignalRow[]>([]);
+  const [weights, setWeights] = useState<WeightRow[]>([]);
+
+  const userId = status?.state.user_id;
+  const weightOn = status?.state.weight_enabled ?? false;
+
+  const load = useCallback(async () => {
+    if (!userId) return;
+    setRows(await loadSignals(userId));
+    setWeights(weightOn ? await loadWeights(userId, DAILY_TREND_DAYS) : []);
+  }, [userId, weightOn]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load]),
+  );
+
+  if (!status) return <View style={{ flex: 1, backgroundColor: color.bg }} />;
+
+  const notes = rows.filter((r) => r.detail);
+  const scalars = rows.filter((r) => r.value !== null);
+  const todayNote =
+    rows.find((r) => r.observed_on === status.today && r.kind === "note")
+      ?.detail ?? "";
+  const loggedToday = rows.some((r) => r.observed_on === status.today);
 
   return (
-    <ScrollView
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
       style={{ flex: 1, backgroundColor: color.bg }}
-      contentContainerStyle={{
-        paddingTop: insets.top + space[4],
-        paddingHorizontal: space[5],
-        paddingBottom: space[12],
-      }}
     >
-      <View style={{ marginBottom: space[8] }}>
-        <Wordmark />
-      </View>
+      <ScrollView
+        contentContainerStyle={{
+          paddingTop: insets.top + space[4],
+          paddingHorizontal: space[5],
+          paddingBottom: space[12],
+        }}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={{ marginBottom: space[8] }}>
+          <Wordmark />
+        </View>
 
-      <Label style={{ marginBottom: space[3] }}>proof</Label>
-      <Body tone="dim">
-        The daily check-in and its trend are not on mobile yet. They are live on
-        the web app, and nothing recorded there is lost — this screen will read
-        the same rows when it ships.
-      </Body>
+        <DailyCheck
+          key={todayNote}
+          userId={status.state.user_id}
+          initialNote={todayNote}
+          loggedToday={loggedToday}
+          weightUnit={weightOn ? status.state.weight_unit : null}
+          onSaved={load}
+        />
 
-      {status?.state.weight_enabled && (
-        <Body tone="mute" style={{ marginTop: space[4] }}>
-          Weight is on for this account. It never affects uptime.
-        </Body>
-      )}
-    </ScrollView>
+        {scalars.length > 0 && (
+          <View style={{ marginTop: space[10] }}>
+            <Label style={{ marginBottom: space[3] }}>trend</Label>
+            <Trend samples={scalars} />
+          </View>
+        )}
+
+        {weightOn && weights.length > 0 && (
+          <View style={{ marginTop: space[10] }}>
+            <Label style={{ marginBottom: space[3] }}>weight</Label>
+            <WeightTrend points={weights} unit={status.state.weight_unit} />
+          </View>
+        )}
+
+        <View style={{ marginTop: space[10] }}>
+          <Label style={{ marginBottom: space[3] }}>the log</Label>
+          {notes.length === 0 ? (
+            <Body tone="mute">
+              Nothing written yet. Anything you want to remember about a day
+              goes here — what moved, what didn&apos;t, what it felt like. This
+              list only grows, and it is what you read on the way back after a
+              break.
+            </Body>
+          ) : (
+            notes.map((n) => (
+              <View key={`${n.observed_on}-${n.kind}`}>
+                <View style={{ paddingVertical: space[4] }}>
+                  {/* The date sits ABOVE the entry. These are paragraphs, not
+                      one-liners, and a fixed-width date column squeezed them
+                      into a gutter. */}
+                  <Mono
+                    style={{
+                      fontSize: size.xs,
+                      color: color.inkMute,
+                      marginBottom: space[2],
+                    }}
+                  >
+                    {n.observed_on}
+                  </Mono>
+                  <Body tone="dim">{n.detail}</Body>
+                </View>
+                <Rule />
+              </View>
+            ))
+          )}
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
+
+/**
+ * The daily check.
+ *
+ * Stays on screen even once something is logged today. It used to disappear
+ * after the first entry, which was fine when the note was a one-line
+ * observation — but people write these as a journal, and "you already checked
+ * in this morning" is not a reason to refuse what happened this evening.
+ *
+ * Today's note is loaded back in, because the write upserts on
+ * `(user_id, observed_on, kind)` — without it, writing again would silently
+ * replace what was already there.
+ */
+function DailyCheck({
+  userId,
+  initialNote,
+  loggedToday,
+  weightUnit,
+  onSaved,
+}: {
+  userId: string;
+  initialNote: string;
+  loggedToday: boolean;
+  weightUnit: "kg" | "lb" | null;
+  onSaved: () => void;
+}) {
+  const [energy, setEnergy] = useState<number | null>(null);
+  const [sleep, setSleep] = useState<number | null>(null);
+  const [note, setNote] = useState(initialNote);
+  const [weight, setWeight] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const empty = !energy && !sleep && !note.trim() && !weight.trim();
+
+  async function save() {
+    if (empty || saving) return;
+    setSaving(true);
+    const w = weightUnit && weight.trim() ? Number(weight) : null;
+    await logSignals(userId, {
+      energy,
+      sleep,
+      detail: note,
+      weight: Number.isFinite(w) ? w : null,
+    });
+    setSaving(false);
+    setSaved(true);
+    onSaved();
+  }
+
+  return (
+    <View>
+      <Label style={{ marginBottom: space[1] }}>
+        {loggedToday ? "today" : "daily check"}
+      </Label>
+      <Body tone="dim" style={{ marginBottom: space[4], fontSize: size.xs }}>
+        Skipping costs nothing. This never affects uptime.
+      </Body>
+
+      <Scale label="energy" value={energy} onChange={setEnergy} />
+      <Scale label="sleep" value={sleep} onChange={setSleep} />
+
+      {weightUnit && (
+        <View style={{ marginTop: space[4] }}>
+          <Label style={{ marginBottom: space[2] }}>weight ({weightUnit})</Label>
+          <TextInput
+            value={weight}
+            onChangeText={setWeight}
+            placeholder="—"
+            placeholderTextColor={color.inkMute}
+            keyboardType="decimal-pad"
+            inputMode="decimal"
+            // No goal, no target, no comparison to a previous value. The field
+            // takes a number and says nothing about it.
+            style={field}
+          />
+        </View>
+      )}
+
+      <Label style={{ marginTop: space[4], marginBottom: space[2] }}>
+        what&apos;s up?
+      </Label>
+      <TextInput
+        value={note}
+        onChangeText={setNote}
+        placeholder="Whatever you want to remember about today."
+        placeholderTextColor={color.inkMute}
+        multiline
+        maxLength={NOTE_MAX}
+        textAlignVertical="top"
+        style={[field, { minHeight: 110, paddingTop: space[3] }]}
+      />
+
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: space[3],
+          marginTop: space[4],
+        }}
+      >
+        <Pressable
+          accessibilityRole="button"
+          disabled={empty || saving}
+          onPress={save}
+          style={({ pressed }) => ({
+            minHeight: TAP,
+            paddingHorizontal: space[5],
+            borderRadius: radius.md,
+            borderWidth: 1,
+            borderColor: color.lineHi,
+            backgroundColor: pressed ? color.line : color.surfaceHi,
+            alignItems: "center",
+            justifyContent: "center",
+            opacity: empty || saving ? 0.4 : 1,
+          })}
+        >
+          <Label style={{ color: color.ink }}>
+            {saving ? "…" : loggedToday ? "save" : "log"}
+          </Label>
+        </Pressable>
+        {saved && !saving && <Body tone="mute">Saved.</Body>}
+      </View>
+    </View>
+  );
+}
+
+function Scale({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: number | null;
+  onChange: (n: number) => void;
+}) {
+  return (
+    <View style={{ marginBottom: space[3] }}>
+      <Label style={{ marginBottom: space[2] }}>{label}</Label>
+      <View style={{ flexDirection: "row", gap: 6 }}>
+        {[1, 2, 3, 4, 5].map((n) => {
+          const on = value === n;
+          return (
+            <Pressable
+              key={n}
+              accessibilityRole="button"
+              accessibilityState={{ selected: on }}
+              accessibilityLabel={`${label} ${n} of 5`}
+              onPress={() => onChange(n)}
+              style={{
+                flex: 1,
+                minHeight: TAP,
+                borderRadius: radius.md,
+                borderWidth: on ? 2 : 1,
+                // Selected has to be unmistakable: on web this pair once
+                // measured 1.10:1 and was effectively invisible. `line` fill
+                // plus a `line-hi` border plus ink text is 11.37:1 for the
+                // number itself.
+                borderColor: on ? color.lineHi : color.line,
+                backgroundColor: on ? color.line : color.surface,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Mono
+                style={{
+                  fontSize: size.sm,
+                  color: on ? color.ink : color.inkMute,
+                }}
+              >
+                {n}
+              </Mono>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+const field = {
+  minHeight: TAP,
+  borderRadius: radius.md,
+  borderWidth: 1,
+  borderColor: color.line,
+  backgroundColor: color.surface,
+  paddingHorizontal: space[4],
+  color: color.ink,
+  fontFamily: "Inter_400Regular",
+  // 16 minimum on a touch device, or iOS zooms the view when it takes focus.
+  fontSize: 16,
+  lineHeight: 24,
+} as const;

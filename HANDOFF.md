@@ -157,7 +157,8 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 10. ~~Onboarding + posture~~ — done 2026-07-28. `/onboarding` states the rule, takes 1–4 levers and a posture, then sets `onboarded_at`. `requireStatus()` gates every signed-in screen. Posture is wired into the two places it is allowed to reach (takeover sentence, milestone panel) and is changeable in Settings. Web also grew an explicit **create-account** path, without which none of this was reachable.
 11. ~~Expo app scaffold + the core screens~~ — done 2026-07-28. `apps/mobile` on **SDK 57**: native tab bar, native stack, native sheet, session gate, dashboard, takeover, day grid, levers, onboarding, sign-in, history, settings. **Typechecks and bundles for both platforms; never run on a device.**
 12. **← ACTIVE: run it on a device.** Nothing in `apps/mobile` has executed. Needs `apps/mobile/.env.local` (see `.env.example`), then `npm run mobile`. The three things to confirm first: the SecureStore chunked-session adapter round-trips, `logicalDateLocal` gives the right day in a non-Istanbul zone, and the native tab bar/sheet look right.
-13. Then: `/proof` on mobile · lever CRUD on mobile · push replaces Telegram · offline outbox · store prep.
+13. ~~`/proof` and lever CRUD on mobile~~ — done 2026-07-28. The trend series and its geometry moved into `packages/core/signals.ts` and **both clients now draw from it**, so the two charts cannot disagree about the same month.
+14. Then: offline outbox · `eas init` + a dev build (the only way to test push) · Sign in with Apple · a real icon · privacy policy.
 
 ## Deliberately partial — grows later (scope ledger)
 
@@ -170,8 +171,8 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 | Proof trend | Daily points, 60-day window | Unchanged | Done |
 | Weight | Opt-in toggle, field, and line — **migration not yet applied** | Unchanged | Needs `db push` |
 | Posture | Chosen at onboarding, changeable in Settings, wired into the takeover sentence and the milestone panel | Same two touchpoints on mobile | Done on web |
-| Mobile `/proof` | A screen that says the check-in is not ported yet | The daily check-in + 60-day trend + optional weight, as on web | Step 13 |
-| Mobile levers | Read-only list in Settings | Create/rename/archive via a native list with swipe actions | Step 13 |
+| Mobile `/proof` | Full: daily check, journal, trend, optional weight, the log | Unchanged | Done |
+| Mobile levers | Full: create, rename, archive, with native alerts | Unchanged | Done |
 | Mobile auth | Email + password | Sign in with Apple (**required by review once any third-party sign-in ships**) + Google | Before submission |
 | App icon | Expo's default artwork | Real icon + splash | Before submission |
 | Widgets | None | Interactive Home/Lock Screen widget: tap a lever without opening the app | v1.1 — SwiftUI + Glance, App Groups |

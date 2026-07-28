@@ -44,11 +44,15 @@ export function LeverButtons({
           >
             <Pressable
               accessibilityRole="button"
-              accessibilityState={{ selected: done, disabled: done || busy }}
+              accessibilityState={{ selected: done, disabled: done }}
               accessibilityLabel={
                 done ? `${lever.label}, logged today` : `Log ${lever.label}`
               }
-              disabled={done || busy}
+              // Only the lever's OWN state disables it. A global "busy" flag
+              // used to lock every button while any write was in flight, so
+              // logging two levers meant waiting out a round trip between
+              // taps. The write is idempotent, so overlapping taps are safe.
+              disabled={done}
               onPress={() => {
                 // One crisp impact. Confirmation that the tap landed, not a
                 // celebration — the register forbids that.
@@ -90,7 +94,6 @@ export function LeverButtons({
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={`Undo ${lever.label}`}
-                disabled={busy}
                 onPress={() => onUndo(lever)}
                 style={{
                   minHeight: TAP,

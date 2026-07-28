@@ -3,7 +3,7 @@ import { Pressable, TextInput, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
 import { Body, Label } from "@/components/ui";
-import { useStatus } from "@/lib/use-status";
+import { cachedStatus } from "@/lib/use-status";
 import { logEntry } from "@/lib/status";
 import { color, radius, size, space, TAP } from "@/theme";
 
@@ -23,7 +23,16 @@ import { color, radius, size, space, TAP } from "@/theme";
 export default function LogSheet() {
   const router = useRouter();
   const { lever } = useLocalSearchParams<{ lever: string }>();
-  const { status } = useStatus();
+  /**
+   * Read once from the cache, deliberately NOT `useStatus()`.
+   *
+   * iOS measures this sheet's content to size it (`fitToContents`). Fetching
+   * here meant mounting nearly empty, being measured at that height, then
+   * filling and resizing — a jolt on every open. The dashboard that launched
+   * this sheet already loaded everything it needs, so re-fetching bought
+   * nothing but the jump.
+   */
+  const [status] = useState(cachedStatus);
   const [custom, setCustom] = useState("");
   const [typing, setTyping] = useState(false);
   const [chosen, setChosen] = useState<string | null>(null);

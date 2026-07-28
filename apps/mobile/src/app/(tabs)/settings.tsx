@@ -9,26 +9,61 @@ import {
 } from "@uptime/core";
 
 import { Body, Label, Rule, Wordmark } from "@/components/ui";
+import { ChoiceCard } from "@/components/choice-card";
 import { supabase } from "@/lib/supabase";
 import { useStatus } from "@/lib/use-status";
-import { color, radius, size, space, TAP } from "@/theme";
+import { color, size, space, TAP } from "@/theme";
+
+/** Local overrides held only until the server confirms them. */
+type Pending = { slammed?: boolean; weight?: boolean; posture?: Posture };
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const { status, refresh } = useStatus();
-  const [busy, setBusy] = useState(false);
+  const [pending, setPending] = useState<Pending>({});
 
   if (!status) return <View style={{ flex: 1, backgroundColor: color.bg }} />;
-  const { state, levers, slammed } = status;
+  const { state, levers } = status;
 
-  async function update(patch: Record<string, unknown>) {
-    setBusy(true);
-    await supabase
+  // A switch moves the instant it is tapped.
+  //
+  // These used to read straight from server state, so the thumb did not move
+  // until a write AND a five-query reload had both come back — seconds, on a
+  // phone, for a toggle. Now the local view flips first and only reverts if the
+  // write actually fails, which is the honest version of optimistic: the UI is
+  // ahead of the server, never lying about it.
+  const slammed = pending?.slammed ?? status.slammed;
+  const weightEnabled = pending?.weight ?? state.weight_enabled;
+
+  async function update(
+    patch: Record<string, unknown>,
+    optimistic: Pending,
+  ) {
+    setPending((p) => ({ ...p, ...optimistic }));
+    const { error } = await supabase
       .from("system_state")
       .update(patch)
       .eq("user_id", state.user_id);
+
+    const drop = () =>
+      setPending((p) => {
+        const next = { ...p };
+        for (const k of Object.keys(optimistic)) delete next[k as keyof Pending];
+        return next;
+      });
+
+    if (error) {
+      // Put it back. A switch that stays on after a failed write is a lie the
+      // user only discovers later, when the monitor behaves unexpectedly.
+      drop();
+      Alert.alert("Didn't save", "That change didn't reach the server.");
+      return;
+    }
+
+    // Hold the optimistic value until the reload lands, THEN drop it. Dropping
+    // first would flash the old value for the length of the round trip.
     await refresh();
-    setBusy(false);
+    drop();
   }
 
   return (
@@ -54,33 +89,17 @@ export default function SettingsScreen() {
       </Body>
 
       <View style={{ gap: space[2] }}>
-        {POSTURE_CHOICES.map((choice) => {
-          const on = choice.value === state.posture;
-          return (
-            <Pressable
-              key={choice.value}
-              accessibilityRole="radio"
-              accessibilityState={{ selected: on }}
-              disabled={busy}
-              onPress={() => update({ posture: choice.value satisfies Posture })}
-              style={{
-                padding: space[3],
-                borderRadius: radius.md,
-                borderWidth: 1,
-                borderColor: on ? color.lineHi : color.line,
-                backgroundColor: on ? color.surfaceHi : color.surface,
-              }}
-            >
-              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                <Body tone={on ? "ink" : "dim"}>{choice.title}</Body>
-                {on && <Body tone="ink">✓</Body>}
-              </View>
-              <Body tone="mute" style={{ marginTop: space[1], fontSize: size.xs }}>
-                {choice.detail}
-              </Body>
-            </Pressable>
-          );
-        })}
+        {POSTURE_CHOICES.map((choice) => (
+          <ChoiceCard
+            key={choice.value}
+            title={choice.title}
+            detail={choice.detail}
+            selected={choice.value === (pending.posture ?? state.posture)}
+            onPress={() =>
+              update({ posture: choice.value }, { posture: choice.value })
+            }
+          />
+        ))}
       </View>
 
       <View style={{ marginVertical: space[6] }}>
@@ -98,14 +117,15 @@ export default function SettingsScreen() {
             : "For genuinely overloaded stretches. Raises the alert thresholds; never pauses the system. Auto-expires after 14 days."
         }
       >
-        <Switch
+        <SettingSwitch
+          label="Slammed mode"
           value={slammed}
-          disabled={busy}
           onValueChange={(on) =>
-            update({ slammed_until: on ? addDays(status.today, 14) : null })
+            update(
+              { slammed_until: on ? addDays(status.today, 14) : null },
+              { slammed: on },
+            )
           }
-          trackColor={{ false: color.line, true: color.lineHi }}
-          thumbColor={color.ink}
         />
       </Row>
 
@@ -117,12 +137,10 @@ export default function SettingsScreen() {
         title="Track weight"
         note="Off by default. Recorded and plotted, and that is the whole feature — it never affects uptime, there is no goal and no interpretation. Switching it off hides it without deleting anything."
       >
-        <Switch
-          value={state.weight_enabled}
-          disabled={busy}
-          onValueChange={(on) => update({ weight_enabled: on })}
-          trackColor={{ false: color.line, true: color.lineHi }}
-          thumbColor={color.ink}
+        <SettingSwitch
+          label="Track weight"
+          value={weightEnabled}
+          onValueChange={(on) => update({ weight_enabled: on }, { weight: on })}
         />
       </Row>
 
@@ -178,6 +196,42 @@ export default function SettingsScreen() {
         <Body tone="mute">sign out</Body>
       </Pressable>
     </ScrollView>
+  );
+}
+
+/**
+ * A switch whose ON state is unmistakable.
+ *
+ * The first version tinted the track `line-hi` when on, which measures only
+ * **2.29:1** against the off track — technically different, and the owner
+ * could not tell on a real phone.
+ *
+ * This palette reserves every bright hue for status (amber is DEGRADED, red is
+ * DOWN), so a switch cannot borrow the usual green. The answer is to go the
+ * other way and take the track all the way to `ink`: **16.52:1** against the
+ * page versus 1.45:1 off, with a dark thumb that stays legible on top of it.
+ * On is now the brightest thing on the screen, which is exactly what it should
+ * be for a setting that changes how the monitor behaves.
+ */
+function SettingSwitch({
+  value,
+  onValueChange,
+  label,
+}: {
+  value: boolean;
+  onValueChange: (on: boolean) => void;
+  label: string;
+}) {
+  return (
+    <Switch
+      value={value}
+      onValueChange={onValueChange}
+      accessibilityLabel={label}
+      trackColor={{ false: color.line, true: color.ink }}
+      thumbColor={color.bg}
+      // iOS draws the off-state track from this rather than trackColor.false.
+      ios_backgroundColor={color.line}
+    />
   );
 }
 

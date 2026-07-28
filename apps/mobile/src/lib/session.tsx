@@ -1,6 +1,7 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase, startSessionAutoRefresh } from "./supabase";
+import { clearStatusCache } from "./use-status";
 
 /**
  * Who is signed in, and whether they have finished first-run setup.
@@ -49,6 +50,12 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [onboarded, setOnboarded] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Read inside the auth listener without re-subscribing on every session
+  // change — resubscribing would tear down and rebuild the listener mid-flight.
+  const currentUserId = session?.user.id;
+  const userIdRef = useRef(currentUserId);
+  userIdRef.current = currentUserId;
+
   useEffect(() => {
     startSessionAutoRefresh();
 
@@ -66,6 +73,9 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     const { data: sub } = supabase.auth.onAuthStateChange(
       async (_event, next) => {
         if (!active) return;
+        // Before anything else: one account must never see another's cached
+        // dashboard for even a frame.
+        if (next?.user.id !== userIdRef.current) clearStatusCache();
         setSession(next);
         // Cleared on sign-out so the next account cannot inherit the previous
         // one's answer for the moment before its own fetch lands.

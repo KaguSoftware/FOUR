@@ -18,6 +18,19 @@ export default function StatusScreen() {
   const router = useRouter();
   const { status, loading, error, refresh } = useStatus();
   const [busy, setBusy] = useState(false);
+  /**
+   * Levers logged on this screen but not yet confirmed by a reload.
+   *
+   * The grid and the button fill the instant you tap, which matters more here
+   * than anywhere else: this is used in a gym basement on bad signal, and every
+   * second where a tap looks like it did nothing is a reason to tap again or
+   * to give up. The write is idempotent — the unique constraint on
+   * `(user_id, logged_for, lever)` makes a retry an update — so being ahead of
+   * the server cannot corrupt the day.
+   */
+  const [justLogged, setJustLogged] = useState<string[]>([]);
+  /** The same, for undo — a mistake should also cost nothing to see fixed. */
+  const [justUndone, setJustUndone] = useState<string[]>([]);
 
   // The phone derives its own logical day and never reads `timezone`, but the
   // server-side monitor does. If it drifts, the pager fires on a different day
@@ -56,11 +69,46 @@ export default function StatusScreen() {
   } = status;
 
   async function log(lever: string, detail: string | null) {
+    setJustUndone((l) => l.filter((k) => k !== lever));
+    setJustLogged((l) => [...l, lever]);
     setBusy(true);
     await logEntry(state.user_id, lever, detail);
     await refresh();
+    setJustLogged((l) => l.filter((k) => k !== lever));
     setBusy(false);
   }
+
+  async function undo(lever: string) {
+    setJustLogged((l) => l.filter((k) => k !== lever));
+    setJustUndone((l) => [...l, lever]);
+    setBusy(true);
+    await undoEntry(state.user_id, lever);
+    await refresh();
+    setJustUndone((l) => l.filter((k) => k !== lever));
+    setBusy(false);
+  }
+
+  // Merged, not replaced: the reload is the source of truth and the optimistic
+  // set only adds to it, so a lever logged on another device still shows.
+  const shownAsLogged = [...new Set([...todayLevers, ...justLogged])].filter(
+    (k) => !justUndone.includes(k),
+  );
+
+  // The grid reads entries, not the lever list, so it needs the same treatment
+  // or the cell stays dark while the button says done — which reads as the tap
+  // half-working.
+  const shownEntries = justLogged.length
+    ? [
+        ...entries,
+        ...justLogged.map((lever) => ({
+          logged_for: today,
+          lever,
+          detail: null,
+        })),
+      ]
+    : entries.filter(
+        (e) => !(e.logged_for === today && justUndone.includes(e.lever)),
+      );
 
   // Down 3+ days: the dashboard is REPLACED, not annotated. A system with no
   // history has never been down, so a first run gets the normal empty state
@@ -71,7 +119,7 @@ export default function StatusScreen() {
         down={down}
         levers={levers}
         playbook={playbook}
-        todayLevers={todayLevers}
+        todayLevers={shownAsLogged}
         lastRun={lastRun}
         lastDetail={lastDetail(entries)}
         posture={state.posture}
@@ -161,7 +209,7 @@ export default function StatusScreen() {
 
       <View style={{ marginTop: space[8], marginBottom: space[10] }}>
         <DayGrid
-          entries={entries}
+          entries={shownEntries}
           today={today}
           leverCount={status.leverCount}
         />
@@ -169,19 +217,14 @@ export default function StatusScreen() {
 
       <LeverButtons
         levers={levers}
-        todayLevers={todayLevers}
+        todayLevers={shownAsLogged}
         busy={busy}
         // Opens the native sheet to attach WHAT you did. Optional, always —
         // the sheet's own "just mark it up" logs with no detail.
         onPress={(lever) =>
           router.push({ pathname: "/log", params: { lever: lever.key } })
         }
-        onUndo={async (lever) => {
-          setBusy(true);
-          await undoEntry(state.user_id, lever.key);
-          await refresh();
-          setBusy(false);
-        }}
+        onUndo={(lever) => undo(lever.key)}
       />
 
       {slammed && (

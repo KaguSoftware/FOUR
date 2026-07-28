@@ -1,5 +1,4 @@
 import { useEffect } from "react";
-import { Platform } from "react-native";
 import {
   NativeTabs,
   Icon,
@@ -21,12 +20,19 @@ import { color, size } from "@/theme";
  * Android. Not a lookalike: the blur, the selection animation, the haptics, the
  * accessibility tree and the scroll-edge behaviour all come from the OS.
  *
- * **Icons are per-platform by design**, because iconography belongs to the
- * interaction layer that adapts per OS. On iOS that is an SF Symbol by name.
- * On Android, expo-router 6 offers `drawable` (a native resource, which needs a
- * prebuild and so does not work in Expo Go) or an image — so we hand it a
- * Material icon rendered by `@expo/vector-icons`, which works in Expo Go and is
- * still the correct Material glyph.
+ * **`Label` and `Icon` must be DIRECT children of `NativeTabs.Trigger`.** They
+ * are never rendered — expo-router walks the children and matches on strict
+ * element identity (`child.type === Icon`), reading their props as config. A
+ * wrapper component, however tidy, produces an element of the wrong type and is
+ * silently dropped, which is exactly how this shipped with no icons at all. Do
+ * not factor these into a helper.
+ *
+ * **One `Icon` covers both platforms.** `sf` is read only when the build target
+ * is iOS and `androidSrc` only on Android, so the unused branch costs nothing.
+ * Android goes through `VectorIcon` because the alternative, `drawable`, is a
+ * native resource that needs a prebuild and therefore cannot work in Expo Go.
+ * `VectorIcon` is *not* a valid child on its own — it is only understood as the
+ * `src`/`androidSrc` prop of an `Icon`.
  *
  * The palette, the type and the copy are identical on both. Those belong to the
  * brand, not the platform.
@@ -73,40 +79,35 @@ export default function TabsLayout() {
     >
       <NativeTabs.Trigger name="index">
         <Label>Status</Label>
-        <TabIcon sf="waveform.path.ecg" md="monitor-heart" />
+        <Icon
+          sf="waveform.path.ecg"
+          androidSrc={<VectorIcon family={MaterialIcons} name="monitor-heart" />}
+        />
       </NativeTabs.Trigger>
 
       <NativeTabs.Trigger name="history">
         <Label>History</Label>
-        <TabIcon sf="clock.arrow.circlepath" md="history" />
+        <Icon
+          sf="clock.arrow.circlepath"
+          androidSrc={<VectorIcon family={MaterialIcons} name="history" />}
+        />
       </NativeTabs.Trigger>
 
       <NativeTabs.Trigger name="proof">
         <Label>Proof</Label>
-        <TabIcon sf="chart.xyaxis.line" md="show-chart" />
+        <Icon
+          sf="chart.xyaxis.line"
+          androidSrc={<VectorIcon family={MaterialIcons} name="show-chart" />}
+        />
       </NativeTabs.Trigger>
 
       <NativeTabs.Trigger name="settings">
         <Label>Settings</Label>
-        <TabIcon sf="gearshape" md="settings" />
+        <Icon
+          sf="gearshape"
+          androidSrc={<VectorIcon family={MaterialIcons} name="settings" />}
+        />
       </NativeTabs.Trigger>
     </NativeTabs>
   );
-}
-
-/**
- * One tab icon, expressed once per platform.
- *
- * `Icon` and `VectorIcon` are different components in expo-router 6, so the
- * branch is here rather than repeated at every call site.
- */
-function TabIcon({
-  sf,
-  md,
-}: {
-  sf: React.ComponentProps<typeof Icon>["sf"];
-  md: React.ComponentProps<typeof MaterialIcons>["name"];
-}) {
-  if (Platform.OS === "ios") return <Icon sf={sf} />;
-  return <VectorIcon family={MaterialIcons} name={md} />;
 }

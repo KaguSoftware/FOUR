@@ -21,6 +21,7 @@ import {
 } from "@uptime/core";
 
 import { Body, Label, Wordmark } from "@/components/ui";
+import { ChoiceCard } from "@/components/choice-card";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "@/lib/session";
 import { color, radius, size, space, TAP } from "@/theme";
@@ -257,43 +258,15 @@ export default function OnboardingScreen() {
             </Text>
 
             <View style={{ gap: space[2] }}>
-              {POSTURE_CHOICES.map((choice) => {
-                const on = choice.value === posture;
-                return (
-                  <Pressable
-                    key={choice.value}
-                    accessibilityRole="radio"
-                    accessibilityState={{ selected: on }}
-                    onPress={() => setPosture(choice.value)}
-                    style={{
-                      padding: space[4],
-                      borderRadius: radius.md,
-                      borderWidth: 1,
-                      // Selection is carried by the mark AND the border
-                      // stepping to lineHi — never by the fill alone, which
-                      // separates by only 1.10:1.
-                      borderColor: on ? color.lineHi : color.line,
-                      backgroundColor: on ? color.surfaceHi : color.surface,
-                    }}
-                  >
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        justifyContent: "space-between",
-                      }}
-                    >
-                      <Body tone={on ? "ink" : "dim"}>{choice.title}</Body>
-                      {on && <Body tone="ink">✓</Body>}
-                    </View>
-                    <Body
-                      tone="mute"
-                      style={{ marginTop: space[1], fontSize: size.xs }}
-                    >
-                      {choice.detail}
-                    </Body>
-                  </Pressable>
-                );
-              })}
+              {POSTURE_CHOICES.map((choice) => (
+                <ChoiceCard
+                  key={choice.value}
+                  title={choice.title}
+                  detail={choice.detail}
+                  selected={choice.value === posture}
+                  onPress={() => setPosture(choice.value)}
+                />
+              ))}
             </View>
 
             {/* Load-bearing. Without it SOFT reads as the easier setting, and

@@ -252,3 +252,40 @@ Exercise the monitor locally without sending anything:
 ```bash
 curl "http://localhost:3000/api/monitor/check?secret=$CRON_SECRET&dry=1"
 ```
+
+## Development builds and push
+
+**There is no `eas` command on this machine — it runs through `npx`.**
+Everything below is run from `apps/mobile` and needs a free Expo account.
+
+```bash
+cd apps/mobile
+npx eas-cli@latest login
+npx eas-cli@latest init      # creates the project, writes extra.eas.projectId into app.json
+
+# EAS Build does NOT see .env.local — it is gitignored and never uploaded.
+# The keys live in EAS instead, so nothing lands in a public repo.
+npx eas-cli@latest env:create --name EXPO_PUBLIC_SUPABASE_URL \
+  --value "https://<ref>.supabase.co" --environment development,preview,production \
+  --visibility plaintext
+npx eas-cli@latest env:create --name EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY \
+  --value "sb_publishable_..." --environment development,preview,production \
+  --visibility plaintext
+
+npx eas-cli@latest build --profile development --platform android  # APK, no Apple account
+npx eas-cli@latest build --profile development --platform ios      # needs an Apple Developer account
+```
+
+**Why this is needed at all:** `expo-notifications` cannot issue a push token
+without an EAS `projectId`, and **remote push does not work in Expo Go** — so
+the escalation ladder is untestable until a development build exists.
+`registerForPush` already fails soft and says why (`"no EAS projectId; run
+eas init"`), so nothing crashes in the meantime.
+
+**Android is the cheap path**: EAS builds an APK you install directly, no Apple
+account and no Mac. iOS device builds need an Apple Developer account ($99/yr)
+or Xcode on the team's Mac.
+
+If the Expo account is an **organisation** rather than a personal one, add
+`"owner": "<org-slug>"` to `app.json` first, or `eas init` creates the project
+under the wrong account.

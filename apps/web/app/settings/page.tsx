@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getStatus } from "@/lib/system";
 import { signOut } from "@/app/actions";
+import { LeverManager } from "./lever-manager";
 import { SlammedToggle } from "./slammed-toggle";
 import { WeightToggle } from "./weight-toggle";
 import { TelegramSetup } from "./telegram-setup";
@@ -23,6 +24,10 @@ export default async function SettingsPage() {
       </header>
 
       <section className="border-line mb-6 border-b pb-6">
+        <LeverManager levers={status.levers} />
+      </section>
+
+      <section className="border-line border-b py-6">
         <SlammedToggle on={slammed} until={state.slammed_until} />
       </section>
 

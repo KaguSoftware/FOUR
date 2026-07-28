@@ -143,14 +143,16 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 6. ~~Spike the Hermes `Intl` timezone risk~~ — done 2026-07-28, answered by research plus `logicalDateLocal`. Two spikes remain and both need a device: Supabase session persistence in Expo, and one real push notification delivered.
 7. ~~`Lever = string` + lever key/label rules in `packages/core/levers.ts`~~ — done 2026-07-28. The engine was untouched by the widening, which is the gate passing: 77 tests green.
 8. ~~Schema migration — `levers` table, drop the `gym`/`food` CHECKs, backfill, `push_token`, `posture`~~ — written and verified 2026-07-28 via `npm run test:migrations` (15 checks). **Not yet applied — needs `npx supabase db push`.**
-9. **← ACTIVE: wire lever CRUD** — server actions for create/rename/archive/reorder, a management UI in Settings, and read `ACTIVE_LEVERS` from the table instead of the constant.
-10. Build the Expo app · push replaces Telegram · offline outbox · store prep.
+9. ~~Wire lever CRUD~~ — done 2026-07-28. Actions, a Settings manager, and `getStatus` reads levers from the table.
+10. **← ACTIVE: onboarding** — state the rule, pick 1–4 levers, choose posture, then set `onboarded_at`. A new signup now gets NO levers, so without this the dashboard has no buttons.
+11. Build the Expo app · push replaces Telegram · offline outbox · store prep.
 
 ## Deliberately partial — grows later (scope ledger)
 
 | Area | What ships now | Intended full shape | Grows in |
 | --- | --- | --- | --- |
-| Levers | Type widened to `string`; key/label rules and validation shipped in `packages/core/levers.ts`. Still the hardcoded pair at runtime, still CHECK-constrained in SQL | Up to 4 user-defined, read from a `levers` table | **Step 8 — active** |
+| Levers | Fully user-defined on web: table, CRUD actions, Settings manager, 1–4 layout | Same on mobile | Done on web |
+| Onboarding | None — a new signup lands with no levers | Rule, lever picker, posture | **Step 10 — active, and blocking new signups** |
 | Day grid | Lightness ramp, generated per lever count | Unchanged; steps grow with user-defined levers | Done |
 | Proof trend | Daily points, 60-day window | Unchanged | Done |
 | Weight | Opt-in toggle, field, and line — **migration not yet applied** | Unchanged | Needs `db push` |
@@ -181,6 +183,8 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 - **`.env.local` lives at `apps/web/.env.local`, not the repo root.** `scripts/_session.mjs` resolves that path relative to its own location so there is one copy of the secrets.
 - **`.gitignore` patterns are deliberately un-anchored.** A root-anchored `/node_modules` would silently stop ignoring `apps/web/.next`.
 - **Reads in `getSystemState` and `/proof` tolerate an unmigrated database.** The weight columns are selected optimistically and retried without them on error, and `amount` is only touched when the opt-in is on. This exists because a deploy and a migration never land at the same instant, and a missing column should not take the whole app down for the minutes in between. Keep that property when touching either read.
+- **A new signup now gets NO levers.** The trigger only creates `system_state`; onboarding is what writes them. Until onboarding ships, a fresh account sees a dashboard with no buttons — `getLevers` falls back to the historical pair only when the table read fails, not when it legitimately returns zero rows for a new user.
+- **"Food first" is gone.** The takeover and the monitor used to rank the food lever first, on the principle that coming back must be lighter than starting. That cannot survive user-defined levers — we cannot know which of someone's levers is the light one — so both now rank by what has actually worked (pinned, then use_count). If you want the old behaviour back, it needs a user-nominated "lightest" lever, which is new product scope.
 - **A migration is not done until `npm run test:migrations` passes.** There is no Docker here, so PGlite is the only pre-flight check, and `supabase db push` is not reversible. That harness already caught an `on delete restrict` that would have broken Apple-mandated account deletion.
 - **The old `handle_new_user()` seeded gym AND food playbook rows for every signup**, so every pre-existing account carries both levers and the backfill covers everyone through `playbook` even if they never logged. The new trigger seeds nothing — onboarding writes the levers.
 - **Playwright's browser binary needs `npx playwright install chromium`.** npm 11's `allow-scripts` gate blocks its postinstall, which silently breaks `scripts/shoot.mjs`.

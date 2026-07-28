@@ -2,7 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import { getSupabase, getSystemState } from "@/lib/system";
-import { addDays, logicalDate, type Lever } from "@uptime/core";
+import {
+  addDays,
+  canAddLever,
+  logicalDate,
+  uniqueLeverKey,
+  validateLeverLabel,
+  type Lever,
+} from "@uptime/core";
 
 /**
  * Every action re-checks auth. Server Functions are reachable via direct POST,
@@ -236,4 +243,131 @@ export async function setWeightEnabled(on: boolean) {
     .eq("user_id", user.id);
   revalidatePath("/settings");
   revalidatePath("/proof");
+}
+
+// ---------------------------------------------------------------------------
+// Levers
+//
+// A lever has a stable `key` and a renameable `label`. Entries store the key,
+// which is what makes renaming free and archiving safe: nothing done here can
+// change what a past day was worth.
+// ---------------------------------------------------------------------------
+
+export type LeverResult = { ok: true } | { ok: false; error: string };
+
+/** Create a lever. Fails closed at four active, matching the DB constraint. */
+export async function createLever(label: string): Promise<LeverResult> {
+  const { supabase, user } = await requireUser();
+
+  const check = validateLeverLabel(label);
+  if (!check.ok) return { ok: false, error: check.reason };
+
+  const { data: existing } = await supabase
+    .from("levers")
+    .select("key, position, archived")
+    .eq("user_id", user.id);
+
+  const rows = existing ?? [];
+  const active = rows.filter((l) => !l.archived);
+  if (!canAddLever(active.length)) {
+    return { ok: false, error: "Four levers is the maximum. Archive one first." };
+  }
+
+  // Unique against EVERY key, archived included — an archived lever still owns
+  // its key because its entries still point at it.
+  const key = uniqueLeverKey(label, rows.map((l) => l.key));
+
+  // Lowest free slot, so archiving then adding reuses the gap rather than
+  // pushing past the position <= 4 constraint.
+  const taken = new Set(active.map((l) => l.position));
+  let position = 1;
+  while (taken.has(position)) position++;
+
+  const { error } = await supabase
+    .from("levers")
+    .insert({ user_id: user.id, key, label: label.trim(), position });
+  if (error) return { ok: false, error: "Could not add that lever." };
+
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
+/** Rename a lever. The key never moves, so history is untouched. */
+export async function renameLever(id: string, label: string): Promise<LeverResult> {
+  const { supabase, user } = await requireUser();
+
+  const check = validateLeverLabel(label);
+  if (!check.ok) return { ok: false, error: check.reason };
+
+  const { error } = await supabase
+    .from("levers")
+    .update({ label: label.trim() })
+    .eq("id", id)
+    .eq("user_id", user.id);
+  if (error) return { ok: false, error: "Could not rename that lever." };
+
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
+/**
+ * Archive a lever. Never deletes.
+ *
+ * Entries keep pointing at the key, so the day grid and the 30-day number are
+ * byte-identical afterwards — nothing you do today can make yesterday worse.
+ * Refuses to archive the last one, because a dashboard with no buttons is not
+ * a state the product has.
+ */
+export async function archiveLever(id: string): Promise<LeverResult> {
+  const { supabase, user } = await requireUser();
+
+  const { data: active } = await supabase
+    .from("levers")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("archived", false);
+
+  if ((active ?? []).length <= 1) {
+    return { ok: false, error: "Keep at least one lever — add another first." };
+  }
+
+  const { error } = await supabase
+    .from("levers")
+    .update({ archived: true })
+    .eq("id", id)
+    .eq("user_id", user.id);
+  if (error) return { ok: false, error: "Could not archive that lever." };
+
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
+/** Bring an archived lever back, into the lowest free slot. */
+export async function restoreLever(id: string): Promise<LeverResult> {
+  const { supabase, user } = await requireUser();
+
+  const { data: active } = await supabase
+    .from("levers")
+    .select("position")
+    .eq("user_id", user.id)
+    .eq("archived", false);
+
+  const rows = active ?? [];
+  if (!canAddLever(rows.length)) {
+    return { ok: false, error: "Four levers is the maximum. Archive one first." };
+  }
+
+  const taken = new Set(rows.map((l) => l.position));
+  let position = 1;
+  while (taken.has(position)) position++;
+
+  const { error } = await supabase
+    .from("levers")
+    .update({ archived: false, position })
+    .eq("id", id)
+    .eq("user_id", user.id);
+  if (error) return { ok: false, error: "Could not restore that lever." };
+
+  revalidatePath("/", "layout");
+  return { ok: true };
 }

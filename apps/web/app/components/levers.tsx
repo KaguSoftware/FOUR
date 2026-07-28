@@ -2,8 +2,8 @@
 
 import { useOptimistic, useState, useTransition } from "react";
 import { logEntry, undoEntry } from "@/app/actions";
-import type { PlaybookItem } from "@/lib/system";
-import { ACTIVE_LEVERS, type Lever } from "@uptime/core";
+import type { LeverRow, PlaybookItem } from "@/lib/system";
+import type { Lever } from "@uptime/core";
 
 /**
  * The whole logging path: tap a lever, tap a chip. Two taps, no typing.
@@ -14,10 +14,13 @@ import { ACTIVE_LEVERS, type Lever } from "@uptime/core";
  * looking dead.
  */
 export function Levers({
+  levers,
   playbook,
   todayLevers,
   compact = false,
 }: {
+  /** Active levers in display order — one to four, user-defined. */
+  levers: LeverRow[];
   playbook: PlaybookItem[];
   todayLevers: string[];
   compact?: boolean;
@@ -51,17 +54,28 @@ export function Levers({
 
   return (
     <>
+      {/* One lever spans the row; three puts the odd one full-width rather than
+          leaving a hole, because an empty cell reads as a missing lever. */}
       <div className="grid grid-cols-2 gap-2">
-        {ACTIVE_LEVERS.map((lever) => (
-          <LeverButton
-            key={lever}
-            lever={lever}
-            done={logged.has(lever)}
-            busy={pending}
-            compact={compact}
-            onOpen={() => setOpen(lever)}
-            onUndo={() => remove(lever)}
-          />
+        {levers.map((l, i) => (
+          <div
+            key={l.key}
+            className={
+              levers.length === 1 || (levers.length === 3 && i === 2)
+                ? "col-span-2"
+                : ""
+            }
+          >
+            <LeverButton
+              lever={l.key}
+              label={l.label}
+              done={logged.has(l.key)}
+              busy={pending}
+              compact={compact}
+              onOpen={() => setOpen(l.key)}
+              onUndo={() => remove(l.key)}
+            />
+          </div>
         ))}
       </div>
 
@@ -80,6 +94,7 @@ export function Levers({
 
 function LeverButton({
   lever,
+  label,
   done,
   busy,
   compact,
@@ -87,6 +102,7 @@ function LeverButton({
   onUndo,
 }: {
   lever: Lever;
+  label: string;
   done: boolean;
   busy: boolean;
   compact: boolean;
@@ -107,7 +123,7 @@ function LeverButton({
             : "border-line-hi bg-surface-hi text-ink hover:bg-line active:bg-line-hi",
         ].join(" ")}
       >
-        {done ? `${lever} ✓` : lever}
+        {done ? `${label} ✓` : label}
       </button>
       {/* Undo sits below rather than overlapping the button it undoes, and is
           a full-width tap target — it is used with one thumb, mid-mistake. */}

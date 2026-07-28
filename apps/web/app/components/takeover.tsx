@@ -44,7 +44,14 @@ export function Takeover({
   // Food first: it is the lighter lever, and coming back must be lighter
   // than starting.
   const options = [...playbook].sort((a, b) => {
-    if (a.lever !== b.lever) return a.lever === "food" ? -1 : 1;
+    // Was "food first", on the principle that coming back must be lighter
+    // than starting. That cannot survive user-defined levers — we have no idea
+    // which of someone's levers is the light one, and guessing would put the
+    // hardest thing at the top of the re-entry screen.
+    //
+    // The honest proxy is what has actually worked most often for this person,
+    // which is use_count, already the sort below. So the lever tier is simply
+    // gone rather than replaced with a guess.
     return Number(b.is_pinned) - Number(a.is_pinned);
   });
 

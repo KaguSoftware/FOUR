@@ -6,9 +6,9 @@ import {
   deriveIntervals,
   downDays,
   lastCompletedRun,
-  leverCount,
   logicalDate,
   uptimeWindow,
+  ACTIVE_LEVERS,
   type Entry,
   type Lever,
 } from "@uptime/core";
@@ -19,6 +19,14 @@ export type PlaybookItem = {
   label: string;
   use_count: number;
   is_pinned: boolean;
+};
+
+export type LeverRow = {
+  id: string;
+  key: string;
+  label: string;
+  position: number;
+  archived: boolean;
 };
 
 export type SystemState = {
@@ -34,7 +42,36 @@ export const DEFAULT_TZ = "Europe/Istanbul";
 
 // The lever set lives in @uptime/core so client components can read it without
 // pulling next/headers into the browser bundle. Re-exported for server callers.
-export { ACTIVE_LEVERS } from "@uptime/core";
+export { ACTIVE_LEVERS };
+
+/**
+ * Active levers, in display order.
+ *
+ * Falls back to the historical pair if the `levers` table is not there yet,
+ * for the same reason the weight columns do: a deploy and a migration never
+ * land at the same instant, and a missing table should not take the dashboard
+ * down for the minutes in between.
+ */
+export async function getLevers(userId: string): Promise<LeverRow[]> {
+  const supabase = await getSupabase();
+  const { data, error } = await supabase
+    .from("levers")
+    .select("id, key, label, position, archived")
+    .eq("user_id", userId)
+    .eq("archived", false)
+    .order("position", { ascending: true });
+
+  if (error || !data || data.length === 0) {
+    return ACTIVE_LEVERS.map((key, i) => ({
+      id: `fallback-${key}`,
+      key,
+      label: key,
+      position: i + 1,
+      archived: false,
+    }));
+  }
+  return data as LeverRow[];
+}
 
 export async function getSupabase() {
   return createClient(await cookies());
@@ -83,19 +120,10 @@ export async function getSystemState(userId: string): Promise<SystemState> {
     .select(migrated ? `${BASE_COLUMNS}, ${WEIGHT_COLUMNS}` : BASE_COLUMNS)
     .single();
 
-  // Seed the playbook too, so re-entry is never a blank page.
-  await supabase.from("playbook").upsert(
-    [
-      { user_id: userId, lever: "food", label: "shake @ lunch", is_pinned: true },
-      {
-        user_id: userId,
-        lever: "gym",
-        label: "treadmill + 2 machines",
-        is_pinned: true,
-      },
-    ],
-    { onConflict: "user_id,lever,label", ignoreDuplicates: true },
-  );
+  // No playbook seeding. It used to insert a gym and a food row here, which
+  // would now VIOLATE playbook_lever_fk for any user whose levers are not that
+  // pair — and after onboarding, most will not be. An empty playbook is a
+  // working screen anyway: the lever sheet always offers "just mark it up".
 
   const createdRow = (created ?? {
     user_id: userId,
@@ -122,7 +150,7 @@ export async function getStatus() {
   const state = await getSystemState(user.id);
   const today = logicalDate(new Date(), state.timezone);
 
-  const [{ data: entryRows }, { data: playbookRows }, { data: milestoneRow }] =
+  const [{ data: entryRows }, { data: playbookRows }, { data: milestoneRow }, levers] =
     await Promise.all([
       supabase
         .from("entries")
@@ -144,6 +172,7 @@ export async function getStatus() {
         .order("first_hit_on", { ascending: false })
         .limit(1)
         .maybeSingle(),
+      getLevers(user.id),
     ]);
 
   const entries = (entryRows ?? []) as Entry[];
@@ -164,8 +193,9 @@ export async function getStatus() {
     entries,
     playbook,
     todayLevers: new Set(todayEntries.map((e) => e.lever)),
-    // Sets how many steps the day-grid ramp has. See ACTIVE_LEVERS.
-    leverCount: leverCount(),
+    levers,
+    // Sets how many steps the day-grid ramp has.
+    leverCount: levers.length,
     uptime: uptimeWindow(entries, today),
     run: currentRun(entries, today),
     down: downDays(entries, today),

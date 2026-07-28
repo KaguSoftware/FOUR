@@ -2,10 +2,15 @@
 
 import { useState, useTransition } from "react";
 import { updatePlaybook } from "@/app/actions";
-import type { PlaybookItem } from "@/lib/system";
-import { ACTIVE_LEVERS } from "@uptime/core";
+import type { LeverRow, PlaybookItem } from "@/lib/system";
 
-export function PlaybookList({ items }: { items: PlaybookItem[] }) {
+export function PlaybookList({
+  items,
+  levers,
+}: {
+  items: PlaybookItem[];
+  levers: LeverRow[];
+}) {
   const [pending, start] = useTransition();
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -30,10 +35,10 @@ export function PlaybookList({ items }: { items: PlaybookItem[] }) {
 
   return (
     <div className="flex flex-col gap-8">
-      {ACTIVE_LEVERS.map((lever) =>
+      {levers.map(({ key: lever, label: leverLabel }) =>
         grouped.get(lever)?.length ? (
           <section key={lever}>
-            <p className="label mb-3">{lever}</p>
+            <p className="label mb-3">{leverLabel}</p>
             <ul className="flex flex-col">
               {(grouped.get(lever) ?? []).map((item) => (
                 <li

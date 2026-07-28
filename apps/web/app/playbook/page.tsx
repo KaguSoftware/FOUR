@@ -23,7 +23,7 @@ export default async function PlaybookPage() {
         <BackLink />
       </header>
 
-      <PlaybookList items={status.playbook} />
+      <PlaybookList items={status.playbook} levers={status.levers} />
     </main>
   );
 }

@@ -79,7 +79,7 @@ export default async function StatusPage() {
         {entries.length === 0 && (
           <p className="text-ink-dim mt-3 text-xs leading-relaxed">
             Nothing logged yet. One small real thing puts the system up today —
-            a short session or the food lever. Either counts on its own.
+            any one of your levers. One is enough on its own.
           </p>
         )}
 
@@ -104,11 +104,15 @@ export default async function StatusPage() {
       {/* The levers sit in the optical centre of the remaining space: this is
           the thing you open the app to press. */}
       <section className="mb-4 flex flex-col justify-center">
-        <Levers playbook={playbook} todayLevers={[...todayLevers]} />
+        <Levers
+          levers={status.levers}
+          playbook={playbook}
+          todayLevers={[...todayLevers]}
+        />
         {slammed && (
           <p className="text-ink-mute mt-3 text-xs">
-            slammed mode — the food lever alone counts. ten minutes of anything
-            counts.
+            slammed mode — still one lever, still ten minutes of anything. the
+            pager waits an extra day.
           </p>
         )}
       </section>

@@ -94,10 +94,12 @@ export async function GET(request: NextRequest) {
     const { up, total } = uptimeWindow(entries, today);
     const uptimePct = total ? (up / total) * 100 : 0;
 
-    // Food first — coming back must be lighter than starting.
-    const playbook = (playbookRows ?? [])
-      .sort((a, b) => (a.lever === "food" ? -1 : 1) - (b.lever === "food" ? -1 : 1))
-      .map((p) => p.label);
+    // Ranked by what has actually worked — pinned first, then use_count, per
+    // the query above. This used to put the food lever first, on the principle
+    // that coming back must be lighter than starting; that cannot survive
+    // user-defined levers, since we have no way to know which of someone's
+    // levers is the light one. See takeover.tsx.
+    const playbook = (playbookRows ?? []).map((p) => p.label);
 
     const siteUrl =
       process.env.NEXT_PUBLIC_SITE_URL ?? request.nextUrl.origin;

@@ -4,11 +4,13 @@ import { revalidatePath } from "next/cache";
 import { getSupabase, getSystemState } from "@/lib/system";
 import {
   addDays,
+  appendDetail,
   canAddLever,
   logicalDate,
   toPosture,
   uniqueLeverKey,
   validateLeverLabel,
+  DETAIL_MAX,
   MAX_LEVERS,
   NOTE_MAX,
   type Lever,
@@ -29,11 +31,25 @@ async function requireUser() {
 }
 
 /**
+ * What every mutating action returns.
+ *
+ * Most of these used to return `void` and never read Supabase's `error` at
+ * all. Combined with `useOptimistic`, that made a failed write indistinguishable
+ * from a successful one: the button filled in, the revalidation quietly put it
+ * back, and nothing ever said why. A readout that can silently disagree with
+ * the database is the one thing this product cannot ship.
+ */
+export type ActionResult = { ok: true } | { ok: false; error: string };
+
+/**
  * Log one lever for today. Idempotent by design — the unique constraint means
  * re-tapping GYM is a no-op, not a duplicate, so a double tap on a bad
  * connection can never corrupt the day.
  */
-export async function logEntry(lever: Lever, detail?: string | null) {
+export async function logEntry(
+  lever: Lever,
+  detail?: string | null,
+): Promise<ActionResult> {
   const { supabase, user } = await requireUser();
   const state = await getSystemState(user.id);
   const today = logicalDate(new Date(), state.timezone);
@@ -64,51 +80,79 @@ export async function logEntry(lever: Lever, detail?: string | null) {
     }
   }
 
-  await supabase.from("entries").upsert(
+  // Appended, never replaced — and capped, which the bare `text` column is
+  // not. Mobile has always composed the detail this way (`log.tsx`); web
+  // overwrote it, so doing the thing twice in one day lost the first half
+  // depending on which client you happened to use.
+  const incoming = detail?.trim() || null;
+  let nextDetail = incoming ? incoming.slice(0, DETAIL_MAX) : null;
+
+  if (incoming) {
+    const { data: existing } = await supabase
+      .from("entries")
+      .select("detail")
+      .eq("user_id", user.id)
+      .eq("logged_for", today)
+      .eq("lever", lever)
+      .maybeSingle();
+
+    if (existing?.detail) nextDetail = appendDetail(existing.detail, incoming);
+  }
+
+  const { error } = await supabase.from("entries").upsert(
     {
       user_id: user.id,
       logged_for: today,
       lever,
-      detail: detail?.trim() || null,
+      detail: nextDetail,
       playbook_id: playbookId,
     },
     { onConflict: "user_id,logged_for,lever" },
   );
 
+  if (error) return { ok: false, error: error.message };
+
   revalidatePath("/", "layout");
+  return { ok: true };
 }
 
 /** Undo today's entry for a lever. Mistakes should cost one tap to fix. */
-export async function undoEntry(lever: Lever) {
+export async function undoEntry(lever: Lever): Promise<ActionResult> {
   const { supabase, user } = await requireUser();
   const state = await getSystemState(user.id);
   const today = logicalDate(new Date(), state.timezone);
 
-  await supabase
+  const { error } = await supabase
     .from("entries")
     .delete()
     .eq("user_id", user.id)
     .eq("logged_for", today)
     .eq("lever", lever);
 
+  if (error) return { ok: false, error: error.message };
+
   revalidatePath("/", "layout");
+  return { ok: true };
 }
 
 /**
  * Busy-season mode. Auto-expires after 14 days so it can never quietly become
  * the permanent state — re-arming is deliberate.
  */
-export async function setSlammed(on: boolean) {
+export async function setSlammed(on: boolean): Promise<ActionResult> {
   const { supabase, user } = await requireUser();
   const state = await getSystemState(user.id);
   const today = logicalDate(new Date(), state.timezone);
 
-  await supabase
+  const { error } = await supabase
     .from("system_state")
     .update({ slammed_until: on ? addDays(today, 14) : null })
     .eq("user_id", user.id);
 
+  if (error) return { ok: false, error: error.message };
+
   revalidatePath("/", "layout");
+  return { ok: true };
 }
 
 /** Annotate an outage after the fact — "knee", "finals". */
@@ -139,7 +183,7 @@ export async function logSignals(input: {
   /** Optional, opt-in. Stored in `signals`, never in `entries`, so it is
       structurally incapable of affecting uptime. */
   weight?: number | null;
-}) {
+}): Promise<ActionResult> {
   const { supabase, user } = await requireUser();
   const state = await getSystemState(user.id);
   const today = logicalDate(new Date(), state.timezone);
@@ -185,22 +229,40 @@ export async function logSignals(input: {
   }
 
   if (rows.length) {
-    await supabase
+    const { error } = await supabase
       .from("signals")
       .upsert(rows, { onConflict: "user_id,observed_on,kind" });
+    if (error) return { ok: false, error: error.message };
   }
 
   revalidatePath("/proof");
   revalidatePath("/");
+  return { ok: true };
 }
 
-export async function setTelegramChatId(chatId: string) {
+export async function setTelegramChatId(
+  chatId: string,
+): Promise<ActionResult> {
   const { supabase, user } = await requireUser();
-  await supabase
+
+  // A chat id is a numeric Telegram identifier, optionally negative for a
+  // group. Anything else is a typo at best — and since every account pages
+  // through one shared bot token, an unvalidated value here is a way to
+  // address someone else's chat.
+  const trimmed = chatId.trim();
+  if (trimmed && !/^-?\d{1,20}$/.test(trimmed)) {
+    return { ok: false, error: "A chat id is a number, like 123456789." };
+  }
+
+  const { error } = await supabase
     .from("system_state")
-    .update({ telegram_chat_id: chatId.trim() || null })
+    .update({ telegram_chat_id: trimmed || null })
     .eq("user_id", user.id);
+
+  if (error) return { ok: false, error: error.message };
+
   revalidatePath("/settings");
+  return { ok: true };
 }
 
 /** Prove the pager works. A channel you have never seen fire is not a channel. */
@@ -229,14 +291,18 @@ export async function signOut() {
  * Switching it off hides the field and the chart but deletes nothing, so
  * switching back on restores the history rather than starting from zero.
  */
-export async function setWeightEnabled(on: boolean) {
+export async function setWeightEnabled(on: boolean): Promise<ActionResult> {
   const { supabase, user } = await requireUser();
-  await supabase
+  const { error } = await supabase
     .from("system_state")
     .update({ weight_enabled: on })
     .eq("user_id", user.id);
+
+  if (error) return { ok: false, error: error.message };
+
   revalidatePath("/settings");
   revalidatePath("/proof");
+  return { ok: true };
 }
 
 // ---------------------------------------------------------------------------

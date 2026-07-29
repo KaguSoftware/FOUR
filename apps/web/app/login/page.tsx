@@ -1,5 +1,6 @@
 import { LoginForm } from "./login-form";
 import { Wordmark } from "@/app/components/wordmark";
+import { safePath } from "@/lib/safe-path";
 
 export default async function LoginPage({
   searchParams,
@@ -16,7 +17,7 @@ export default async function LoginPage({
           <p className="text-ink-mute mt-2 text-sm">Authentication required.</p>
         </div>
         <LoginForm
-          next={params.next ?? "/"}
+          next={safePath(params.next)}
           error={params.error}
           sent={params.sent === "1"}
         />

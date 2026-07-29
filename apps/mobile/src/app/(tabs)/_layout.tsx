@@ -46,11 +46,12 @@ export default function TabsLayout() {
   const userId = session?.user.id;
 
   useEffect(() => {
-    // Runs here rather than at first launch: by the time someone reaches the
-    // tabs they have chosen levers, so the permission prompt is about something
-    // rather than being the first thing a stranger sees. Re-running is cheap —
-    // it re-stores the token, which is what catches an OS rotation.
-    if (userId) registerForPush(userId);
+    // Refresh only — never prompt. This runs on every mount, and its job is to
+    // re-store the token, which is what catches an OS rotation. Asking here
+    // would overrule the choice the user just made in onboarding: someone who
+    // picked "start without alerts" got the system dialog anyway, seconds
+    // later, with nothing on screen explaining why.
+    if (userId) registerForPush(userId, { prompt: false });
   }, [userId]);
 
   const reminderAt = status?.state.daily_reminder_at ?? null;

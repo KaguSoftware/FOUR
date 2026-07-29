@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { Alert, Linking, View } from "react-native";
+import { Alert, Linking } from "react-native";
 import * as Notifications from "expo-notifications";
 import { useFocusEffect } from "expo-router";
 import {
@@ -10,6 +10,7 @@ import {
 } from "@uptime/core";
 
 import { Body, Label } from "@/components/ui";
+import { Loading } from "@/components/states";
 import { Screen } from "@/components/screen";
 import { Segmented } from "@/components/segmented";
 import {
@@ -24,7 +25,7 @@ import {
 import { cancelReminder, sendTestAlert, syncReminder } from "@/lib/reminder";
 import { supabase } from "@/lib/supabase";
 import { useStatus } from "@/lib/use-status";
-import { color, space } from "@/theme";
+import { space } from "@/theme";
 
 /** Local overrides held only until the server confirms them. */
 type Pending = {
@@ -66,7 +67,7 @@ export default function AlertsScreen() {
     }, []),
   );
 
-  if (!status) return <View style={{ flex: 1, backgroundColor: color.bg }} />;
+  if (!status) return <Loading />;
   const { state } = status;
 
   // A control moves the instant it is tapped.

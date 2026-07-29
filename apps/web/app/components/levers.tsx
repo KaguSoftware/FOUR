@@ -26,6 +26,7 @@ export function Levers({
   compact?: boolean;
 }) {
   const [open, setOpen] = useState<Lever | null>(null);
+  const [failed, setFailed] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [logged, setLogged] = useOptimistic(
     new Set(todayLevers),
@@ -37,18 +38,26 @@ export function Levers({
     },
   );
 
+  // The optimistic state rolls itself back when the revalidated page disagrees,
+  // so a failed write already un-fills the button. What was missing is the
+  // reason: the lever just quietly popped back out, which reads as the app
+  // ignoring the tap.
   function commit(lever: Lever, detail?: string | null) {
     setOpen(null);
+    setFailed(null);
     startTransition(async () => {
       setLogged({ lever, on: true });
-      await logEntry(lever, detail ?? null);
+      const result = await logEntry(lever, detail ?? null);
+      if (!result.ok) setFailed(result.error);
     });
   }
 
   function remove(lever: Lever) {
+    setFailed(null);
     startTransition(async () => {
       setLogged({ lever, on: false });
-      await undoEntry(lever);
+      const result = await undoEntry(lever);
+      if (!result.ok) setFailed(result.error);
     });
   }
 
@@ -78,6 +87,18 @@ export function Levers({
           </div>
         ))}
       </div>
+
+      {/* Stated at full ink inside a bordered well rather than in red: `down`
+          and `degraded` mean the user's system is down, and a write that did
+          not land is the app's failure, not theirs. See DESIGN.md. */}
+      {failed && (
+        <p
+          role="alert"
+          className="border-line-hi bg-surface text-ink mt-2 rounded border px-3 py-2 text-xs"
+        >
+          Not saved — {failed}
+        </p>
+      )}
 
       {open && (
         <PlaybookSheet

@@ -26,7 +26,18 @@ export type WeightRow = { observed_on: string; amount: number | null };
  */
 const ROW_LIMIT = 280;
 
-export async function loadSignals(userId: string) {
+/**
+ * A read that reports its own failure.
+ *
+ * These used to return `[]` on error, which meant a dropped connection
+ * rendered as the empty state — telling someone with months of journal that
+ * they had written nothing. In a product whose whole promise is that history
+ * is never truncated, a failed read must never be able to look like an empty
+ * one.
+ */
+export type Read<T> = { rows: T[]; error: string | null };
+
+export async function loadSignals(userId: string): Promise<Read<SignalRow>> {
   const { data, error } = await supabase
     .from("signals")
     .select("observed_on, kind, value, detail")
@@ -34,8 +45,8 @@ export async function loadSignals(userId: string) {
     .order("observed_on", { ascending: false })
     .limit(ROW_LIMIT);
 
-  if (error) return [];
-  return (data ?? []) as SignalRow[];
+  if (error) return { rows: [], error: error.message };
+  return { rows: (data ?? []) as SignalRow[], error: null };
 }
 
 /**
@@ -43,7 +54,10 @@ export async function loadSignals(userId: string) {
  * of the main query entirely, so an account with weight off never touches the
  * column.
  */
-export async function loadWeights(userId: string, days: number) {
+export async function loadWeights(
+  userId: string,
+  days: number,
+): Promise<Read<WeightRow>> {
   const { data, error } = await supabase
     .from("signals")
     .select("observed_on, amount")
@@ -52,8 +66,11 @@ export async function loadWeights(userId: string, days: number) {
     .order("observed_on", { ascending: false })
     .limit(days);
 
-  if (error) return [];
-  return ((data ?? []) as WeightRow[]).filter((w) => w.amount !== null);
+  if (error) return { rows: [], error: error.message };
+  return {
+    rows: ((data ?? []) as WeightRow[]).filter((w) => w.amount !== null),
+    error: null,
+  };
 }
 
 /**
@@ -84,13 +101,19 @@ export async function logSignals(
     // Appended, never replaced. The field opens blank every time — being
     // handed back this morning's text is not how a journal is used — so a
     // plain upsert here would quietly overwrite it.
-    const { data: existing } = await supabase
+    const { data: existing, error: readError } = await supabase
       .from("signals")
       .select("detail")
       .eq("user_id", userId)
       .eq("observed_on", day)
       .eq("kind", "note")
       .maybeSingle();
+
+    // If we could not read what is already there, we cannot safely append to
+    // it: `appendNote(undefined, …)` returns just the new text, and the upsert
+    // would then REPLACE the day's journal with it. Failing the whole save is
+    // the only honest option — the user still has their text in the field.
+    if (readError) return { error: readError };
 
     rows.push({
       user_id: userId,

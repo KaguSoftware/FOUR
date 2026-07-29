@@ -31,6 +31,8 @@ export function SignalCheck({
   const [detail, setDetail] = useState(initialDetail);
   const [weight, setWeight] = useState("");
   const [done, setDone] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const noteRef = useRef<HTMLTextAreaElement>(null);
 
@@ -53,27 +55,43 @@ export function SignalCheck({
   // types a character.
   useEffect(grow, []);
 
+  // Only the explicit skip closes the form. A successful save used to close it
+  // too, onto a dead end that asked the user to reload the page — while the
+  // action had already revalidated `/proof` on its own.
   if (done) {
-    return (
-      <p className="text-ink-mute text-xs">
-        Saved. <span className="text-ink-dim">Reload to keep writing.</span>
-      </p>
-    );
+    return <p className="text-ink-mute text-xs">Nothing logged today.</p>;
   }
 
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault();
+        setFailed(null);
+        setSaved(false);
         start(async () => {
           const w = weightOpt && weight.trim() ? Number(weight) : null;
-          await logSignals({
+          const result = await logSignals({
             energy,
             sleep,
             detail,
             weight: Number.isFinite(w) ? w : null,
           });
-          setDone(true);
+
+          // Reported, not assumed. This used to mark itself saved whatever came
+          // back, so a rejected write said "Saved." and the trend below it
+          // silently disagreed.
+          if (!result.ok) {
+            setFailed(result.error);
+            return;
+          }
+
+          // The scales reset because they are today's reading and it has landed.
+          // The note does not: on web it is prefilled with today's entry, so it
+          // is an edit-in-place field and clearing it would look like deletion.
+          setEnergy(null);
+          setSleep(null);
+          setWeight("");
+          setSaved(true);
         });
       }}
     >
@@ -155,7 +173,21 @@ export function SignalCheck({
         >
           {loggedToday ? "leave it" : "skip today"}
         </button>
+        {saved && !pending && (
+          <p aria-live="polite" className="text-ink-mute self-center text-xs">
+            Saved.
+          </p>
+        )}
       </div>
+
+      {failed && (
+        <p
+          role="alert"
+          className="border-line-hi bg-surface text-ink mt-3 rounded border px-3 py-2 text-xs"
+        >
+          Not saved — {failed}
+        </p>
+      )}
     </form>
   );
 }

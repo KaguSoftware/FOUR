@@ -65,3 +65,8 @@ next-env.d.ts
 
 # local test/dev helpers
 scratch/
+
+# Supabase CLI link state. Not secret, but it publishes the project ref and the
+# pooler hostname, and this repo is public. Un-anchored so it catches a stray
+# copy created by running the CLI from the wrong directory.
+.temp/

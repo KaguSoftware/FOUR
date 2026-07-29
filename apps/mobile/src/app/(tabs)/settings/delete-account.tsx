@@ -9,6 +9,7 @@ import {
 
 import { Button } from "@/components/button";
 import { field } from "@/components/fields";
+import { Loading } from "@/components/states";
 import { Screen } from "@/components/screen";
 import { Body, Label } from "@/components/ui";
 import { clearOutbox } from "@/lib/outbox";
@@ -37,7 +38,7 @@ export default function DeleteAccountScreen() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  if (!status) return <View style={{ flex: 1, backgroundColor: color.bg }} />;
+  if (!status) return <Loading />;
   const email = status.user.email ?? "";
 
   const armed =

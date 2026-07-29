@@ -43,8 +43,20 @@ export type PushRegistration =
  * before someone has logged a single day spends the one prompt iOS gives you on
  * a stranger — it is called after onboarding, when the user has chosen levers
  * and the alerts have something to be about.
+ *
+ * **`prompt` splits the two callers**, the same way `reminder.ts` splits
+ * `syncReminder` from `reconcileReminder`. Onboarding and the Alerts screen
+ * ask deliberately, in response to something the user just did. Every other
+ * caller — notably the tab layout, which runs on every mount — passes
+ * `prompt: false` and only refreshes a token that permission already exists
+ * for. Without that split, someone who chose "not now" during onboarding got
+ * the OS dialog anyway the moment the tabs mounted, which is precisely the
+ * out-of-context prompt the onboarding step was written to avoid.
  */
-export async function registerForPush(userId: string): Promise<PushRegistration> {
+export async function registerForPush(
+  userId: string,
+  { prompt = true }: { prompt?: boolean } = {},
+): Promise<PushRegistration> {
   // A simulator cannot receive a push, and asking there returns an error that
   // reads like a real failure.
   if (!Device.isDevice) {
@@ -68,6 +80,7 @@ export async function registerForPush(userId: string): Promise<PushRegistration>
   const existing = await Notifications.getPermissionsAsync();
   let status = existing.status;
   if (status !== "granted") {
+    if (!prompt) return { ok: false, reason: "notifications not permitted" };
     status = (await Notifications.requestPermissionsAsync()).status;
   }
   if (status !== "granted") {

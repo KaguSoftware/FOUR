@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
+import { safePath } from "@/lib/safe-path";
 
 /**
  * Magic-link landing. Exchanges the code for a session, then honours the
@@ -9,7 +10,7 @@ import { createClient } from "@/utils/supabase/server";
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = request.nextUrl;
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/";
+  const next = safePath(searchParams.get("next"));
 
   if (code) {
     const supabase = createClient(await cookies());

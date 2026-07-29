@@ -11,6 +11,7 @@ import { DAILY_TREND_DAYS, NOTE_MAX } from "@uptime/core";
 
 import { Body, Label, Mono, Rule } from "@/components/ui";
 import { field, noteField } from "@/components/fields";
+import { Fault, Loading } from "@/components/states";
 import { Screen } from "@/components/screen";
 import { Trend, WeightTrend } from "@/components/trend";
 import { useStatus } from "@/lib/use-status";
@@ -38,14 +39,24 @@ export default function ProofScreen() {
   const { status } = useStatus();
   const [rows, setRows] = useState<SignalRow[]>([]);
   const [weights, setWeights] = useState<WeightRow[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   const userId = status?.state.user_id;
   const weightOn = status?.state.weight_enabled ?? false;
 
   const load = useCallback(async () => {
     if (!userId) return;
-    setRows(await loadSignals(userId));
-    setWeights(weightOn ? await loadWeights(userId, DAILY_TREND_DAYS) : []);
+    const signals = await loadSignals(userId);
+    const weight = weightOn
+      ? await loadWeights(userId, DAILY_TREND_DAYS)
+      : { rows: [], error: null };
+
+    setError(signals.error ?? weight.error);
+    // Rows are replaced only on a clean read. A failed refresh keeps whatever
+    // was already on screen — blanking a journal because the network blinked
+    // is the one thing this screen must never do.
+    if (!signals.error) setRows(signals.rows);
+    if (!weight.error) setWeights(weight.rows);
   }, [userId, weightOn]);
 
   useEffect(() => {
@@ -57,7 +68,7 @@ export default function ProofScreen() {
     }, [load]),
   );
 
-  if (!status) return <View style={{ flex: 1, backgroundColor: color.bg }} />;
+  if (!status) return <Loading />;
 
   const notes = rows.filter((r) => r.detail);
   const scalars = rows.filter((r) => r.value !== null);
@@ -92,7 +103,13 @@ export default function ProofScreen() {
 
         <View style={{ marginTop: space[10] }}>
           <Label style={{ marginBottom: space[3] }}>the log</Label>
-          {notes.length === 0 ? (
+          {error ? (
+            // Never the empty state while a read is failing. "Nothing written
+            // yet" over a journal that exists is a lie the user has no way to
+            // check, and it lands on the screen that is supposed to be the
+            // evidence their history is intact.
+            <Fault message={error} onRetry={load} />
+          ) : notes.length === 0 ? (
             <Body tone="mute">
               Nothing written yet. Anything you want to remember about a day
               goes here — what moved, what didn&apos;t, what it felt like. This
@@ -180,20 +197,41 @@ function DailyCheck({
   const [weight, setWeight] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
 
   const empty = !energy && !sleep && !note.trim() && !weight.trim();
 
   async function save() {
     if (empty || saving) return;
     setSaving(true);
+    setFailed(null);
+    setSaved(false);
     const w = weightUnit && weight.trim() ? Number(weight) : null;
-    await logSignals(userId, {
+    const { error } = await logSignals(userId, {
       energy,
       sleep,
       detail: note,
       weight: Number.isFinite(w) ? w : null,
     });
     setSaving(false);
+
+    // This used to set "Saved." unconditionally and reload regardless. A write
+    // that failed reported success, and the reload then showed the day without
+    // it — the readout contradicting itself, which is the one thing a panel
+    // cannot do.
+    if (error) {
+      setFailed(error.message);
+      return;
+    }
+
+    // Cleared only on success, so a failed save leaves every field exactly as
+    // typed and the retry is one tap. On success they must clear: the note
+    // field is documented to open blank, and leaving the text in it made a
+    // second tap append the same entry twice.
+    setEnergy(null);
+    setSleep(null);
+    setNote("");
+    setWeight("");
     setSaved(true);
     onSaved();
   }
@@ -269,8 +307,26 @@ function DailyCheck({
             {saving ? "…" : loggedToday ? "save" : "log"}
           </Label>
         </Pressable>
-        {saved && !saving && <Body tone="mute">Saved.</Body>}
+        {saved && !saving && (
+          // Announced, not just drawn: the confirmation is the only feedback
+          // this control gives, and a screen reader user gets no other signal
+          // that the write landed.
+          <Body tone="mute" accessibilityLiveRegion="polite">
+            Saved.
+          </Body>
+        )}
       </View>
+
+      {failed && !saving && (
+        <View style={{ marginTop: space[4] }}>
+          <Fault
+            label="not saved"
+            message={failed}
+            onRetry={save}
+            retryLabel="try again"
+          />
+        </View>
+      )}
     </View>
   );
 }

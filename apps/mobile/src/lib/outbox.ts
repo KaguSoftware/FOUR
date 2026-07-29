@@ -4,6 +4,7 @@ import {
   enqueue,
   pending,
   settle,
+  OUTBOX_MAX,
   type OutboxItem,
 } from "@uptime/core";
 import { createStore } from "./store";
@@ -35,36 +36,83 @@ import { today } from "./status";
  */
 
 const keyFor = (userId: string) => `outbox.v1.${userId}`;
+const healthKeyFor = (userId: string) => `outbox.health.v1.${userId}`;
+
+/**
+ * A tap the server refused for a reason retrying cannot fix.
+ *
+ * Kept rather than discarded. A dropped log is a day the user believes is up
+ * and is not, and quietly losing one is the precise failure this product
+ * exists to prevent — so it leaves the send queue (where it would block
+ * everything behind it) and lands here, where a screen can show it.
+ */
+export type BlockedItem = OutboxItem & { reason: string };
+
+export type OutboxHealth = {
+  blocked: BlockedItem[];
+  /** Taps evicted by the {@link OUTBOX_MAX} cap, which is silent otherwise. */
+  dropped: number;
+};
+
+const NO_HEALTH: OutboxHealth = { blocked: [], dropped: 0 };
 
 const queueStore = createStore<OutboxItem[]>([]);
+const healthStore = createStore<OutboxHealth>(NO_HEALTH);
+
 /** Whose queue is in the store right now. */
 let loadedFor: string | null = null;
+/** In-flight hydration, so two concurrent callers share one disk read. */
+let hydratingFor: string | null = null;
+let hydration: Promise<void> | null = null;
 
 export const outboxStore = {
   get: queueStore.get,
   subscribe: queueStore.subscribe,
 };
 
-async function readPersisted(userId: string): Promise<OutboxItem[]> {
+/** Trouble worth showing a user: refused taps, and taps lost to the cap. */
+export const outboxHealthStore = {
+  get: healthStore.get,
+  subscribe: healthStore.subscribe,
+};
+
+async function readJson<T>(key: string, fallback: T): Promise<T> {
   try {
-    const raw = await AsyncStorage.getItem(keyFor(userId));
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as OutboxItem[]) : [];
+    const raw = await AsyncStorage.getItem(key);
+    if (!raw) return fallback;
+    return JSON.parse(raw) as T;
   } catch {
     // A corrupt queue must not brick logging. Losing unsent taps is bad;
     // refusing to accept new ones because of them is worse.
-    return [];
+    return fallback;
   }
+}
+
+async function readPersisted(userId: string): Promise<OutboxItem[]> {
+  const parsed = await readJson<OutboxItem[]>(keyFor(userId), []);
+  return Array.isArray(parsed) ? parsed : [];
+}
+
+async function readHealth(userId: string): Promise<OutboxHealth> {
+  const parsed = await readJson<OutboxHealth>(healthKeyFor(userId), NO_HEALTH);
+  return {
+    blocked: Array.isArray(parsed?.blocked) ? parsed.blocked : [],
+    dropped: Number.isFinite(parsed?.dropped) ? parsed.dropped : 0,
+  };
 }
 
 /** Push the in-memory queue to disk. Never awaited by anything user-facing. */
 function persist(userId: string, queue: OutboxItem[]) {
-  AsyncStorage.setItem(keyFor(userId), JSON.stringify(capped(queue))).catch(
-    () => {
-      // Nothing useful to do. The queue is still correct in memory and will
-      // flush from there; the only cost is losing it if the app is killed.
-    },
+  AsyncStorage.setItem(keyFor(userId), JSON.stringify(queue)).catch(() => {
+    // Nothing useful to do. The queue is still correct in memory and will
+    // flush from there; the only cost is losing it if the app is killed.
+  });
+}
+
+function persistHealth(userId: string, health: OutboxHealth) {
+  healthStore.set(health);
+  AsyncStorage.setItem(healthKeyFor(userId), JSON.stringify(health)).catch(
+    () => {},
   );
 }
 
@@ -74,17 +122,57 @@ function persist(userId: string, queue: OutboxItem[]) {
  * Idempotent per user, so the hook can call it on every mount. Switching users
  * replaces the store outright rather than merging — one account's unsent taps
  * are not the other's to send.
+ *
+ * `loadedFor` is set only once the read has landed. It used to be set first,
+ * so a second caller arriving mid-read returned immediately and believed an
+ * empty store was this user's real queue.
  */
-export async function hydrate(userId: string) {
+export async function hydrate(userId: string): Promise<void> {
   if (loadedFor === userId) return;
-  loadedFor = userId;
-  queueStore.set(await readPersisted(userId));
+  if (hydratingFor === userId && hydration) return hydration;
+
+  hydratingFor = userId;
+  hydration = (async () => {
+    const [queue, health] = await Promise.all([
+      readPersisted(userId),
+      readHealth(userId),
+    ]);
+    // A user switch during the read wins; this result is stale.
+    if (hydratingFor !== userId) return;
+    queueStore.set(queue);
+    healthStore.set(health);
+    loadedFor = userId;
+  })();
+
+  return hydration;
 }
 
-/** Forget everything on sign-out. */
-export function clearOutbox() {
+/**
+ * Forget everything on sign-out.
+ *
+ * Deletes the persisted copies too. Leaving them behind meant a signed-out —
+ * or deleted — account's taps stayed readable on disk indefinitely, and would
+ * be flushed the moment that user id signed in again on this device.
+ */
+export async function clearOutbox(): Promise<void> {
+  const userId = loadedFor ?? hydratingFor;
   loadedFor = null;
+  hydratingFor = null;
+  hydration = null;
   queueStore.set([]);
+  healthStore.set(NO_HEALTH);
+
+  if (!userId) return;
+  try {
+    await AsyncStorage.multiRemove([keyFor(userId), healthKeyFor(userId)]);
+  } catch {
+    // Best effort. The stores are already empty, so nothing is shown or sent.
+  }
+}
+
+/** Discard refused taps once the user has seen them. */
+export function clearBlocked(userId: string) {
+  persistHealth(userId, { ...healthStore.get(), blocked: [], dropped: 0 });
 }
 
 /**
@@ -97,19 +185,47 @@ export function queueWrite(
   op: "log" | "undo",
   detail: string | null,
 ): OutboxItem[] {
-  const next = capped(
-    enqueue(queueStore.get(), {
-      logged_for: today(),
-      lever,
-      op,
-      detail,
-      queued_at: Date.now(),
-    }),
-  );
+  const grown = enqueue(queueStore.get(), {
+    logged_for: today(),
+    lever,
+    op,
+    detail,
+    queued_at: Date.now(),
+  });
+  const next = capped(grown);
+
+  // The cap drops the oldest intents silently. Counting them is the only way
+  // the user can ever learn that a tap they made is never going to arrive.
+  if (next.length < grown.length) {
+    const health = healthStore.get();
+    persistHealth(userId, {
+      ...health,
+      dropped: health.dropped + (grown.length - next.length),
+    });
+  }
+
   queueStore.set(next);
   persist(userId, next);
   return next;
 }
+
+/**
+ * Why a write failed, and whether trying again could ever help.
+ *
+ * Postgres reports constraint and permission failures with a SQLSTATE. Those
+ * describe the request, not the connection: an RLS denial or a foreign key
+ * violation will fail identically forever, so retrying one is an infinite
+ * loop. Anything else — no signal, a timeout, a 5xx — is worth retrying.
+ */
+const PERMANENT_SQLSTATE = /^(22|23|42)/;
+
+function isPermanent(error: { code?: string | null } | null): boolean {
+  return !!error?.code && PERMANENT_SQLSTATE.test(error.code);
+}
+
+type SendResult =
+  | { ok: true }
+  | { ok: false; permanent: boolean; reason: string };
 
 /**
  * Send everything that is waiting.
@@ -118,6 +234,13 @@ export function queueWrite(
  * rest queued rather than losing them or resending what already landed. The
  * writes are idempotent — entries upsert on `(user_id, logged_for, lever)` —
  * so a retry after an ambiguous failure is an update, never a duplicate.
+ *
+ * A **transient** failure stops the pass: the rest are almost certainly going
+ * to fail for the same reason, and hammering a dead connection drains the
+ * battery of a phone already struggling for signal. A **permanent** failure
+ * moves that one item aside and the pass continues — before this split, a
+ * single unsendable tap sat at the head of the queue and blocked every later
+ * one forever, with nothing on screen to say so.
  *
  * Returns what remains WITHOUT publishing it to the store. The caller decides
  * when the queue may shrink, because dropping a settled item before the
@@ -128,14 +251,25 @@ export async function flush(userId: string): Promise<OutboxItem[]> {
   let queue = queueStore.get();
   if (queue.length === 0) return queue;
 
+  const blocked: BlockedItem[] = [];
+
   for (const item of pending(queue)) {
-    const ok = await send(userId, item);
-    // Stop at the first failure. The rest are almost certainly going to fail
-    // for the same reason, and hammering a dead connection drains the battery
-    // of a phone that is already struggling for signal.
-    if (!ok) break;
+    const result = await send(userId, item);
+
+    if (!result.ok && !result.permanent) break;
+
+    if (!result.ok) blocked.push({ ...item, reason: result.reason });
+
     queue = settle(queue, item);
     persist(userId, queue);
+  }
+
+  if (blocked.length) {
+    const health = healthStore.get();
+    persistHealth(userId, {
+      ...health,
+      blocked: [...health.blocked, ...blocked].slice(-OUTBOX_MAX),
+    });
   }
 
   return queue;
@@ -146,7 +280,7 @@ export function commitFlushed(queue: OutboxItem[]) {
   queueStore.set(queue);
 }
 
-async function send(userId: string, item: OutboxItem): Promise<boolean> {
+async function send(userId: string, item: OutboxItem): Promise<SendResult> {
   if (item.op === "undo") {
     const { error } = await supabase
       .from("entries")
@@ -154,7 +288,9 @@ async function send(userId: string, item: OutboxItem): Promise<boolean> {
       .eq("user_id", userId)
       .eq("logged_for", item.logged_for)
       .eq("lever", item.lever);
-    return !error;
+    return error
+      ? { ok: false, permanent: isPermanent(error), reason: error.message }
+      : { ok: true };
   }
 
   let playbookId: string | null = null;
@@ -195,5 +331,7 @@ async function send(userId: string, item: OutboxItem): Promise<boolean> {
     { onConflict: "user_id,logged_for,lever" },
   );
 
-  return !error;
+  return error
+    ? { ok: false, permanent: isPermanent(error), reason: error.message }
+    : { ok: true };
 }

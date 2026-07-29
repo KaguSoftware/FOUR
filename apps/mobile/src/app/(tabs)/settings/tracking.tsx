@@ -1,13 +1,14 @@
 import { useState } from "react";
-import { Alert, View } from "react-native";
+import { Alert } from "react-native";
 
 import { Label } from "@/components/ui";
+import { Loading } from "@/components/states";
 import { Screen } from "@/components/screen";
 import { Segmented } from "@/components/segmented";
 import { Group, Note, SwitchRow } from "@/components/settings-ui";
 import { supabase } from "@/lib/supabase";
 import { useStatus } from "@/lib/use-status";
-import { color, space } from "@/theme";
+import { space } from "@/theme";
 
 type Unit = "kg" | "lb";
 
@@ -34,7 +35,7 @@ export default function TrackingScreen() {
   const { status, refresh } = useStatus();
   const [pending, setPending] = useState<Pending>({});
 
-  if (!status) return <View style={{ flex: 1, backgroundColor: color.bg }} />;
+  if (!status) return <Loading />;
   const { state } = status;
 
   const weightEnabled = pending.enabled ?? state.weight_enabled;

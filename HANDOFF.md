@@ -116,6 +116,28 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 - **The device-testing round, 2026-07-29.** Screen scaffold with correct tab-bar and status-bar insets; the page-switch twitch; calendar-month grid on Home with today's cell pulsing; History captions and incident ranges; Settings split into an index and four sub-screens on a native stack; drag-to-reorder and drag-to-archive with fade-and-collapse motion; the undo control replaced by tapping a logged lever; the per-day grid denominator and its two follow-up bugs. All verified as `tsc` clean, 162 tests, `expo lint` clean, `expo export` bundling both platforms, and the web app building.
 - **The real-app Settings + Auth round, 2026-07-29.** Settings grew to the full surface: Alerts now holds the daily reminder (opt-in, native time picker, local scheduling via `lib/reminder.ts`) and a delivery block (permission status + send-a-test-alert); Tracking gained the kg/lb unit control; Account gained change email, change password, a passive sync row (outbox depth + staleness), export-as-JSON through the share sheet, and delete account (typed-email confirm → native alert → `delete_own_account()` RPC, migration `20260729030000`); a new About screen (version, privacy, terms, support mailto). Auth: sign-in rebuilt with Sign in with Apple (native button, nonce flow), Google (PKCE browser round-trip), and a 6-digit email OTP screen that doubles as forgot-password; onboarding is now five steps (rule+levers → posture → tracking → reminder → alerts priming before the OS prompt). New deps (all SDK 54 pins, Expo Go-safe): expo-apple-authentication, expo-crypto, expo-web-browser, datetimepicker, expo-file-system, expo-sharing. Verified: tsc clean ×3, 162 tests, 19 migration checks, expo lint clean, expo export both platforms. **Provider flows and the reminder are untested on device; the third-party providers are dead until the Supabase dashboard config below is done.**
 
+- **The full-system audit and the trust-bug round, 2026-07-29.** Three parallel
+  audits (core+schema, mobile, web) produced a findings list; the P0 slice is
+  built. **Security:** two open redirects closed (`?next=@evil.com` escaped the
+  origin through both `/auth/callback` and the login form — now `safePath()` in
+  `apps/web/lib/safe-path.ts`); the cron secret is header-only and
+  timing-safe-compared; the monitor no longer echoes every `user_id`; Telegram
+  chat ids are validated as numeric. **The pager's own failure mode:** the
+  monitor loop had no per-user try/catch, so one unparseable
+  `system_state.timezone` threw and every user after it was never evaluated —
+  now each pass is isolated, the zone is validated via core's
+  `hasTimeZoneSupport`, and the DB keeps the last good value via a trigger.
+  **The readout no longer lies:** six web actions ignored Supabase's `error`
+  and six mobile paths reported success unconditionally — all now return and
+  surface failure. **Data:** `DETAIL_MAX`, weight bounds, a composite
+  `playbook_id` FK, and a `monitor_runs` day-unique are enforced in the
+  database; `milestones` and `monitor_runs` are select-only for their subject.
+  **Offline:** the outbox classifies permanent vs transient failures and
+  dead-letters the former (one refused tap used to block the queue forever),
+  reports a stale queue via core's `oldestAgeDays`, and clears its storage on
+  sign-out. Verified: **162 tests, tsc clean ×3, 26 migration checks (was 19),
+  expo lint clean, expo export both platforms, web production build clean.**
+
 **Written but NOT verified end-to-end:**
 
 - **Vercel cron has never run.** The route works locally; the schedule is unproven.
@@ -126,6 +148,12 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 
 **Blocked / needs the owner:**
 
+- **`npx supabase db push` from the repo root** to apply
+  `20260729040000_integrity_hardening.sql` (26 harness checks green). Until it
+  lands, the RLS split, the length and weight bounds, the composite playbook
+  FK, the `monitor_runs` day-unique and the timezone trigger are all local
+  only. **Nothing breaks without it** — every fix has an app-side layer too —
+  but the second layer is missing.
 - **Rotate two credentials** — see Gotchas. Still outstanding from 2026-07-19.
 - **A development build** — see *Roadmap* step 15. This is the gate on push.
 - **`npx supabase db push` from the repo root** to apply `20260729030000_delete_account.sql` (19 harness checks green). Delete account fails politely until then.
@@ -162,7 +190,10 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 | `apps/mobile/src/lib/store.ts` | A subscribable value. **The fix for cross-screen sync** — read the docblock before touching either hook below. |
 | `apps/mobile/src/lib/use-status.ts` | The shared status store + the focus staleness guard. `refreshStatus()` is callable from anywhere, including the sheets. |
 | `apps/mobile/src/lib/use-outbox.ts` | Flush triggers, and the "reload before shrinking the queue" rule that stops undo flickering. |
-| `apps/mobile/src/lib/outbox.ts` | The queue: in-memory store, AsyncStorage as backup, and the **only** entry write path in the app. |
+| `apps/mobile/src/lib/outbox.ts` | The queue: in-memory store, AsyncStorage as backup, and the **only** entry write path in the app. Also owns permanent-vs-transient failure classification and the dead-letter list. |
+| `apps/mobile/src/components/states.tsx` | `Loading` / `Failed` / `Fault` — the loading and failure surfaces, and the reason failure is not red. |
+| `apps/web/lib/safe-path.ts` | Clamps a `next=` redirect to a same-origin path. Both open redirects went through values this now rejects. |
+| `supabase/migrations/20260729040000_integrity_hardening.sql` | RLS split for the audit/milestone tables, length and weight bounds, composite `playbook_id` FK, `monitor_runs` day-unique, timezone trigger. |
 | `apps/mobile/src/lib/supabase.ts` | Keychain-backed session storage. Chunks the session because SecureStore caps a value at 2048 bytes on Android. |
 | `apps/mobile/src/lib/status.ts` | The client-side port of `getStatus()`. Five queries, everything else derived by core. |
 | `apps/mobile/src/lib/reminder.ts` | The daily reminder: local scheduling, silent app-start reconcile, the test alert. The only file allowed to prompt for notification permission outside onboarding. |
@@ -197,8 +228,16 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 15. ~~Device-testing round one~~ — done 2026-07-29. Chrome insets and the page-switch twitch, the note field, the Settings rewrite, the rename to `four`, the calendar-month grid, today's pulse, History captions and ranges, universal undo, lever drag-to-reorder / drag-to-archive, and the per-day grid denominator. All migrations applied.
 16. ~~Settings sub-screens, archive motion, and the grid-denominator fixes~~ — done 2026-07-29. Settings is now `app/(tabs)/settings/` — an index of value-stating rows pushing into `levers` / `alerts` / `tracking` / `account` on a native `Stack`, so the transitions, back button and edge-swipe are the platform's. Archiving fades and collapses, with the rest of the list carried up by `LinearTransition`. The undo control is gone: a logged lever stays tappable and its sheet offers "add what else you did" or "remove today's <lever>".
 17. ~~Real-app Settings + Auth + Onboarding~~ — done 2026-07-29. Full settings surface (reminder, delivery, unit, change email/password, sync, export, delete account, About), Apple + Google + email-OTP sign-in, five-step onboarding. Pending on the owner: the Supabase dashboard config and `db push` listed under *Blocked*.
-18. **← ACTIVE: a development build.** `eas init` is done (project `3570cebf…`, owner `parsa-mansouri`). What remains: `eas env:create` for the two `EXPO_PUBLIC_` vars, then `eas build --profile development`. **iOS needs an Apple Developer account ($99/yr)**; Android builds a free APK. Push cannot be tested before this. (The Apple Developer account also unlocks Sign in with Apple on the real bundle id.)
-19. Then: a real app icon · **`/privacy` and `/terms` pages on the web app** (the mobile About screen already links to both — they 404 until written) · store listings.
+18. ~~Full-system audit + the P0 trust-bug round~~ — 2026-07-29. Open redirects,
+    monitor isolation and secret handling, silent write failures on both
+    clients, outbox dead-lettering, push hygiene, and an integrity migration.
+    The remaining findings are triaged in
+    `~/.claude/plans/go-through-the-entire-crystalline-bee.md` as P1 (launch
+    blockers), P2 (web catch-up + data-model debt) and P3 (quality). **Read
+    that file before picking the next thing** — it is the audit's full output,
+    not just what got built.
+19. **← ACTIVE: a development build.** `eas init` is done (project `3570cebf…`, owner `parsa-mansouri`). What remains: `eas env:create` for the two `EXPO_PUBLIC_` vars, then `eas build --profile development`. **iOS needs an Apple Developer account ($99/yr)**; Android builds a free APK. Push cannot be tested before this. (The Apple Developer account also unlocks Sign in with Apple on the real bundle id.)
+20. Then: a real app icon · **`/privacy` and `/terms` pages on the web app** (the mobile About screen already links to both — they 404 until written) · store listings. Also from the audit and needed before submission: `ITSAppUsesNonExemptEncryption` in `ios.infoPlist` (TestFlight stalls without it), `env` on the `eas.json` **production** profile (`lib/supabase.ts` throws at module load without the `EXPO_PUBLIC_` vars, so a production build made without them is a launch crash, not a degraded state), a filled-in `submit` block, an Android notification icon, and FCM V1 credentials for Android push.
 
 ## Deliberately partial — grows later (scope ledger)
 
@@ -233,6 +272,46 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 | Monetization | Free | Undecided. **The usual paywalls are all ruled out by the thesis**, not by preference — lever count is the product's name, longer history attacks re-entry, gamification fails a build test. Any model has to sell something other than a feature | Post-launch |
 
 ## Gotchas / open issues
+
+- **A failure state is never red or amber, and this is a product rule, not a
+  style preference.** `down` and `degraded` describe the state of the user's
+  own system. An app that cannot reach its database is a different axis, and
+  painting it red says "you are down" when the truth is "we could not read" —
+  landing hardest in the exact moment the product is designed for, reopening
+  after days away. Faults are stated at full ink inside a bordered `surface`
+  well: emphasis by containment, not hue. `components/states.tsx` on mobile and
+  the same treatment inline on web. **Owner review welcome — this was decided
+  during the 2026-07-29 audit round and is reversible.**
+- **A read that fails must never render as an empty state.** `loadSignals` used
+  to return `[]` on error, so a dropped connection told someone with months of
+  journal that they had written nothing — on the one screen whose job is to be
+  evidence their history is intact. Reads now return `{ rows, error }` and a
+  failed refresh KEEPS what is already on screen rather than blanking it.
+- **`logSignals` bails if it cannot read the existing note.** The append path
+  reads today's note, then upserts the joined text. If that read fails,
+  `appendNote(undefined, …)` returns only the new text and the upsert
+  REPLACES the day's journal. Failing the whole save is the only honest option
+  — the user still has their text in the field.
+- **The outbox distinguishes permanent from transient failures.** A SQLSTATE in
+  class 22/23/42 (bad input, constraint, permission) describes the request and
+  will fail identically forever; anything else is worth retrying. Transient
+  stops the pass to spare the battery; permanent moves that one item to a
+  dead-letter list and the pass continues. Before the split, a single
+  unsendable tap sat at the head of the queue and blocked every later one
+  **forever**, with nothing on screen to say so. Refused taps surface on
+  Settings → Account.
+- **`registerForPush` must be called with `{ prompt: false }` from anywhere
+  that is not a deliberate user action.** The tab layout runs it on every
+  mount; when it could prompt, someone who chose "start without alerts" in
+  onboarding got the OS dialog seconds later anyway. Same split as
+  `syncReminder` vs `reconcileReminder` in `reminder.ts` — keep it.
+- **Unregister the push token BEFORE `signOut()`.** It is an RLS-protected
+  write and needs the session that is about to end. Skipping it left a
+  signed-out phone still receiving that account's pages.
+- **The monitor's per-user loop must stay inside its try/catch.** `runPass()`
+  is extracted precisely so one account's failure is contained. One bad
+  timezone used to end the pass for everyone after it in the list — the pager
+  failing closed, silently, for people who had done nothing wrong.
 
 - **An unguarded `Stack.Screen` declared before the `Stack.Protected` branches becomes the INITIAL ROUTE when those branches guard away.** `auth/callback` was declared right after `(auth)`; the moment a session existed, `(auth)` left the stack and the callback — an invisible redirect screen — won initial route. Its redirect pointed at `/`, which is guarded behind `onboarded === true`, so the first Apple sign-in on a fresh account redirected into nothing: a blank screen that survived reloads (2026-07-29). Two rules: unguarded utility screens go LAST in the stack, and any `Redirect` must target a route the gate has actually mounted for every state it can render in (`/sign-in` / `/onboarding` / `/`).
 - **React Native's `Switch` ships `alignSelf: 'flex-start'` as a default style** (`Switch.js:267` in RN 0.81). It silently beats the parent row's `alignItems: "center"`, so every switch pinned to the top of its row while the label sat centered. `SwitchRow` passes `style={{ alignSelf: "center" }}` — caller style composes after the default, so it wins. Any future bare `Switch` needs the same override.
@@ -322,10 +401,12 @@ npm run shoot -- out ",history,proof"
 npm run reset                     # wipe synthetic data
 ```
 
-Exercise the monitor locally without sending anything:
+Exercise the monitor locally without sending anything. **Header only** — the
+`?secret=` form was removed on 2026-07-29:
 
 ```bash
-curl "http://localhost:3000/api/monitor/check?secret=$CRON_SECRET&dry=1"
+curl -H "Authorization: Bearer $CRON_SECRET" \
+  "http://localhost:3000/api/monitor/check?dry=1"
 ```
 
 ## Development builds and push

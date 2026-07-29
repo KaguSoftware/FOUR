@@ -2,6 +2,7 @@ import { View } from "react-native";
 import { uptimeWindow } from "@uptime/core";
 import { Body, Label, Mono, Rule } from "@/components/ui";
 import { DayGrid } from "@/components/day-grid";
+import { Loading } from "@/components/states";
 import { Screen } from "@/components/screen";
 import { useStatus } from "@/lib/use-status";
 import { color, size, space } from "@/theme";
@@ -15,7 +16,7 @@ import { color, size, space } from "@/theme";
  */
 export default function HistoryScreen() {
   const { status } = useStatus();
-  if (!status) return <View style={{ flex: 1, backgroundColor: color.bg }} />;
+  if (!status) return <Loading />;
 
   const { entries, today, runs, outages, allTime, leverSpans } = status;
 

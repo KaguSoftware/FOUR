@@ -239,5 +239,75 @@ gone[0].users === 0 && gone[0].state === 0
   : bad(`RPC left rows behind: users=${gone[0].users} state=${gone[0].state}`);
 await db.exec(`create or replace function auth.uid() returns uuid language sql stable as $$ select null::uuid $$`);
 
+// --- integrity hardening ----------------------------------------------------
+// Each of these was reachable from a normal signed-in session before
+// 20260729040000. They are checked here rather than trusted because a
+// constraint that silently failed to apply looks exactly like one that did.
+
+// The audit log and the once-ever ledger are read-only to their subject.
+const writable = await q(`
+  select tablename, cmd from pg_policies
+  where schemaname = 'public' and tablename in ('monitor_runs', 'milestones')
+`);
+writable.length === 2 && writable.every((p) => p.cmd === "SELECT")
+  ? ok("monitor_runs and milestones are select-only for their owner")
+  : bad(`audit/milestone policies still allow ${JSON.stringify(writable)}`);
+
+// entries.detail is capped at DETAIL_MAX in the database, not just in core.
+try {
+  await db.exec(`insert into public.entries (user_id, logged_for, lever, detail)
+                 values ('${b}', '2026-07-05', 'gym', repeat('x', 161))`);
+  bad("a 161-character entry detail was accepted");
+} catch {
+  ok("entries.detail is capped at 160 in the database");
+}
+
+// Weight cannot be negative or absurd.
+try {
+  await db.exec(`insert into public.signals (user_id, observed_on, kind, amount)
+                 values ('${b}', '2026-07-05', 'weight', -5)`);
+  bad("a negative weight was accepted");
+} catch {
+  ok("signals.amount is bounded to 1..999");
+}
+
+// An entry cannot reference another user's playbook row.
+await db.exec(`insert into public.playbook (user_id, lever, label) values ('${c}', 'gym', 'C private')`);
+const foreignPb = await q(`select id from public.playbook where user_id = '${c}' and label = 'C private'`);
+try {
+  await db.exec(`insert into public.entries (user_id, logged_for, lever, playbook_id)
+                 values ('${b}', '2026-07-06', 'gym', '${foreignPb[0].id}')`);
+  bad("an entry borrowed another user's playbook row");
+} catch {
+  ok("entries.playbook_id cannot cross users — the FK is composite now");
+}
+
+// One monitor row per user per day.
+await db.exec(`insert into public.monitor_runs (user_id, ran_on, down_days, action)
+               values ('${b}', '2026-07-07', 0, 'none')`);
+try {
+  await db.exec(`insert into public.monitor_runs (user_id, ran_on, down_days, action)
+                 values ('${b}', '2026-07-07', 0, 'none')`);
+  bad("a duplicate monitor_runs row was accepted for the same day");
+} catch {
+  ok("monitor_runs is unique per (user, day)");
+}
+
+// A junk timezone is refused by keeping the previous value — the failure that
+// used to end the whole monitor pass for every user after it.
+await db.exec(`update public.system_state set timezone = 'Europe/Istanbul' where user_id = '${b}'`);
+await db.exec(`update public.system_state set timezone = 'Not/AZone' where user_id = '${b}'`);
+const tz = await q(`select timezone from public.system_state where user_id = '${b}'`);
+tz[0].timezone === "Europe/Istanbul"
+  ? ok("an unparseable timezone is rejected in favour of the previous one")
+  : bad(`system_state.timezone accepted junk: ${tz[0].timezone}`);
+
+// A real zone still writes through, or the guard would be a freeze.
+await db.exec(`update public.system_state set timezone = 'America/New_York' where user_id = '${b}'`);
+const tz2 = await q(`select timezone from public.system_state where user_id = '${b}'`);
+tz2[0].timezone === "America/New_York"
+  ? ok("a valid timezone still writes through")
+  : bad(`valid timezone was blocked: ${tz2[0].timezone}`);
+
 console.log(process.exitCode ? "\nRESULT: FAILURES ABOVE" : "\nRESULT: all checks passed");
 await db.close();

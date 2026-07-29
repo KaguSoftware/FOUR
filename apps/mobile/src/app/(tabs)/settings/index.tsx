@@ -1,12 +1,11 @@
-import { View } from "react-native";
 import Constants from "expo-constants";
 import { POSTURE_CHOICES } from "@uptime/core";
 
+import { Loading } from "@/components/states";
 import { Screen } from "@/components/screen";
 import { Group, LinkRow, RowRule } from "@/components/settings-ui";
 import { reminderLabel } from "@/lib/reminder";
 import { useStatus } from "@/lib/use-status";
-import { color } from "@/theme";
 
 /**
  * The Settings index.
@@ -23,7 +22,7 @@ import { color } from "@/theme";
 export default function SettingsIndex() {
   const { status } = useStatus();
 
-  if (!status) return <View style={{ flex: 1, backgroundColor: color.bg }} />;
+  if (!status) return <Loading />;
   const { state, levers, user } = status;
 
   const posture =

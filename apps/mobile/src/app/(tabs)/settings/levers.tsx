@@ -1,10 +1,9 @@
-import { View } from "react-native";
 
+import { Loading } from "@/components/states";
 import { Screen } from "@/components/screen";
 import { Note } from "@/components/settings-ui";
 import { LeverManager } from "@/components/lever-manager";
 import { useStatus } from "@/lib/use-status";
-import { color } from "@/theme";
 
 /**
  * The full lever manager: rename, archive, add.
@@ -15,7 +14,7 @@ import { color } from "@/theme";
 export default function LeversScreen() {
   const { status, refresh } = useStatus();
 
-  if (!status) return <View style={{ flex: 1, backgroundColor: color.bg }} />;
+  if (!status) return <Loading />;
 
   return (
     <Screen underHeader>

@@ -52,9 +52,9 @@ A monorepo, so the derivation engine exists exactly once.
 
 ```
 packages/core/     @uptime/core — uptime, runs, outages, fade tiers, milestones.
-                   Pure TypeScript. No React, no Next, no DOM. 44 tests.
+                   Pure TypeScript. No React, no Next, no DOM. 162 tests.
 apps/web/          Next.js 16.2 App Router client. Live on Vercel.
-apps/mobile/       Expo / React Native client. Not built yet.
+apps/mobile/       Expo / React Native client. Runs on hardware.
 supabase/          Migrations. One database, shared by every client.
 scripts/           Dev helpers — seed, reset, screenshot.
 ```
@@ -116,7 +116,7 @@ an enforced constraint.
 ## Tests
 
 ```bash
-npm test             # packages/core — 44 tests
+npm test             # packages/core — 162 tests
 npm run typecheck    # both workspaces
 npm run lint
 ```
@@ -140,10 +140,13 @@ npm run reset            # wipe synthetic data
 npm run shoot -- out ",history,proof"
 ```
 
-Exercise the monitor locally without sending anything:
+Exercise the monitor locally without sending anything. The secret goes in the
+header — the `?secret=` form was removed because a query string lands in access
+logs and `Referer` headers:
 
 ```bash
-curl "http://localhost:3000/api/monitor/check?secret=$CRON_SECRET&dry=1"
+curl -H "Authorization: Bearer $CRON_SECRET" \
+  "http://localhost:3000/api/monitor/check?dry=1"
 ```
 
 ## Where this is going

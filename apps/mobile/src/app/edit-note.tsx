@@ -6,6 +6,7 @@ import { NOTE_MAX } from "@uptime/core";
 
 import { Body, Label, Mono } from "@/components/ui";
 import { noteField } from "@/components/fields";
+import { Fault } from "@/components/states";
 import { rewriteNote } from "@/lib/signals";
 import { cachedStatus } from "@/lib/use-status";
 import { color, radius, size, space, TAP } from "@/theme";
@@ -27,13 +28,23 @@ export default function EditNoteSheet() {
   const [status] = useState(cachedStatus);
   const [draft, setDraft] = useState(text ?? "");
   const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
 
   async function save() {
     const userId = status?.state.user_id;
     if (!userId || busy) return;
     setBusy(true);
-    await rewriteNote(userId, date, draft);
+    setFailed(null);
+    const { error } = await rewriteNote(userId, date, draft);
     setBusy(false);
+
+    // The sheet used to dismiss whether or not the write landed, so a failed
+    // edit — or a failed delete — looked exactly like a successful one, and
+    // the log behind it still showed the old text with no explanation.
+    if (error) {
+      setFailed(error.message);
+      return;
+    }
     router.back();
   }
 
@@ -102,6 +113,10 @@ export default function EditNoteSheet() {
             {busy ? "…" : draft.trim() ? "save" : "delete entry"}
           </Label>
         </Pressable>
+
+        {failed && !busy && (
+          <Fault label="not saved" message={failed} onRetry={save} retryLabel="try again" />
+        )}
 
         <Body tone="mute" style={{ fontSize: size.xs, textAlign: "center" }}>
           Nothing here affects uptime.

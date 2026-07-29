@@ -3,6 +3,7 @@ import { KeyboardAvoidingView, Platform, TextInput, View } from "react-native";
 
 import { Button } from "@/components/button";
 import { field } from "@/components/fields";
+import { Loading } from "@/components/states";
 import { Screen } from "@/components/screen";
 import { Note } from "@/components/settings-ui";
 import { Body, Label } from "@/components/ui";
@@ -31,7 +32,7 @@ export default function ChangeEmailScreen() {
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  if (!status) return <View style={{ flex: 1, backgroundColor: color.bg }} />;
+  if (!status) return <Loading />;
   const current = status.user.email ?? "—";
 
   const next = email.trim().toLowerCase();

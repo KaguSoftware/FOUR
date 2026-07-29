@@ -112,3 +112,37 @@ export function validateLeverLabel(label: string): LeverLabelCheck {
 export function canAddLever(currentActive: number): boolean {
   return currentActive < MAX_LEVERS;
 }
+
+/** How long an entry's detail may get before it stops being a label. */
+export const DETAIL_MAX = 160;
+
+/**
+ * Add to what a day already records, rather than replacing it.
+ *
+ * One entry per lever per day is a schema rule — `unique (user_id, logged_for,
+ * lever)` — not a product one. Doing the thing twice is still one day up, but
+ * the record of *what* you did should not lose the first half because you came
+ * back and logged the second.
+ *
+ * Deliberately joined with a middot on one line, not a newline: this is a
+ * label that appears inside a lever button's sheet and in the takeover's
+ * playbook, both of which are single-line. The journal is the place for
+ * paragraphs, and it has its own `appendNote`.
+ *
+ * Duplicates are dropped. Tapping the same playbook item twice in a day is a
+ * mis-tap, not two facts.
+ */
+export function appendDetail(
+  existing: string | null,
+  next: string | null,
+): string | null {
+  const add = next?.trim();
+  const had = existing?.trim();
+  if (!add) return had || null;
+  if (!had) return add.slice(0, DETAIL_MAX);
+
+  const parts = had.split(" · ").map((p) => p.trim());
+  if (parts.some((p) => p.toLowerCase() === add.toLowerCase())) return had;
+
+  return [...parts, add].join(" · ").slice(0, DETAIL_MAX);
+}

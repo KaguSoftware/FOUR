@@ -1,13 +1,8 @@
 import { useEffect } from "react";
-import { Alert, Pressable, RefreshControl, Text, View } from "react-native";
+import { Alert, RefreshControl, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import * as Localization from "expo-localization";
-import {
-  applyToDay,
-  MILESTONE_COPY,
-  milestonePanel,
-  type OutboxItem,
-} from "@uptime/core";
+import { applyToDay, MILESTONE_COPY, milestonePanel } from "@uptime/core";
 
 import { Body, Label, Mono } from "@/components/ui";
 import { DayGrid } from "@/components/day-grid";
@@ -17,8 +12,8 @@ import { Takeover } from "@/components/takeover";
 import { useStatus } from "@/lib/use-status";
 import { useOutbox } from "@/lib/use-outbox";
 import { archiveLever, reorderLevers } from "@/lib/levers";
-import { syncTimeZone, type LeverRow, type LoggedEntry } from "@/lib/status";
-import { color, radius, size, space, TAP } from "@/theme";
+import { syncTimeZone, type LeverRow } from "@/lib/status";
+import { color, radius, size, space } from "@/theme";
 
 export default function StatusScreen() {
   const router = useRouter();
@@ -88,13 +83,6 @@ export default function StatusScreen() {
       .map((lever) => ({ logged_for: today, lever, detail: null })),
   ];
 
-  // What one undo would take back: today's most recent tap, from whichever
-  // source knows about it. A tap still sitting in the outbox has no server row
-  // and no `created_at`, so its `queued_at` stands in — both are "when the
-  // person pressed it", which is the only ordering that matters here.
-  const undoable = levers.find(
-    (l) => l.key === mostRecentToday(entries, queue, today, shownAsLogged),
-  );
 
   // Down 3+ days: the dashboard is REPLACED, not annotated. A system with no
   // history has never been down, so a first run gets the normal empty state
@@ -209,34 +197,6 @@ export default function StatusScreen() {
         onArchive={(lever) => confirmArchive(lever, state.user_id, refresh)}
       />
 
-      {/* ONE undo, below everything, for whatever was tapped last.
-
-          There used to be one per lever, rendered inside that lever's column.
-          Logging one of two side-by-side levers made its column 48pt taller
-          than its neighbour, so the whole grid reflowed on every tap — and
-          four levers could put four undo buttons on screen at once. Down here
-          it pushes nothing but the slammed note, and tapping it repeatedly
-          walks back through today most-recent-first. */}
-      {undoable && (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`Undo ${undoable.label}`}
-          onPress={() => write(undoable.key, "undo", null)}
-          style={({ pressed }) => ({
-            minHeight: TAP,
-            marginTop: space[3],
-            alignItems: "center",
-            justifyContent: "center",
-            borderRadius: radius.md,
-            backgroundColor: pressed ? color.surface : "transparent",
-          })}
-        >
-          <Body tone="mute" style={{ fontSize: size.xs }}>
-            undo — {undoable.label}
-          </Body>
-        </Pressable>
-      )}
-
       {slammed && (
         <Body tone="mute" style={{ marginTop: space[3] }}>
           slammed mode — still one lever, still ten minutes of anything. the
@@ -276,46 +236,6 @@ function confirmArchive(
       },
     ],
   );
-}
-
-/**
- * The lever key of today's most recent tap, or null if nothing is logged.
- *
- * Two sources, because a tap can exist in either or both. The server knows
- * `created_at` for anything that landed; the outbox knows `queued_at` for
- * anything that has not. `shownAsLogged` is the arbiter of what currently
- * counts as logged — an entry the queue has already undone must not be
- * offered for undo a second time.
- */
-function mostRecentToday(
-  entries: readonly LoggedEntry[],
-  queue: readonly OutboxItem[],
-  today: string,
-  shownAsLogged: string[],
-): string | null {
-  const stamps = new Map<string, number>();
-
-  for (const e of entries) {
-    if (e.logged_for !== today) continue;
-    stamps.set(e.lever, Date.parse(e.created_at));
-  }
-  for (const q of queue) {
-    if (q.logged_for !== today || q.op !== "log") continue;
-    // A queued tap is newer than whatever the server had for that lever —
-    // it is literally the thing that has not been sent yet.
-    stamps.set(q.lever, q.queued_at);
-  }
-
-  let best: string | null = null;
-  let bestAt = -Infinity;
-  for (const [lever, at] of stamps) {
-    if (!shownAsLogged.includes(lever)) continue;
-    if (Number.isFinite(at) && at > bestAt) {
-      best = lever;
-      bestAt = at;
-    }
-  }
-  return best;
 }
 
 /**

@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  DETAIL_MAX,
   LEVER_KEY_MAX,
   LEVER_LABEL_MAX,
+  appendDetail,
   canAddLever,
   isValidLeverKey,
   slugifyLever,
@@ -99,5 +101,38 @@ describe("canAddLever", () => {
     expect(canAddLever(MAX_LEVERS - 1)).toBe(true);
     expect(canAddLever(MAX_LEVERS)).toBe(false);
     expect(canAddLever(MAX_LEVERS + 1)).toBe(false);
+  });
+});
+
+describe("appendDetail", () => {
+  it("keeps what was already recorded when adding to it", () => {
+    // One entry per lever per day is a SCHEMA rule, not a product one. Doing
+    // the thing twice is still one day up, and the record of what you did
+    // should not lose the first half.
+    expect(appendDetail("treadmill", "2 machines")).toBe("treadmill · 2 machines");
+  });
+
+  it("handles either side being absent", () => {
+    expect(appendDetail(null, "shake")).toBe("shake");
+    expect(appendDetail("shake", null)).toBe("shake");
+    expect(appendDetail(null, null)).toBeNull();
+    expect(appendDetail("", "  ")).toBeNull();
+  });
+
+  it("drops a repeat rather than recording it twice", () => {
+    // Tapping the same playbook item twice in a day is a mis-tap, not two facts.
+    expect(appendDetail("shake", "shake")).toBe("shake");
+    expect(appendDetail("shake", "SHAKE")).toBe("shake");
+    expect(appendDetail("a · b", "b")).toBe("a · b");
+  });
+
+  it("trims, and stays inside DETAIL_MAX", () => {
+    expect(appendDetail("  a  ", "  b  ")).toBe("a · b");
+    const long = appendDetail("x".repeat(200), "y");
+    expect(long!.length).toBe(DETAIL_MAX);
+  });
+
+  it("never returns an empty string — null means nothing recorded", () => {
+    expect(appendDetail("   ", null)).toBeNull();
   });
 });

@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
+  Easing,
+  FadeIn,
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
@@ -41,6 +43,32 @@ const tapFeedback = () =>
   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 const nudgeFeedback = () =>
   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+/**
+ * How an archived lever leaves.
+ *
+ * A hand-built layout animation rather than one of Reanimated's presets,
+ * because the cells are absolutely positioned: `FadeOut` would leave the button
+ * hanging in place at zero opacity while its neighbours had already sprung into
+ * the gap. This shrinks it toward its own centre as it goes, which is what
+ * makes the reflow read as one movement instead of two.
+ *
+ * Deliberately not a fling toward the trash. The trash is where you DROP it;
+ * by the time this runs the decision is made and confirmed, and a second piece
+ * of theatre after a confirmation dialog is one too many.
+ */
+function collapse(values: { currentHeight: number; currentWidth: number }) {
+  "worklet";
+  return {
+    initialValues: { opacity: 1, transform: [{ scale: 1 }] },
+    animations: {
+      opacity: withTiming(0, { duration: 160, easing: Easing.out(Easing.quad) }),
+      transform: [
+        { scale: withTiming(0.86, { duration: 220, easing: Easing.out(Easing.cubic) }) },
+      ],
+    },
+  };
+}
 
 /** Where slot `i` sits, in a two-column grid of `height`-tall cells. */
 const slotAt = (i: number, cellW: number, height: number) => ({
@@ -365,22 +393,34 @@ function LeverCell({
   return (
     <GestureDetector gesture={pan}>
       <Animated.View
+        // A lever that arrives fades in rather than appearing mid-grid; one
+        // that leaves collapses toward its own centre and takes its space with
+        // it, so the levers behind it slide up rather than jumping. The exit is
+        // the slower of the two on purpose — a thing being removed should read
+        // as a decision, and it is also the only moment the grid changes shape.
+        entering={FadeIn.duration(180)}
+        exiting={collapse}
         style={[{ position: "absolute", width, height }, animated]}
       >
         <Pressable
           accessibilityRole="button"
-          accessibilityState={{ selected: done, disabled: done }}
+          accessibilityState={{ selected: done }}
           accessibilityLabel={
-            done ? `${lever.label}, logged today` : `Log ${lever.label}`
+            done
+              ? `${lever.label}, logged today. Opens what else you did, or remove it`
+              : `Log ${lever.label}`
           }
           accessibilityHint={
             draggable ? "Touch and hold to reorder or archive" : undefined
           }
-          // Only the lever's OWN state disables it. A global "busy" flag used
-          // to lock every button while any write was in flight, so logging two
-          // levers meant waiting out a round trip between taps. The write is
-          // idempotent, so overlapping taps are safe.
-          disabled={done || lifted}
+          // **A logged lever is still tappable**, and that is the whole undo
+          // story. It used to be disabled, with a separate undo control sitting
+          // under the grid — which meant logging one of two levers made that
+          // column taller than its neighbour and reflowed the whole grid on
+          // every tap. Now the lever is the only thing you ever press, and what
+          // you can do with it lives behind it: add what else you did, or take
+          // the day back. Only a drag in progress disables it.
+          disabled={lifted}
           onPress={() => {
             // One crisp impact. Confirmation that the tap landed, not a
             // celebration — the register forbids that.

@@ -227,7 +227,7 @@ deliberate choice from the first screen, and is changeable at any time.
 
 - A working, deployed web client at `personal-system-rho.vercel.app`, in daily
   use by the owner.
-- 153 passing tests encoding the product's invariants — `packages/core`.
+- 162 passing tests encoding the product's invariants — `packages/core`.
 - The mobile app running on real hardware as of 2026-07-29, in daily use.
 - A verified end-to-end alert delivery (fade detected → alert composed →
   delivered to a phone), 2026-07-19.

@@ -35,6 +35,7 @@ export function Screen({
   headerRight,
   refreshControl,
   wordmark = true,
+  underHeader = false,
 }: {
   children: ReactNode;
   /** Sits on the wordmark's baseline — the up/degraded label on Status. */
@@ -42,6 +43,15 @@ export function Screen({
   refreshControl?: ScrollViewProps["refreshControl"];
   /** Off for surfaces that own their whole header, like the takeover. */
   wordmark?: boolean;
+  /**
+   * For a screen pushed onto a native stack that shows a header.
+   *
+   * The header is opaque, so react-native-screens already lays the content out
+   * below it — the top inset is spoken for, and adding it again would leave a
+   * band of empty page. The scrim goes too: there is real chrome up there now,
+   * which is what the scrim was standing in for.
+   */
+  underHeader?: boolean;
 }) {
   const insets = useSafeAreaInsets();
 
@@ -51,7 +61,7 @@ export function Screen({
         style={{ flex: 1 }}
         contentInsetAdjustmentBehavior="never"
         contentContainerStyle={{
-          paddingTop: insets.top + space[4],
+          paddingTop: underHeader ? space[5] : insets.top + space[4],
           paddingHorizontal: space[5],
           // The indicator AND the bar. `insets.bottom` alone clears the
           // indicator and leaves everything under the tab bar.
@@ -60,7 +70,7 @@ export function Screen({
         refreshControl={refreshControl}
         keyboardShouldPersistTaps="handled"
       >
-        {wordmark && (
+        {wordmark && !underHeader && (
           <View
             style={{
               flexDirection: "row",
@@ -77,18 +87,22 @@ export function Screen({
       </ScrollView>
 
       {/* Painted after the ScrollView so it sits above it. Exactly the inset —
-          the wordmark's own top padding provides the breathing room below. */}
-      <View
-        pointerEvents="none"
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          height: insets.top,
-          backgroundColor: color.bg,
-        }}
-      />
+          the wordmark's own top padding provides the breathing room below.
+          Omitted under a native header, which is real chrome doing the same
+          job properly. */}
+      {!underHeader && (
+        <View
+          pointerEvents="none"
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            height: insets.top,
+            backgroundColor: color.bg,
+          }}
+        />
+      )}
     </View>
   );
 }

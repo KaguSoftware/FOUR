@@ -38,36 +38,72 @@ export const MAX_LEVERS = 4;
 /**
  * A lever's lifespan, as dates.
  *
- * `archived_on` is null while the lever is still offered. Both ends are
- * inclusive of the day named: a lever created on the 3rd counts for the 3rd,
- * and one archived on the 9th counted for the 9th — it was there for most of
- * that day, and the alternative silently dims a day someone already lived.
+ * `created_on` counts from that day **inclusive**; `archived_on` stops counting
+ * from that day **exclusive**, and is null while the lever is still offered.
+ *
+ * Archiving being exclusive is a deliberate asymmetry. Counting a lever on the
+ * day it was archived means the day you tidy up is a day you cannot fill: two
+ * levers left, both logged, and the cell still reads two-of-three because the
+ * one you just removed is still in the denominator. Nobody reads that as
+ * correct.
  */
 export type LeverSpan = {
   created_on: string;
   archived_on: string | null;
 };
 
+/** Levers whose span contains `date`. Raw — 0 means "nothing known". */
+function spanning(spans: readonly LeverSpan[], date: string): number {
+  let n = 0;
+  for (const span of spans) {
+    if (span.created_on > date) continue;
+    if (span.archived_on !== null && span.archived_on <= date) continue;
+    n++;
+  }
+  return n;
+}
+
 /**
- * How many levers existed on `date`.
+ * How many levers you had on `date`.
  *
  * This is the denominator the grid shades against, and it is a function of the
  * day rather than of today. Using the CURRENT active count meant history
  * rewrote itself: adding a third lever turned every previously-complete
  * two-lever day from fully lit into two thirds, for a decision made afterwards.
  *
- * Never returns less than 1. A date before any lever existed has no shade to
- * compute anyway — there can be no entries on it — and returning 0 would only
- * hand a divide-by-zero to whatever asked.
+ * **The hard part is dates we know nothing about, and getting it wrong is what
+ * shipped first.** `levers.created_at` records when the ROW was written, not
+ * when the lever entered someone's life — the migration that introduced the
+ * table backfilled every existing lever with the timestamp of the migration
+ * itself. Months of real entries sit before that stamp. The first version
+ * floored the answer at 1 on the reasoning that a day before any lever existed
+ * could have no entries on it, which is simply false for those rows, and the
+ * result was that every one of those days rendered as one-of-one: a day where
+ * you did half of what you had came out fully lit.
+ *
+ * So there is no floor of 1 here. Before the earliest thing we know about, the
+ * answer is the earliest lever set we DO know about, projected backwards. That
+ * is a guess, but it is the *right* guess — someone with two levers today
+ * almost certainly had two last month — and unlike `1` it is never a
+ * fabricated fact that turns a half-finished day into a complete one.
  */
 export function leversOn(spans: readonly LeverSpan[], date: string): number {
-  let n = 0;
+  const now = spanning(spans, date);
+  if (now > 0) return Math.min(now, MAX_LEVERS);
+
+  // Nothing spans this date. Either it predates every lever, or the account has
+  // none at all.
+  let earliest: string | null = null;
   for (const span of spans) {
-    if (span.created_on > date) continue;
-    if (span.archived_on !== null && span.archived_on < date) continue;
-    n++;
+    if (earliest === null || span.created_on < earliest) earliest = span.created_on;
   }
-  return Math.max(1, Math.min(n, MAX_LEVERS));
+  if (earliest === null) return 1;
+
+  // Only project backwards. A date AFTER everything was archived genuinely has
+  // no levers, and inventing some would dim a day that was legitimately full.
+  if (date > earliest) return 1;
+
+  return Math.min(Math.max(spanning(spans, earliest), 1), MAX_LEVERS);
 }
 
 type LeverCount = 1 | 2 | 3 | 4;

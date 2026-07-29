@@ -3,9 +3,10 @@ import { Pressable, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
+import { appendDetail } from "@uptime/core";
 import { Body, Label } from "@/components/ui";
 import { cachedStatus } from "@/lib/use-status";
-import { queueWrite } from "@/lib/outbox";
+import { outboxStore, queueWrite } from "@/lib/outbox";
 import { color, radius, size, space, TAP } from "@/theme";
 
 /**
@@ -16,6 +17,12 @@ import { color, radius, size, space, TAP } from "@/theme";
  * dismissing it by swiping down, which still leaves the day up, because the
  * entry is written the moment you choose anything here and "just mark it up"
  * is always offered.
+ *
+ * **It is also where a logged lever is un-logged.** There used to be a separate
+ * undo control on the dashboard; putting it here means the lever is the only
+ * thing you ever press, and what you can do with it lives behind it. Tapping a
+ * lever you already logged opens this in its second state: what is recorded,
+ * the option to add what else you did, and the option to take the day back.
  *
  * Ranked by what has actually worked, so restarting is reopening a file rather
  * than reinventing anything. An empty playbook is a working screen: the button
@@ -40,31 +47,52 @@ export default function LogSheet() {
   const [chosen, setChosen] = useState<string | null>(null);
 
   const leverRow = status?.levers.find((l) => l.key === lever);
+  const label = leverRow?.label ?? lever;
   const items = (status?.playbook ?? [])
     .filter((p) => p.lever === lever)
     .slice(0, 3);
 
   /**
-   * Log it, and get out of the way.
+   * What is already recorded for today, if anything.
    *
-   * This used to `await logEntry()` — up to three sequential Supabase round
-   * trips — before dismissing, so the sheet sat there while the network
-   * decided, and the dashboard behind it did not show the lever as logged
-   * until it happened to refetch. Undo felt instant next to it for one reason:
-   * undo went through the outbox and this did not.
-   *
-   * Now it queues, exactly like undo. The queue is shared and synchronous, so
-   * the dashboard has the tap before the sheet has finished closing, and the
-   * whole thing works with no signal at all — which is what the outbox was
-   * built for and what this path was quietly bypassing.
+   * The queue wins over the server: an unsent tap is still a tap, and the
+   * dashboard is already showing it as logged. Reading the store rather than
+   * subscribing keeps the sheet a single measured height.
    */
-  function commit(detail: string | null) {
+  const today = status?.today;
+  const queued = outboxStore
+    .get()
+    .find((q) => q.logged_for === today && q.lever === lever);
+  const serverEntry = status?.entries.find(
+    (e) => e.logged_for === today && e.lever === lever,
+  );
+  const logged = queued ? queued.op === "log" : !!serverEntry;
+  const detail = queued ? queued.detail : (serverEntry?.detail ?? null);
+
+  function commit(next: string | null) {
     // One pick per sheet: the second tap is always an accident.
     if (chosen !== null || !status) return;
-    setChosen(detail ?? "");
+    setChosen(next ?? "");
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     router.back();
-    queueWrite(status.state.user_id, lever, "log", detail);
+    // Adding to a day that is already logged APPENDS rather than replacing.
+    // One entry per lever per day is a schema rule, not a product one — doing
+    // the thing twice is still one day up, and the record of what you did
+    // should not lose the first half.
+    queueWrite(
+      status.state.user_id,
+      lever,
+      "log",
+      logged ? appendDetail(detail, next) : next,
+    );
+  }
+
+  function remove() {
+    if (chosen !== null || !status) return;
+    setChosen("");
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    router.back();
+    queueWrite(status.state.user_id, lever, "undo", null);
   }
 
   return (
@@ -80,9 +108,31 @@ export default function LogSheet() {
         gap: space[2],
       }}
     >
-      <Label style={{ marginBottom: space[1] }}>
-        {leverRow?.label ?? lever}
-      </Label>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "baseline",
+          justifyContent: "space-between",
+          marginBottom: space[1],
+        }}
+      >
+        <Label>{label}</Label>
+        {logged && <Label style={{ color: color.inkDim }}>logged today</Label>}
+      </View>
+
+      {/* What is already on the record. Shown before the options, so "add
+          another" is obviously an addition rather than a replacement. */}
+      {logged && detail && (
+        <Body tone="dim" style={{ marginBottom: space[1] }}>
+          {detail}
+        </Body>
+      )}
+
+      {items.length > 0 && logged && (
+        <Label style={{ color: color.inkMute, marginBottom: space[1] }}>
+          add what else you did
+        </Label>
+      )}
 
       {items.map((item) => (
         <Pressable
@@ -142,7 +192,7 @@ export default function LogSheet() {
               justifyContent: "center",
             }}
           >
-            <Body tone="ink">log</Body>
+            <Body tone="ink">{logged ? "add" : "log"}</Body>
           </Pressable>
         </View>
       ) : (
@@ -163,21 +213,44 @@ export default function LogSheet() {
         </Pressable>
       )}
 
-      <Pressable
-        accessibilityRole="button"
-        disabled={chosen !== null}
-        onPress={() => commit(null)}
-        style={{
-          minHeight: TAP,
-          alignItems: "center",
-          justifyContent: "center",
-          marginTop: space[1],
-        }}
-      >
-        <Body tone="mute" style={{ fontSize: size.xs }}>
-          just mark it up
-        </Body>
-      </Pressable>
+      {/* The floor when nothing is logged yet; the way back when something is.
+          Exactly one of these is ever offered, so the sheet never asks you to
+          read two similar buttons and pick. */}
+      {logged ? (
+        <Pressable
+          accessibilityRole="button"
+          disabled={chosen !== null}
+          onPress={remove}
+          style={({ pressed }) => ({
+            minHeight: TAP,
+            alignItems: "center",
+            justifyContent: "center",
+            marginTop: space[1],
+            borderRadius: radius.md,
+            backgroundColor: pressed ? color.downDim : "transparent",
+          })}
+        >
+          <Body style={{ fontSize: size.xs, color: color.down }}>
+            remove today&apos;s {label}
+          </Body>
+        </Pressable>
+      ) : (
+        <Pressable
+          accessibilityRole="button"
+          disabled={chosen !== null}
+          onPress={() => commit(null)}
+          style={{
+            minHeight: TAP,
+            alignItems: "center",
+            justifyContent: "center",
+            marginTop: space[1],
+          }}
+        >
+          <Body tone="mute" style={{ fontSize: size.xs }}>
+            just mark it up
+          </Body>
+        </Pressable>
+      )}
     </View>
   );
 }

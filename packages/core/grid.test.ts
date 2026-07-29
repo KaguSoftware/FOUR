@@ -32,12 +32,51 @@ describe("leversOn", () => {
     expect(leversOn(spans, "2026-07-01")).toBe(1);
   });
 
-  it("includes both endpoints — the day it appeared and the day it went", () => {
-    const spans = [span("2026-03-03", "2026-03-09")];
-    expect(leversOn(spans, "2026-03-02")).toBe(1); // floor, not 0
+  it("stops counting an archived lever ON its archive date, not after", () => {
+    // Otherwise the day you tidy up is a day you cannot fill: two levers left,
+    // both logged, and the cell still reads two-of-three.
+    const spans = [span("2026-01-01"), span("2026-01-01"), span("2026-01-01", "2026-06-10")];
+    expect(leversOn(spans, "2026-06-09")).toBe(3);
+    expect(leversOn(spans, "2026-06-10")).toBe(2);
+  });
+
+  it("counts from the creation date inclusive", () => {
+    const spans = [span("2026-03-03")];
     expect(leversOn(spans, "2026-03-03")).toBe(1);
-    expect(leversOn(spans, "2026-03-09")).toBe(1);
-    expect(leversOn(spans, "2026-03-10")).toBe(1); // floor again
+  });
+
+  it("projects the earliest known lever set backwards, never a bare 1", () => {
+    // THE BUG THIS EXISTS FOR. `levers.created_at` is when the ROW was written.
+    // The migration that introduced the table stamped every pre-existing lever
+    // with the migration's own timestamp, so months of real entries sit before
+    // it. Flooring at 1 there made every one of those days one-of-one — a day
+    // where you did one of two rendered as fully lit.
+    const twoLeversStampedAtMigration = [
+      span("2026-07-28"),
+      span("2026-07-28"),
+    ];
+    expect(leversOn(twoLeversStampedAtMigration, "2026-05-14")).toBe(2);
+    expect(gridFill(1, leversOn(twoLeversStampedAtMigration, "2026-05-14"))).not.toBe(
+      INK,
+    );
+  });
+
+  it("projects backwards past an archive too", () => {
+    // All three were stamped at the migration; one has since been archived.
+    // A day before the stamp had three, not one and not two.
+    const spans = [
+      span("2026-07-28"),
+      span("2026-07-28"),
+      span("2026-07-28", "2026-07-29"),
+    ];
+    expect(leversOn(spans, "2026-05-14")).toBe(3);
+    expect(leversOn(spans, "2026-07-29")).toBe(2);
+  });
+
+  it("does NOT project forwards — a fully archived account is not resurrected", () => {
+    const spans = [span("2026-01-01", "2026-02-01")];
+    expect(leversOn(spans, "2025-12-01")).toBe(1); // before: projected
+    expect(leversOn(spans, "2026-09-01")).toBe(1); // after: genuinely none
   });
 
   it("never returns zero, so nothing downstream divides by it", () => {

@@ -1,5 +1,10 @@
 import { useState } from "react";
 import { Alert, Pressable, TextInput, View } from "react-native";
+import Animated, {
+  FadeIn,
+  FadeOut,
+  LinearTransition,
+} from "react-native-reanimated";
 import {
   canAddLever,
   uniqueLeverKey,
@@ -132,8 +137,18 @@ export function LeverManager({
         freely; archiving keeps every day you already logged.
       </Body>
 
+      {/* Archiving is the one thing on this screen that changes the shape of
+          the list, so it is the one thing that gets motion. The row fades and
+          collapses, and `LinearTransition` carries every row below it up into
+          the space rather than snapping — which is what makes it read as "that
+          one left" instead of "the list redrew". */}
       {levers.map((lever) => (
-        <View key={lever.id}>
+        <Animated.View
+          key={lever.id}
+          entering={FadeIn.duration(180)}
+          exiting={FadeOut.duration(160)}
+          layout={LinearTransition.duration(240)}
+        >
           {editing === lever.id ? (
             <View
               style={{
@@ -225,7 +240,7 @@ export function LeverManager({
             </View>
           )}
           <Rule />
-        </View>
+        </Animated.View>
       ))}
 
       {full ? (

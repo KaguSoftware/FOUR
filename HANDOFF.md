@@ -11,7 +11,7 @@ The **active step** is marked `← ACTIVE` in *Roadmap* below. Do that. Before y
 start:
 
 1. Check *Blocked / needs the owner* — do not re-do work that is waiting on them.
-2. Run `npm test`. **153 tests must be green.** They encode the invariants the
+2. Run `npm test`. **162 tests must be green.** They encode the invariants the
    product rests on; if they are red, stop and fix that first.
 3. Skim *Gotchas*. Several are traps that have already cost time once.
 
@@ -98,7 +98,7 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 
 **Done and verified:**
 
-- Schema pushed — 9 tables, RLS on all. Verified: anon reads return zero rows, cross-user insert rejected (42501). **All six migrations applied to the live database as of 2026-07-29.**
+- Schema pushed — 9 tables, RLS on all. Verified: anon reads return zero rows, cross-user insert rejected (42501). **All seven migrations applied to the live database as of 2026-07-29.**
 - Auth: password sign-in + magic link fallback; deep link survives sign-in via `?next=`.
 - Status dashboard, re-entry takeover, day grid, two-tap logging with playbook chips, history, playbook, proof, settings.
 - Monitor route with fade tiers, milestone ledger, plateau detection. **Verified end-to-end** against seeded data: silent at 1 day, pages at 2, escalates at 3, same-day dedupe works.
@@ -113,7 +113,7 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 - **The mobile app runs on hardware, 2026-07-29.** It is being used and bug-reported against. Expo SDK **54** (moved back from 57 deliberately — Expo Go ships one SDK and the owner's phone has 54).
 - **Renamed to `four`, 2026-07-29.** Display name only. App name, both wordmarks, web title, PWA manifest, and the push-notification title fallback. The `uptime` slug, the `uptime://` scheme, `com.kagusoftware.uptime` and the `@uptime/*` packages are all unchanged, and ~60 uses of "uptime" as the *metric* are untouched — including the persisted `uptime_80` / `uptime_90` milestone kinds.
 - **All six migrations applied to the live database, 2026-07-29.** `npx supabase migration list` shows local and remote matching.
-- **The device-testing round, 2026-07-29.** Screen scaffold with correct tab-bar and status-bar insets; calendar-month grid on Home; today's cell pulses; universal undo; sectioned Settings with a segmented posture control; drag-to-reorder and drag-to-archive levers; per-day grid denominator. All verified as `tsc` clean, 153 tests, `expo lint` clean, `expo export` bundling both platforms, and the web app building.
+- **The device-testing round, 2026-07-29.** Screen scaffold with correct tab-bar and status-bar insets; the page-switch twitch; calendar-month grid on Home with today's cell pulsing; History captions and incident ranges; Settings split into an index and four sub-screens on a native stack; drag-to-reorder and drag-to-archive with fade-and-collapse motion; the undo control replaced by tapping a logged lever; the per-day grid denominator and its two follow-up bugs. All verified as `tsc` clean, 162 tests, `expo lint` clean, `expo export` bundling both platforms, and the web app building.
 
 **Written but NOT verified end-to-end:**
 
@@ -181,8 +181,8 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 13. ~~`/proof` and lever CRUD on mobile~~ — done 2026-07-28. The trend series and its geometry moved into `packages/core/signals.ts` and **both clients now draw from it**, so the two charts cannot disagree about the same month.
 14. ~~Offline outbox~~ — done 2026-07-28. Every lever tap on mobile goes through it, online or not. Rules in `packages/core/outbox.ts` (17 tests), storage and flushing in `apps/mobile/src/lib/outbox.ts`.
 15. ~~Device-testing round one~~ — done 2026-07-29. Chrome insets and the page-switch twitch, the note field, the Settings rewrite, the rename to `four`, the calendar-month grid, today's pulse, History captions and ranges, universal undo, lever drag-to-reorder / drag-to-archive, and the per-day grid denominator. All migrations applied.
-16. **← ACTIVE: Settings sub-screens and archive motion.** Requested 2026-07-29, **not started.** Three parts: (a) split Settings from one page into a grouped index that pushes into sub-screens — an `app/(tabs)/settings/` directory with a native `Stack`, so the transitions are the platform's own rather than hand-animated; (b) exit + layout animations when a lever is archived, in both `lever-manager.tsx` and `lever-buttons.tsx` (Reanimated 4 `exiting` / `LinearTransition`); (c) the owner mentioned an "accessibility" section as an example of the pattern — **do not invent settings to fill it**; ask what belongs there.
-17. **A development build.** `eas init` is done (project `3570cebf…`, owner `parsa-mansouri`). What remains: `eas env:create` for the two `EXPO_PUBLIC_` vars, then `eas build --profile development`. **iOS needs an Apple Developer account ($99/yr)**; Android builds a free APK. Push cannot be tested before this.
+16. ~~Settings sub-screens, archive motion, and the grid-denominator fixes~~ — done 2026-07-29. Settings is now `app/(tabs)/settings/` — an index of value-stating rows pushing into `levers` / `alerts` / `tracking` / `account` on a native `Stack`, so the transitions, back button and edge-swipe are the platform's. Archiving fades and collapses, with the rest of the list carried up by `LinearTransition`. The undo control is gone: a logged lever stays tappable and its sheet offers "add what else you did" or "remove today's <lever>".
+17. **← ACTIVE: a development build.** `eas init` is done (project `3570cebf…`, owner `parsa-mansouri`). What remains: `eas env:create` for the two `EXPO_PUBLIC_` vars, then `eas build --profile development`. **iOS needs an Apple Developer account ($99/yr)**; Android builds a free APK. Push cannot be tested before this.
 18. Then: Sign in with Apple (required once any third-party sign-in ships) · a real app icon · a privacy policy at `/privacy` · store listings.
 
 ## Deliberately partial — grows later (scope ledger)
@@ -205,10 +205,11 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 | Playbook | **No tab.** Still exists, still self-populates from logging, still feeds the lever sheet and the takeover | Unchanged — browsing it is not coming back | Decided 2026-07-28 |
 | Daily note | A journal: auto-growing box, 6000 chars, today's entry loaded back for editing | Same on mobile | With mobile `/proof` |
 | Outage annotation | `annotateOutage` action exists; no UI | Tap an outage in `/history` to label it | After real outages exist |
-| Undo | **Mobile: one row below the lever grid, walking back today most-recent-first.** Web: still per-lever | Long-press any grid cell to edit that day | Low priority |
+| Undo | **Mobile: there is no undo control.** A logged lever stays tappable; its sheet offers "add what else you did" or "remove today's <lever>". Web: still a per-lever undo | Same on web | Mobile done 2026-07-29 |
 | Lever order | **Mobile: long-press and drag.** Drag to the trash to archive | Same on web (the RPC is shared and ready) | Mobile done 2026-07-29 |
-| Settings layout | **Mobile: one page, four labelled sections.** Web: one flat page | Grouped index pushing into sub-screens | **Roadmap step 16** |
-| Archive motion | Instant — the row just disappears | Exit + layout animation in both the manager and the lever grid | **Roadmap step 16** |
+| Settings layout | **Mobile: an index pushing into four sub-screens on a native stack.** Web: one flat page | Same on web | Mobile done 2026-07-29 |
+| Archive motion | **Mobile: fade + collapse, with the list carried up.** Web: instant | Same on web | Mobile done 2026-07-29 |
+| Settings "accessibility" section | None. The owner named it as an example of the pattern; there is nothing real to put in it — reduce-motion and text size are OS settings the app already honours | **Ask before inventing one** | Undecided |
 | Home grid | **Mobile: the real calendar month**, today pulsing. History keeps the dense trailing 90 | Same on web | Mobile done 2026-07-29 |
 | Timezone | Defaults to Europe/Istanbul in DB | Device-detected at signup, editable | With mobile |
 | Monetization | Free | Undecided. **The usual paywalls are all ruled out by the thesis**, not by preference — lever count is the product's name, longer history attacks re-entry, gamification fails a build test. Any model has to sell something other than a feature | Post-launch |
@@ -219,7 +220,8 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 - **The outbox must reload BEFORE it shrinks the queue.** The queue is an overlay on the server's view (`applyToDay`). Dropping a settled item first hands the screen back a `todayLevers` the server has not re-sent, so an undo landed, the lever reappeared for the length of the round trip, then vanished again — three visible state changes for one tap. `drain()` awaits `onFlushed()` first. Do not "simplify" that ordering.
 - **There is exactly one entry write path: the outbox.** `logEntry`/`undoEntry` used to exist in `lib/status.ts` alongside `send()` in `lib/outbox.ts` — same upserts, different timing. The log sheet used the slow one and awaited the network before dismissing; the dashboard used the outbox and felt instant. They are gone. Anything that logs or undoes calls `queueWrite`.
 - **`supabase` runs from the REPO ROOT; `expo` and `eas` run from `apps/mobile`.** Both directions have bitten. Running `supabase db push` from `apps/mobile` finds no local migrations, reports *"Remote migration versions not found in local migrations directory"*, and then **suggests `migration repair --status reverted` for every applied migration — do not run that.** It marks applied migrations un-applied and the next push tries to re-create existing tables. It also drops a stray `apps/mobile/supabase/.temp/` that must be deleted. Happened 2026-07-29.
-- **A day's grid shade is computed against the levers that existed THAT day**, via `leversOn` — not against today's active count. Using the current count meant adding a fourth lever retroactively dimmed every complete three-lever day already on screen. That is the same class of problem as a stored counter: history changing because of a decision made after it. `levers.archived_at` is maintained by a database trigger (`stamp_lever_archived`), so no client has to remember.
+- **A day's grid shade is computed against the levers that existed THAT day**, via `leversOn` — not against today's active count. Using the current count meant adding a fourth lever retroactively dimmed every complete three-lever day already on screen: the same class of problem as a stored counter, history changing because of a decision made after it. `levers.archived_at` is maintained by a database trigger (`stamp_lever_archived`), so no client has to remember.
+  **This shipped broken twice on 2026-07-29 and both failures are worth knowing.** (1) `levers.created_at` is when the ROW was written — the custom-levers migration backfilled every pre-existing lever with the migration's own timestamp, so months of real entries sat before it. `leversOn` floored the answer at 1 there, on the written-down assumption that "a day before any lever existed can have no entries on it", which is false for exactly those rows. Every such day rendered one-of-one — a day where you did half of what you had came out **fully lit**. The floor is gone: before the earliest thing we know about, it projects the earliest known lever set backwards. `20260729020000` also backdates `created_at` to each lever's first entry, because an entry is proof the lever existed. (2) `archived_on` was compared with `<`, so a lever archived TODAY still counted today — with the backfill stamping every already-archived row at `now()`, two-of-two read as two-of-**three** and could never fill. It is `<=` now: creation is inclusive, archiving is exclusive. **A lever's span is `[created_on, archived_on)`.**
 - **Reordering levers needs a DEFERRABLE constraint and goes through an RPC.** `position` is unique among active levers and `check (position between 1 and 4)` leaves nowhere to park a row mid-swap, so *every* reorder passes through a state where two levers claim one slot. A plain unique index rejects that moment. `20260729000000_lever_order.sql` swaps it for a deferrable `EXCLUDE` (the only constraint type taking both a partial `WHERE` and `DEFERRABLE`) and adds `reorder_levers(uuid[])`. **The four-lever cap is unchanged and still structural** — only *when* uniqueness is checked moved to COMMIT. If reordering ever reports "could not save that order", the migration is not applied.
 - **`GestureDetector` needs `GestureHandlerRootView` and expo-router does not provide one.** It is in `src/app/_layout.tsx`. Without it the lever drag gesture silently never activates — no error, nothing. (The native stack's edge-swipe is unaffected; that one is handled natively by react-native-screens.)
 - **Tab screens must pad `insets.bottom + TAB_BAR`, not `insets.bottom`.** The bar is translucent, so content slides under it and stays readable-but-unreachable. `NativeTabs` exposes no height and expo-router 6 mounts no `BottomTabBarHeightContext`, so `useBottomTabBarHeight()` throws here — `TAB_BAR` in `theme.ts` is a constant for that reason. Use `components/screen.tsx` rather than rolling it per screen.
@@ -269,7 +271,7 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 ```bash
 npm install          # installs every workspace
 npm run dev          # apps/web on http://localhost:3000
-npm test             # packages/core — 153 tests, the gate for everything
+npm test             # packages/core — 162 tests, the gate for everything
 npm run typecheck    # both workspaces
 npm run lint
 npm run test:migrations  # runs every migration against real Postgres (WASM)

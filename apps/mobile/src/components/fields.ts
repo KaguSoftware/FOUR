@@ -11,6 +11,14 @@ import { color, radius, space, TAP } from "@/theme";
  *
  * `fontSize: 16` is not a style choice — below 16 iOS zooms the whole view when
  * the field takes focus, which on a sheet reads as the screen jumping.
+ *
+ * **No `lineHeight` on a single-line field, deliberately.** iOS TextKit pins
+ * glyphs to the bottom of an inflated line box, so `lineHeight: 24` pushed the
+ * text visibly below the field's vertical centre — reported on device as
+ * "padding issues" (2026-07-29). Without it the native control centres the
+ * text itself. `paddingVertical: 0` is the Android half of the same fix: its
+ * TextInput ships default vertical padding that throws off centring in a
+ * min-height box.
  */
 export const field = {
   minHeight: TAP,
@@ -18,14 +26,17 @@ export const field = {
   borderWidth: 1,
   borderColor: color.line,
   paddingHorizontal: space[4],
+  paddingVertical: 0,
   color: color.ink,
   fontFamily: "Inter_400Regular",
   fontSize: 16,
-  lineHeight: 24,
 } as const;
 
 /**
  * A multi-line note field.
+ *
+ * Multiline is where `lineHeight` belongs — wrapped text needs the reading
+ * leading, and a top-aligned multiline box has no centring to break.
  *
  * `maxHeight` is load-bearing on the daily check: without it a long entry grows
  * the field without limit and pushes the log — and the save button — off the
@@ -37,6 +48,7 @@ export const field = {
  */
 export const noteField = {
   ...field,
+  lineHeight: 24,
   minHeight: 110,
   maxHeight: 260,
   paddingTop: space[3],

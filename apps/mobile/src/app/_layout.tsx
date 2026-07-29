@@ -105,12 +105,6 @@ function RootNavigator({ fontsLoaded }: { fontsLoaded: boolean }) {
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
       </Stack.Protected>
 
-      {/* Outside every guard: the OAuth redirect can arrive in either auth
-          state, and an unmatched route in the middle of a sign-in reads as a
-          crash. It renders nothing — it just forwards to whichever branch the
-          gate has open. */}
-      <Stack.Screen name="auth/callback" options={{ headerShown: false }} />
-
       <Stack.Protected guard={!!session && onboarded === false}>
         <Stack.Screen
           name="onboarding"
@@ -135,6 +129,15 @@ function RootNavigator({ fontsLoaded }: { fontsLoaded: boolean }) {
         <Stack.Screen name="add-lever" options={SHEET} />
         <Stack.Screen name="edit-note" options={SHEET} />
       </Stack.Protected>
+
+      {/* Outside every guard, and deliberately LAST. The OAuth redirect can
+          arrive in any auth state, so it must always resolve — but an
+          unguarded screen declared before the branches becomes the initial
+          route the moment its predecessors are guarded away, which is how the
+          first Apple sign-in landed on a blank screen instead of onboarding
+          (2026-07-29). Declared last, it is reachable by deep link and
+          nothing else. */}
+      <Stack.Screen name="auth/callback" options={{ headerShown: false }} />
     </Stack>
   );
 }

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Alert, Pressable, TextInput, View } from "react-native";
+import { field } from "./fields";
 import Animated, {
   FadeIn,
   FadeOut,
@@ -176,18 +177,15 @@ export function LeverManager({
                   );
                 }}
                 returnKeyType="done"
-                style={{
-                  flex: 1,
-                  minHeight: TAP,
-                  borderRadius: radius.md,
-                  borderWidth: 1,
-                  borderColor: color.lineHi,
-                  backgroundColor: color.surface,
-                  paddingHorizontal: space[3],
-                  color: color.ink,
-                  fontFamily: "Inter_400Regular",
-                  fontSize: 16,
-                }}
+                style={[
+                  field,
+                  {
+                    flex: 1,
+                    borderColor: color.lineHi,
+                    backgroundColor: color.surface,
+                    paddingHorizontal: space[3],
+                  },
+                ]}
               />
               <Pressable
                 onPress={() => setEditing(null)}
@@ -264,18 +262,14 @@ export function LeverManager({
             maxLength={LEVER_LABEL_MAX}
             onSubmitEditing={create}
             returnKeyType="done"
-            style={{
-              flex: 1,
-              minHeight: TAP,
-              borderRadius: radius.md,
-              borderWidth: 1,
-              borderColor: color.line,
-              backgroundColor: color.surface,
-              paddingHorizontal: space[3],
-              color: color.ink,
-              fontFamily: "Inter_400Regular",
-              fontSize: 16,
-            }}
+            style={[
+              field,
+              {
+                flex: 1,
+                backgroundColor: color.surface,
+                paddingHorizontal: space[3],
+              },
+            ]}
           />
           <Pressable
             accessibilityRole="button"

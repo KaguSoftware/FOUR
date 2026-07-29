@@ -22,6 +22,7 @@ import {
 } from "@uptime/core";
 
 import { Button } from "@/components/button";
+import { field } from "@/components/fields";
 import { Body, Label, Wordmark } from "@/components/ui";
 import { ChoiceCard } from "@/components/choice-card";
 import { Segmented } from "@/components/segmented";
@@ -144,17 +145,11 @@ export default function OnboardingScreen() {
     color: color.ink,
   } as const;
 
-  const field = {
-    minHeight: 56,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: color.line,
-    backgroundColor: color.surface,
-    paddingHorizontal: space[4],
-    color: color.ink,
-    fontFamily: "Inter_400Regular",
-    fontSize: 16,
-  } as const;
+  // The shared metrics, at first-run size on the page surface.
+  const leverField = [
+    field,
+    { minHeight: 56, backgroundColor: color.surface },
+  ] as const;
 
   return (
     <KeyboardAvoidingView
@@ -219,7 +214,7 @@ export default function OnboardingScreen() {
                     }
                     placeholder={`Lever ${i + 1}`}
                     placeholderTextColor={color.inkMute}
-                    style={[field, { flex: 1 }]}
+                    style={[leverField, { flex: 1 }]}
                   />
                   {labels.length > 1 && (
                     <Pressable

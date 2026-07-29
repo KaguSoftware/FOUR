@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { LEVER_LABEL_MAX, MAX_LEVERS } from "@uptime/core";
 
+import { field } from "@/components/fields";
 import { Body, Label } from "@/components/ui";
 import { createLever } from "@/lib/levers";
 import { cachedStatus, refreshStatus } from "@/lib/use-status";
@@ -85,17 +86,14 @@ export default function AddLeverSheet() {
         returnKeyType="done"
         placeholder="Name it"
         placeholderTextColor={color.inkMute}
-        style={{
-          minHeight: 56,
-          borderRadius: radius.md,
-          borderWidth: 1,
-          borderColor: color.lineHi,
-          backgroundColor: color.surfaceHi,
-          paddingHorizontal: space[4],
-          color: color.ink,
-          fontFamily: "Inter_400Regular",
-          fontSize: 16,
-        }}
+        style={[
+          field,
+          {
+            minHeight: 56,
+            borderColor: color.lineHi,
+            backgroundColor: color.surfaceHi,
+          },
+        ]}
       />
 
       {error && <Body tone="degraded">{error}</Body>}

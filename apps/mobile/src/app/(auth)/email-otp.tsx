@@ -164,6 +164,10 @@ export default function EmailOtpScreen() {
                 letterSpacing: size.xl * 0.4,
                 textAlign: "center",
                 minHeight: 56,
+                // letterSpacing trails the LAST digit too, which drags a
+                // centred run of glyphs half a space left. Widening the left
+                // pad by one spacing unit shifts it back to true centre.
+                paddingLeft: space[4] + size.xl * 0.4,
               },
             ]}
           />

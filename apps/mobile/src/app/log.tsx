@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
 import { appendDetail } from "@uptime/core";
+import { field } from "@/components/fields";
 import { Body, Label } from "@/components/ui";
 import { cachedStatus } from "@/lib/use-status";
 import { outboxStore, queueWrite } from "@/lib/outbox";
@@ -164,20 +165,10 @@ export default function LogSheet() {
             placeholderTextColor={color.inkMute}
             onSubmitEditing={() => commit(custom.trim() || null)}
             returnKeyType="done"
-            style={{
-              flex: 1,
-              minHeight: 56,
-              borderRadius: radius.md,
-              borderWidth: 1,
-              borderColor: color.line,
-              backgroundColor: color.surfaceHi,
-              paddingHorizontal: space[4],
-              color: color.ink,
-              fontFamily: "Inter_400Regular",
-              // 16 minimum on a touch device. Below that iOS zooms the whole
-              // view on focus and the sheet jumps.
-              fontSize: 16,
-            }}
+            style={[
+              field,
+              { flex: 1, minHeight: 56, backgroundColor: color.surfaceHi },
+            ]}
           />
           <Pressable
             accessibilityRole="button"

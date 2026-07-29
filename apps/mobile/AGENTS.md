@@ -68,6 +68,14 @@ To change a dependency: `cd apps/mobile && npx expo install --fix`.
   change, delete `node_modules` and `package-lock.json` at the repo root and
   reinstall; a leftover `react-native` at the root gets resolved in preference
   to the workspace's own and fails with an unrelated-looking syntax error.
+- **Never run `expo` or `eas` from the repo root — `cd apps/mobile` first.**
+  Neither finds a config up there, so both invent one instead of failing:
+  `expo` drops a stray root `tsconfig.json`, and `eas` writes a root `app.json`
+  **and registers a brand-new empty EAS project against it**. After that every
+  `eas` command run from the root silently targets the wrong project — no env
+  vars, no credentials — and the errors point nowhere near the cause. Happened
+  on 2026-07-29 with `eas device:create`; the stray `app.json` and the orphan
+  project both had to be deleted by hand.
 - Verify with `npm run typecheck` and then, from `apps/mobile`,
   `npx expo export --platform ios --platform android`. That export is the only
   proof the module graph actually resolves.

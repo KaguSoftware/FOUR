@@ -42,7 +42,7 @@ export default async function HistoryPage() {
       </section>
 
       <section className="mb-8">
-        <DayGrid entries={entries} today={today} leverCount={status.leverCount} days={90} />
+        <DayGrid entries={entries} today={today} spans={status.leverSpans} days={90} />
         <p className="text-ink-mute mt-2 text-xs">last 90 days</p>
       </section>
 

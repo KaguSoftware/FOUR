@@ -30,7 +30,7 @@ describe("splitPage", () => {
 
   it("never leaves the body empty, which renders as a blank row on Android", () => {
     const { title, body } = splitPage("SYSTEM STABLE");
-    expect(title).toBe("uptime");
+    expect(title).toBe("four");
     expect(body).toBe("SYSTEM STABLE");
   });
 });

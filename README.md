@@ -1,6 +1,12 @@
-# uptime
+# four
 
 Uptime monitor for one body.
+
+Named for the ceiling: four levers, of which any **one** keeps the day up. The
+product is `four`; the metric it derives is still called uptime, and so are
+`uptimeWindow`, the `uptime_80` / `uptime_90` milestone kinds and the
+`uptime://` deep-link scheme. Renaming those would orphan live rows and break
+notification tap-through — they are the score, not the brand.
 
 The only score is uptime: did the system stay up today. A day is **up** if one
 small real thing got logged — a gym session of any quality, or the food lever.

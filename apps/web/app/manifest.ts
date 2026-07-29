@@ -9,8 +9,8 @@ import type { MetadataRoute } from "next";
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "uptime",
-    short_name: "uptime",
+    name: "four",
+    short_name: "four",
     description: "Uptime monitor for one body.",
     start_url: "/",
     display: "standalone",

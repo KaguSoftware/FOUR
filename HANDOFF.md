@@ -1,9 +1,9 @@
-# uptime — Handoff
+# four — Handoff
 
 > **New chat? Read this file top to bottom before doing anything.** It is written
 > to be sufficient on its own. Companions: `PRODUCT.md` (product truth),
 > `DESIGN.md` (visual system), `.impeccable/design.json` (design sidecar), and
-> the approved plan at `~/.claude/plans/i-got-this-web-majestic-bee.md`.
+> the approved plan at `~/.claude/plans/some-issues-1-things-memoized-toast.md`.
 
 ## If the user just said "continue"
 
@@ -11,9 +11,15 @@ The **active step** is marked `← ACTIVE` in *Roadmap* below. Do that. Before y
 start:
 
 1. Check *Blocked / needs the owner* — do not re-do work that is waiting on them.
-2. Run `npm test`. **91 tests must be green.** They encode the invariants the
+2. Run `npm test`. **153 tests must be green.** They encode the invariants the
    product rests on; if they are red, stop and fix that first.
 3. Skim *Gotchas*. Several are traps that have already cost time once.
+
+**The app is now running on real hardware** (as of 2026-07-29) and the owner is
+testing on a device. That changes how to work on it: bugs arrive as descriptions
+of what the screen did, not as failing tests, and several have been regressions
+invisible to `tsc`. See *The cross-screen sync trap* in Gotchas — it caused three
+separate reported bugs in one day.
 
 ---
 
@@ -54,7 +60,7 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 | Auth | Email 6-digit code · Sign in with Apple · Google · email + password |
 | Widget | **After launch (v1.1+)** |
 | Money | Free for v1 |
-| Name | Keep `uptime` for now; branding pending |
+| Name | **`four`**, after the four-lever ceiling. Display name only — the `uptime` slug, the `uptime://` scheme, `com.kagusoftware.uptime` and the `@uptime/*` packages are all unchanged |
 | Tone | Blunt ops register, with a **`STRICT` / `SOFT` posture** setting |
 | Lever edits | **Rename freely; archive never deletes** |
 | **Day grid encoding** | **Lightness ramp** — see below. Owner's call, 2026-07-28 |
@@ -67,7 +73,8 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 
 ## Stack & environment
 
-- **Monorepo** on npm workspaces: `packages/core`, `apps/web`, `apps/mobile` (not built yet)
+- **Monorepo** on npm workspaces: `packages/core`, `apps/web`, `apps/mobile`
+- **Mobile: Expo SDK 54** / React Native 0.81.5 / expo-router 6 / Reanimated 4 / react-native-gesture-handler
 - Next.js 16.2.10 (App Router, Turbopack) · React 19.2 · Tailwind v4 (CSS-first)
 - Supabase (Postgres 17, Auth, RLS) — project `yqphirnsvcqzstwjfshs` ("parsa-system", eu-west-1)
 - Vercel (cron via `apps/web/vercel.ts`) · Vitest · Playwright (dev screenshots only)
@@ -91,7 +98,7 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 
 **Done and verified:**
 
-- Schema pushed — 8 tables, RLS on all. Verified: anon reads return zero rows, cross-user insert rejected (42501).
+- Schema pushed — 9 tables, RLS on all. Verified: anon reads return zero rows, cross-user insert rejected (42501). **All six migrations applied to the live database as of 2026-07-29.**
 - Auth: password sign-in + magic link fallback; deep link survives sign-in via `?next=`.
 - Status dashboard, re-entry takeover, day grid, two-tap logging with playbook chips, history, playbook, proof, settings.
 - Monitor route with fade tiers, milestone ledger, plateau detection. **Verified end-to-end** against seeded data: silent at 1 day, pages at 2, escalates at 3, same-day dedupe works.
@@ -103,17 +110,23 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 - **Onboarding, posture and multi-user sign-up, 2026-07-28.** `/onboarding` (rule + 1–4 levers, then posture), `requireStatus()` gating every signed-in screen, `completeOnboarding` / `setPosture` actions, a Settings posture control, posture wired into the takeover and the milestone panel, "just mark it up" added to the takeover so an empty playbook is not a dead end, and an explicit create-account path on `/login`. Verified: **91 tests green, 15 migration checks, tsc clean, eslint clean, production build emits `/onboarding`.** Contrast measured on all 26 new colour pairs — see Gotchas for the two findings.
 - **Three legibility defects caught by reviewing renders rather than reading code**, all fixed: 6px horizontal overflow from an assumed `box-sizing`; a run length set in the label face instead of tabular mono; and a 1–5 scale whose selected step sat at **1.10:1** against its unselected siblings — effectively invisible. Now 15.31:1. **Screenshot and look at the render; the detector does not catch these.**
 
+- **The mobile app runs on hardware, 2026-07-29.** It is being used and bug-reported against. Expo SDK **54** (moved back from 57 deliberately — Expo Go ships one SDK and the owner's phone has 54).
+- **Renamed to `four`, 2026-07-29.** Display name only. App name, both wordmarks, web title, PWA manifest, and the push-notification title fallback. The `uptime` slug, the `uptime://` scheme, `com.kagusoftware.uptime` and the `@uptime/*` packages are all unchanged, and ~60 uses of "uptime" as the *metric* are untouched — including the persisted `uptime_80` / `uptime_90` milestone kinds.
+- **All six migrations applied to the live database, 2026-07-29.** `npx supabase migration list` shows local and remote matching.
+- **The device-testing round, 2026-07-29.** Screen scaffold with correct tab-bar and status-bar insets; calendar-month grid on Home; today's cell pulses; universal undo; sectioned Settings with a segmented posture control; drag-to-reorder and drag-to-archive levers; per-day grid denominator. All verified as `tsc` clean, 153 tests, `expo lint` clean, `expo export` bundling both platforms, and the web app building.
+
 **Written but NOT verified end-to-end:**
 
-- **The entire mobile app has never run.** It typechecks and `expo export` bundles it for iOS and Android, which proves the module graph resolves and nothing more. No screen has rendered, no tap has been handled, no session has been stored. Treat every mobile behaviour as unproven until it runs on hardware.
 - **Vercel cron has never run.** The route works locally; the schedule is unproven.
+- **Push has never been delivered to a device.** Needs a development build; `expo-notifications` cannot issue a token without an EAS `projectId` and remote push does not work in Expo Go.
+- **Drag-to-reorder and drag-to-archive have not been used on a device** as of this writing. The RPC they depend on is applied; the gesture itself is unproven on hardware.
 - Plateau thresholds pass unit tests but have no longitudinal data behind them. `PLATEAU_WEEKS` (4) and `MIN_DAYS_PER_WEEK` (3) are educated guesses.
 
 **Blocked / needs the owner:**
 
-- **Run `npx supabase db push`** to apply `20260728010000_custom_levers.sql`. Verified in WASM Postgres but never run against the live database. **The app still reads the hardcoded pair, so the migration is safe to apply ahead of the code.**
-- **Rotate two credentials** — see Gotchas.
-- Note for a fresh chat: `apps/web/.env.local` is **not** on this machine, so the dev server and the dev scripts cannot run here until it is recreated. Tests, typecheck, lint and build all work without it.
+- **Rotate two credentials** — see Gotchas. Still outstanding from 2026-07-19.
+- **A development build** — see *Roadmap* step 15. This is the gate on push.
+- Note for a fresh chat: `apps/web/.env.local` is **not** on this machine, so the web dev server and the dev scripts cannot run here. Tests, typecheck, lint, both builds and `supabase db push` all work without it — `apps/mobile/.env.local` **does** exist.
 
 ## File map (key files)
 
@@ -134,12 +147,20 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 | `apps/web/app/globals.css` | Tailwind v4 `@theme` tokens. Normative in oklch. |
 | `apps/web/proxy.ts` | Session refresh + route protection (Next 16 name for middleware). |
 | `apps/web/vercel.ts` | Cron schedule. Inside the app dir because Vercel's Root Directory points there. |
-| `apps/mobile/AGENTS.md` | **Read before touching mobile.** SDK 57 moved several APIs; this records which, and that the installed `.d.ts` files beat the docs. |
+| `packages/core/grid.ts` | The day-grid ramp **and `leversOn`** — how many levers existed on a given day, which is the denominator each cell is shaded against. |
+| `packages/core/month.ts` | `monthGrid()` — the calendar month as a Monday-first 7-column grid. Home's grid, not History's. |
+| `apps/mobile/AGENTS.md` | **Read before touching mobile.** SDK **54** facts, and the two run-it-from-the-right-directory traps (`expo`/`eas` from the root, `supabase` from `apps/mobile`). |
+| `apps/mobile/src/lib/store.ts` | A subscribable value. **The fix for cross-screen sync** — read the docblock before touching either hook below. |
+| `apps/mobile/src/lib/use-status.ts` | The shared status store + the focus staleness guard. `refreshStatus()` is callable from anywhere, including the sheets. |
+| `apps/mobile/src/lib/use-outbox.ts` | Flush triggers, and the "reload before shrinking the queue" rule that stops undo flickering. |
+| `apps/mobile/src/lib/outbox.ts` | The queue: in-memory store, AsyncStorage as backup, and the **only** entry write path in the app. |
 | `apps/mobile/src/lib/supabase.ts` | Keychain-backed session storage. Chunks the session because SecureStore caps a value at 2048 bytes on Android. |
-| `apps/mobile/src/lib/status.ts` | The client-side port of `getStatus()`. Three queries, everything else derived by core. |
-| `apps/mobile/src/app/_layout.tsx` | The auth + onboarding gate, via `Stack.Protected`. |
+| `apps/mobile/src/lib/status.ts` | The client-side port of `getStatus()`. Five queries, everything else derived by core. |
+| `apps/mobile/src/components/screen.tsx` | Every tab screen's frame. Owns the safe-area insets, the tab-bar allowance and the status-bar scrim. |
+| `apps/mobile/src/components/lever-buttons.tsx` | The lever grid, with long-press drag-to-reorder and drag-to-archive. |
+| `apps/mobile/src/app/_layout.tsx` | The auth + onboarding gate via `Stack.Protected`, plus `GestureHandlerRootView`. |
 | `apps/mobile/src/app/(tabs)/_layout.tsx` | The native tab bar — real `UITabBar` / Material 3, SF Symbols and Material Symbols per platform. |
-| `supabase/migrations/` | Schema. `db push` to apply. |
+| `supabase/migrations/` | Schema. `db push` **from the repo root** to apply. |
 | `scripts/seed.mjs` | Seed synthetic history: `npm run seed -- 31 11`. |
 
 ## Roadmap / next steps
@@ -155,12 +176,14 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 8. ~~Schema migration — `levers` table, drop the `gym`/`food` CHECKs, backfill, `push_token`, `posture`~~ — written and verified 2026-07-28 via `npm run test:migrations` (15 checks). **Not yet applied — needs `npx supabase db push`.**
 9. ~~Wire lever CRUD~~ — done 2026-07-28. Actions, a Settings manager, and `getStatus` reads levers from the table.
 10. ~~Onboarding + posture~~ — done 2026-07-28. `/onboarding` states the rule, takes 1–4 levers and a posture, then sets `onboarded_at`. `requireStatus()` gates every signed-in screen. Posture is wired into the two places it is allowed to reach (takeover sentence, milestone panel) and is changeable in Settings. Web also grew an explicit **create-account** path, without which none of this was reachable.
-11. ~~Expo app scaffold + the core screens~~ — done 2026-07-28. `apps/mobile` on **SDK 57**: native tab bar, native stack, native sheet, session gate, dashboard, takeover, day grid, levers, onboarding, sign-in, history, settings. **Typechecks and bundles for both platforms; never run on a device.**
-12. **← ACTIVE: run it on a device.** Nothing in `apps/mobile` has executed. Needs `apps/mobile/.env.local` (see `.env.example`), then `npm run mobile`. The three things to confirm first: the SecureStore chunked-session adapter round-trips, `logicalDateLocal` gives the right day in a non-Istanbul zone, and the native tab bar/sheet look right.
+11. ~~Expo app scaffold + the core screens~~ — done 2026-07-28, then **moved from SDK 57 back to SDK 54** the same day so it runs in the owner's Expo Go. Native tab bar, native stack, native sheets, session gate, dashboard, takeover, day grid, levers, onboarding, sign-in, history, settings.
+12. ~~Run it on a device~~ — done 2026-07-29. It runs, and a round of real bugs came back from it.
 13. ~~`/proof` and lever CRUD on mobile~~ — done 2026-07-28. The trend series and its geometry moved into `packages/core/signals.ts` and **both clients now draw from it**, so the two charts cannot disagree about the same month.
 14. ~~Offline outbox~~ — done 2026-07-28. Every lever tap on mobile goes through it, online or not. Rules in `packages/core/outbox.ts` (17 tests), storage and flushing in `apps/mobile/src/lib/outbox.ts`.
-15. **← ACTIVE: a development build.** `eas init` is done (project `3570cebf…`, owner `parsa-mansouri`). What remains: `eas env:create` for the two `EXPO_PUBLIC_` vars, then `eas build --profile development`. **iOS needs an Apple Developer account ($99/yr)**; Android builds a free APK. Push cannot be tested before this.
-16. Then: Sign in with Apple (required once any third-party sign-in ships) · a real app icon · a privacy policy at `/privacy` · store listings.
+15. ~~Device-testing round one~~ — done 2026-07-29. Chrome insets and the page-switch twitch, the note field, the Settings rewrite, the rename to `four`, the calendar-month grid, today's pulse, History captions and ranges, universal undo, lever drag-to-reorder / drag-to-archive, and the per-day grid denominator. All migrations applied.
+16. **← ACTIVE: Settings sub-screens and archive motion.** Requested 2026-07-29, **not started.** Three parts: (a) split Settings from one page into a grouped index that pushes into sub-screens — an `app/(tabs)/settings/` directory with a native `Stack`, so the transitions are the platform's own rather than hand-animated; (b) exit + layout animations when a lever is archived, in both `lever-manager.tsx` and `lever-buttons.tsx` (Reanimated 4 `exiting` / `LinearTransition`); (c) the owner mentioned an "accessibility" section as an example of the pattern — **do not invent settings to fill it**; ask what belongs there.
+17. **A development build.** `eas init` is done (project `3570cebf…`, owner `parsa-mansouri`). What remains: `eas env:create` for the two `EXPO_PUBLIC_` vars, then `eas build --profile development`. **iOS needs an Apple Developer account ($99/yr)**; Android builds a free APK. Push cannot be tested before this.
+18. Then: Sign in with Apple (required once any third-party sign-in ships) · a real app icon · a privacy policy at `/privacy` · store listings.
 
 ## Deliberately partial — grows later (scope ledger)
 
@@ -182,12 +205,25 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 | Playbook | **No tab.** Still exists, still self-populates from logging, still feeds the lever sheet and the takeover | Unchanged — browsing it is not coming back | Decided 2026-07-28 |
 | Daily note | A journal: auto-growing box, 6000 chars, today's entry loaded back for editing | Same on mobile | With mobile `/proof` |
 | Outage annotation | `annotateOutage` action exists; no UI | Tap an outage in `/history` to label it | After real outages exist |
-| Undo | Under a logged lever, today only | Long-press any grid cell to edit that day | Low priority |
+| Undo | **Mobile: one row below the lever grid, walking back today most-recent-first.** Web: still per-lever | Long-press any grid cell to edit that day | Low priority |
+| Lever order | **Mobile: long-press and drag.** Drag to the trash to archive | Same on web (the RPC is shared and ready) | Mobile done 2026-07-29 |
+| Settings layout | **Mobile: one page, four labelled sections.** Web: one flat page | Grouped index pushing into sub-screens | **Roadmap step 16** |
+| Archive motion | Instant — the row just disappears | Exit + layout animation in both the manager and the lever grid | **Roadmap step 16** |
+| Home grid | **Mobile: the real calendar month**, today pulsing. History keeps the dense trailing 90 | Same on web | Mobile done 2026-07-29 |
 | Timezone | Defaults to Europe/Istanbul in DB | Device-detected at signup, editable | With mobile |
-| Monetization | Free | Undecided | Post-launch |
+| Monetization | Free | Undecided. **The usual paywalls are all ruled out by the thesis**, not by preference — lever count is the product's name, longer history attacks re-entry, gamification fails a build test. Any model has to sell something other than a feature | Post-launch |
 
 ## Gotchas / open issues
 
+- **THE CROSS-SCREEN SYNC TRAP (2026-07-29) — read this before touching any mobile data hook.** `useStatus` was a module-level `let cached` wrapped in a per-screen `useState`, so `refresh()` updated the variable and *the calling screen only*. Nothing was subscribed. A focus refresh on every tab was silently covering for it — everyone re-fetched, so everyone converged. Adding a 30s staleness guard removed the cover and produced **three separate bug reports that looked unrelated**: logging took ~30s to show, the Track-weight toggle "did nothing", and adding a lever "did nothing". All one cause. It is now a real store (`lib/store.ts` + `useSyncExternalStore`). **Never reintroduce a bare module variable read through `useState`, and never let a screen depend on another screen deciding to reload** — the sheets can call `refreshStatus()` directly for exactly this reason.
+- **The outbox must reload BEFORE it shrinks the queue.** The queue is an overlay on the server's view (`applyToDay`). Dropping a settled item first hands the screen back a `todayLevers` the server has not re-sent, so an undo landed, the lever reappeared for the length of the round trip, then vanished again — three visible state changes for one tap. `drain()` awaits `onFlushed()` first. Do not "simplify" that ordering.
+- **There is exactly one entry write path: the outbox.** `logEntry`/`undoEntry` used to exist in `lib/status.ts` alongside `send()` in `lib/outbox.ts` — same upserts, different timing. The log sheet used the slow one and awaited the network before dismissing; the dashboard used the outbox and felt instant. They are gone. Anything that logs or undoes calls `queueWrite`.
+- **`supabase` runs from the REPO ROOT; `expo` and `eas` run from `apps/mobile`.** Both directions have bitten. Running `supabase db push` from `apps/mobile` finds no local migrations, reports *"Remote migration versions not found in local migrations directory"*, and then **suggests `migration repair --status reverted` for every applied migration — do not run that.** It marks applied migrations un-applied and the next push tries to re-create existing tables. It also drops a stray `apps/mobile/supabase/.temp/` that must be deleted. Happened 2026-07-29.
+- **A day's grid shade is computed against the levers that existed THAT day**, via `leversOn` — not against today's active count. Using the current count meant adding a fourth lever retroactively dimmed every complete three-lever day already on screen. That is the same class of problem as a stored counter: history changing because of a decision made after it. `levers.archived_at` is maintained by a database trigger (`stamp_lever_archived`), so no client has to remember.
+- **Reordering levers needs a DEFERRABLE constraint and goes through an RPC.** `position` is unique among active levers and `check (position between 1 and 4)` leaves nowhere to park a row mid-swap, so *every* reorder passes through a state where two levers claim one slot. A plain unique index rejects that moment. `20260729000000_lever_order.sql` swaps it for a deferrable `EXCLUDE` (the only constraint type taking both a partial `WHERE` and `DEFERRABLE`) and adds `reorder_levers(uuid[])`. **The four-lever cap is unchanged and still structural** — only *when* uniqueness is checked moved to COMMIT. If reordering ever reports "could not save that order", the migration is not applied.
+- **`GestureDetector` needs `GestureHandlerRootView` and expo-router does not provide one.** It is in `src/app/_layout.tsx`. Without it the lever drag gesture silently never activates — no error, nothing. (The native stack's edge-swipe is unaffected; that one is handled natively by react-native-screens.)
+- **Tab screens must pad `insets.bottom + TAB_BAR`, not `insets.bottom`.** The bar is translucent, so content slides under it and stays readable-but-unreachable. `NativeTabs` exposes no height and expo-router 6 mounts no `BottomTabBarHeightContext`, so `useBottomTabBarHeight()` throws here — `TAB_BAR` in `theme.ts` is a constant for that reason. Use `components/screen.tsx` rather than rolling it per screen.
+- **`contentInsetAdjustmentBehavior` must be `"never"` on tab ScrollViews.** Left automatic, UIKit computes its own safe-area inset *after* first layout, on top of the `insets.top` the code already adds — two sources of truth for one number, one arriving a frame late. That was the visible page-switch twitch. A residual frame from `NativeTabsView`'s `useDeferredValue` remains and is upstream.
 - **Day boundary is 04:00 local, not midnight.** A 01:30 session counts for the day that just ended. `logicalDate()` handles this; don't bypass it.
 - **RESOLVED 2026-07-28 — do not use `logicalDate()` on mobile.** Hermes delegates Intl to platform ICU and the behaviour varies by Android version. Documented failures: `RangeError: Invalid timezone name!` for valid IANA zones (hermes#572), the options object ignored entirely on API 21-23 (hermes#776), and `resolvedOptions().timeZone` reporting `UTC` because the device zone is never exposed. It can pass on a test device and fail on a user's.
   **Use `logicalDateLocal(now)` instead** — no Intl at all. A phone's `Date` is already in the user's local time, which is the timezone the 04:00 boundary actually means. `hasTimeZoneSupport(tz)` probes the engine if you need to know. A test cross-checks the two implementations agree under Node, so a divergence fails CI rather than silently corrupting a month of history.
@@ -218,7 +254,9 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 - **"Food first" is gone.** The takeover and the monitor used to rank the food lever first, on the principle that coming back must be lighter than starting. That cannot survive user-defined levers — we cannot know which of someone's levers is the light one — so both now rank by what has actually worked (pinned, then use_count). If you want the old behaviour back, it needs a user-nominated "lightest" lever, which is new product scope.
 - **A migration is not done until `npm run test:migrations` passes.** There is no Docker here, so PGlite is the only pre-flight check, and `supabase db push` is not reversible. That harness already caught an `on delete restrict` that would have broken Apple-mandated account deletion.
 - **The old `handle_new_user()` seeded gym AND food playbook rows for every signup**, so every pre-existing account carries both levers and the backfill covers everyone through `playbook` even if they never logged. The new trigger seeds nothing — onboarding writes the levers.
-- **Expo SDK 57 moved things.** `Stack` is `expo-router/stack`, not `expo-router`; root `Tabs` is deprecated; the tab bar is `NativeTabs` from `expo-router/unstable-native-tabs`. A doc lookup gave me the old, wrong answer for `Stack` — **read the installed `.d.ts` files**, which is what `apps/mobile/AGENTS.md` now says.
+- **The app is on Expo SDK 54, moved back from 57 on 2026-07-28** so it runs in the owner's Expo Go. `Stack` is `expo-router/stack`, not `expo-router`; root `Tabs` is deprecated; the tab bar is `NativeTabs` from `expo-router/unstable-native-tabs`, and on 54 `Icon`/`Label`/`VectorIcon` are **top-level exports** rather than sub-components. A doc lookup gave the old, wrong answer for `Stack` — **read the installed `.d.ts` files**, which is what `apps/mobile/AGENTS.md` says. **Do not bump the SDK without checking what Expo Go the owner has.**
+- **`Label` and `Icon` must be DIRECT children of `NativeTabs.Trigger`.** expo-router walks the children and matches on strict element identity, so a tidy wrapper component produces the wrong element type and is silently dropped — which is exactly how the app once shipped with no tab icons at all.
+- **The day-grid ramp is proportional, and the No-Subdivision Rule stands.** Lightness is `0.51 + (fired / leverCount) × 0.44`; the cell is never divided into a partial bar. A proportional *bar* was built and reverted the same day (2026-07-29) — it was legible, and it was also the product telling someone their day was three-quarters missing. Values are pre-resolved hex in `packages/core/grid.ts`, generated with the same oklch→sRGB conversion `scripts/check-contrast.mjs` uses.
 - **SecureStore caps a value at 2048 bytes on Android and a Supabase session is bigger.** `apps/mobile/src/lib/supabase.ts` chunks it across keys with a manifest written last. Get this wrong and it presents as "the app randomly logs me out", which is miserable to debug on a device. **Untested on hardware.**
 - **`npx expo export` must run from `apps/mobile`**, not the repo root, or it resolves the wrong entry point. There is no root script for it on purpose — `npm run typecheck` covers the cheap check.
 - **`.gitignore` had `.env*` with no exception**, so `.env.example` files were invisible and the env contract was undocumented. Negations added; don't drop them.
@@ -231,7 +269,7 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 ```bash
 npm install          # installs every workspace
 npm run dev          # apps/web on http://localhost:3000
-npm test             # packages/core — 91 tests, the gate for everything
+npm test             # packages/core — 153 tests, the gate for everything
 npm run typecheck    # both workspaces
 npm run lint
 npm run test:migrations  # runs every migration against real Postgres (WASM)
@@ -242,8 +280,12 @@ npm run mobile           # Expo dev server; scan the QR with Expo Go or a dev bu
 npm run mobile:ios
 npm run mobile:android
 cd apps/mobile && npx expo export --platform ios   # proves the module graph resolves
+cd apps/mobile && npx expo lint
 npm run build
-npx supabase db push # apply migrations (link once with --project-ref)
+
+# Migrations: FROM THE REPO ROOT, never from apps/mobile. See Gotchas.
+npx supabase migration list   # local vs remote; "remote": "" means not applied
+npx supabase db push
 
 # Dev helpers (credentials from apps/web/.env.local)
 npm run seed -- 31 11             # 31-day run that ended 11 days ago

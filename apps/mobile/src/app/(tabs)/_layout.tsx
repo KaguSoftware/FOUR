@@ -78,10 +78,10 @@ export default function TabsLayout() {
       }}
     >
       <NativeTabs.Trigger name="index">
-        <Label>Status</Label>
+        <Label>Home</Label>
         <Icon
-          sf="waveform.path.ecg"
-          androidSrc={<VectorIcon family={MaterialIcons} name="monitor-heart" />}
+          sf="house"
+          androidSrc={<VectorIcon family={MaterialIcons} name="home" />}
         />
       </NativeTabs.Trigger>
 

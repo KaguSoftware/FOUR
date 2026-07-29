@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Stack } from "expo-router/stack";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
@@ -55,10 +56,16 @@ export default function RootLayout() {
   });
 
   return (
-    <SessionProvider>
-      <StatusBar style="light" />
-      <RootNavigator fontsLoaded={fontsLoaded} />
-    </SessionProvider>
+    // Required for `GestureDetector` to receive anything — expo-router's
+    // `ExpoRoot` does NOT provide this, so without it the lever drag gesture
+    // silently never activates. (The native stack's edge-swipe is unaffected:
+    // that one is handled natively by react-native-screens.)
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SessionProvider>
+        <StatusBar style="light" />
+        <RootNavigator fontsLoaded={fontsLoaded} />
+      </SessionProvider>
+    </GestureHandlerRootView>
   );
 }
 

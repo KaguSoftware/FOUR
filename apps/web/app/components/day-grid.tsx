@@ -1,11 +1,18 @@
-import { addDays, gridFill, type Entry } from "@uptime/core";
+import {
+  addDays,
+  gridFill,
+  leversOn,
+  type Entry,
+  type LeverSpan,
+} from "@uptime/core";
 
 /**
  * 30 cells, one per day. Filled = up, hollow = down, ring = today.
  *
  * Fill lightness carries HOW MANY levers fired, never WHICH — status colour is
  * reserved for status, and a colour-coded grid would turn "which lever" into a
- * value judgement about the day.
+ * value judgement about the day. It is proportional: two of three levers is two
+ * thirds of the way to ink.
  *
  * The cell is never subdivided. Segments, quadrants and fractional fills draw
  * the absence as a visible hole, and a hole reads as "you did not finish" —
@@ -16,13 +23,17 @@ import { addDays, gridFill, type Entry } from "@uptime/core";
 export function DayGrid({
   entries,
   today,
-  leverCount,
+  spans,
   days = 30,
 }: {
   entries: Entry[];
   today: string;
-  /** Active levers, which sets the number of ramp steps. */
-  leverCount: number;
+  /**
+   * Every lever's lifespan, archived included. Each day is shaded against the
+   * levers that existed THAT day — using today's count re-scales history every
+   * time a lever is added.
+   */
+  spans: LeverSpan[];
   days?: number;
 }) {
   const byDate = new Map<string, Set<string>>();
@@ -39,14 +50,11 @@ export function DayGrid({
   });
 
   return (
-    <ul
-      className="grid grid-cols-15 gap-[3px]"
-      aria-label={`Last ${days} days`}
-    >
+    <ul className="grid grid-cols-15 gap-[3px]" aria-label={`Last ${days} days`}>
       {cells.map(({ date, levers, isToday }) => {
         const fired = levers?.size ?? 0;
         // The ramp is generated, so the fill is a value rather than a class.
-        const fill = gridFill(fired, leverCount);
+        const fill = gridFill(fired, leversOn(spans, date));
         return (
           <li
             key={date}

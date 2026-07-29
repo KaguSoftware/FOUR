@@ -165,11 +165,19 @@ of these is wrong:**
   the hero must resist that. If it shrinks into the platform's scale, the
   dashboard becomes a list with a number on it.
 
+**Decided:**
+
+- Product name: **`four`**, after the ceiling of four levers. The name IS the
+  constraint, which also settles a monetization question permanently — lever
+  count can never be a paid tier.
+
 **Explicitly undecided:**
 
-- Product name. `uptime` is the working name; branding is in progress and the
-  bare word is likely unavailable on the App Store.
-- Monetization. Free for v1; model undecided.
+- Monetization. Free for v1; model undecided. Note that the usual paywalls are
+  all ruled out by the thesis rather than by preference: more levers is the
+  name, longer history attacks re-entry, and gamification is out of scope with
+  a build-failing test enforcing it. Any model has to sell something other than
+  a feature.
 - The plateau thresholds themselves — `PLATEAU_WEEKS` (4) and
   `MIN_DAYS_PER_WEEK` (3) are educated guesses with no longitudinal data behind
   them yet. Revisit once roughly six weeks of real signal exists.
@@ -180,7 +188,7 @@ of these is wrong:**
   `system stable`. This is the product's identity and its default.
 - **The product never tells the user what their goal should be, and never
   evaluates how well they did it.**
-- Existing wordmark: lowercase `uptime`, set in Archivo Black.
+- Existing wordmark: lowercase `four`, set in Archivo Black.
 - Dark-only. Confirmed rationale: the app is opened at 6am and at 11pm, and a
   white screen at either hour is hostile.
 
@@ -219,7 +227,8 @@ deliberate choice from the first screen, and is changeable at any time.
 
 - A working, deployed web client at `personal-system-rho.vercel.app`, in daily
   use by the owner.
-- 44 passing tests encoding the product's invariants — `packages/core`.
+- 153 passing tests encoding the product's invariants — `packages/core`.
+- The mobile app running on real hardware as of 2026-07-29, in daily use.
 - A verified end-to-end alert delivery (fade detected → alert composed →
   delivered to a phone), 2026-07-19.
 - Recorded contrast measurements for the existing palette.

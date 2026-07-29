@@ -68,6 +68,18 @@ To change a dependency: `cd apps/mobile && npx expo install --fix`.
   change, delete `node_modules` and `package-lock.json` at the repo root and
   reinstall; a leftover `react-native` at the root gets resolved in preference
   to the workspace's own and fails with an unrelated-looking syntax error.
+- **Never run `supabase` from `apps/mobile` — it belongs at the REPO ROOT.**
+  `supabase/` (config, migrations, `.temp`) lives at the root. Run `db push`
+  from here and the CLI finds no local migrations directory, sees zero local
+  against four remote, and reports *"Remote migration versions not found in
+  local migrations directory"* — then helpfully suggests
+  `supabase migration repair --status reverted <every applied version>`.
+  **Do not run that.** It marks applied migrations as un-applied, and the next
+  push tries to re-create tables that already exist. The fix is always `cd` to
+  the repo root. Happened on 2026-07-29; it also left a stray
+  `apps/mobile/supabase/.temp/` linking this directory to the project, which
+  had to be deleted so the next command would fail loudly instead of quietly
+  repeating the same thing.
 - **Never run `expo` or `eas` from the repo root — `cd apps/mobile` first.**
   Neither finds a config up there, so both invent one instead of failing:
   `expo` drops a stray root `tsconfig.json`, and `eas` writes a root `app.json`

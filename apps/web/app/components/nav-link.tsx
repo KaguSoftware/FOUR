@@ -61,11 +61,11 @@ export function NavLink({
   );
 }
 
-/** Back to status. Same feedback, same hit area. */
+/** Back home. Same feedback, same hit area. */
 export function BackLink() {
   return (
     <NavLink href="/" className="-mr-2 px-2">
-      ← status
+      ← home
     </NavLink>
   );
 }

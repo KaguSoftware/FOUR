@@ -26,14 +26,18 @@ const archivoBlack = Archivo_Black({
 });
 
 export const metadata: Metadata = {
-  title: "uptime",
+  // The product is `four`, after the ceiling of four levers. The METRIC is
+  // still called uptime, which is why the description below is unchanged and
+  // why `uptime_80`/`uptime_90` milestone kinds and `uptimeWindow` keep their
+  // names — those are the score, not the brand.
+  title: "four",
   description: "Uptime monitor for one body.",
   // Added to the home screen from Safari, this launches without browser
   // chrome. `black-translucent` lets the near-black background run under the
   // status bar instead of leaving a pale strip above it.
   appleWebApp: {
     capable: true,
-    title: "uptime",
+    title: "four",
     statusBarStyle: "black-translucent",
   },
   formatDetection: { telephone: false, date: false, address: false, email: false },

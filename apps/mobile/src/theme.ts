@@ -1,3 +1,5 @@
+import { Platform } from "react-native";
+
 /**
  * The visual system, ported for React Native.
  *
@@ -90,3 +92,20 @@ export const TAP = 48;
 
 /** The lever button. Bigger than the minimum because it is the whole product. */
 export const LEVER_HEIGHT = 64;
+
+/**
+ * The tab bar's own height, ABOVE the home indicator — add `insets.bottom` on
+ * top of this, never instead of it.
+ *
+ * A constant because there is nothing to ask. `NativeTabs` exposes no height
+ * (see `NativeTabsProps` in expo-router's
+ * `native-tabs/NativeBottomTabs/types.d.ts` — the OS owns it), and expo-router 6
+ * mounts no `BottomTabBarHeightContext`, so `useBottomTabBarHeight()` from
+ * `@react-navigation/bottom-tabs` throws here rather than answering.
+ *
+ * Getting this wrong is not cosmetic: the bar is translucent, so content does
+ * not stop at it — it slides underneath and stays readable-but-unreachable,
+ * which is how the sign-out row, the add-lever button and the oldest incident
+ * all ended up under the glass.
+ */
+export const TAB_BAR = Platform.select({ ios: 49, android: 80, default: 56 });

@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useRef, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase, startSessionAutoRefresh } from "./supabase";
 import { clearStatusCache } from "./use-status";
+import { clearOutbox } from "./outbox";
 
 /**
  * Who is signed in, and whether they have finished first-run setup.
@@ -74,8 +75,12 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       async (_event, next) => {
         if (!active) return;
         // Before anything else: one account must never see another's cached
-        // dashboard for even a frame.
-        if (next?.user.id !== userIdRef.current) clearStatusCache();
+        // dashboard for even a frame — nor inherit its unsent taps, which the
+        // outbox would otherwise flush under the new user's credentials.
+        if (next?.user.id !== userIdRef.current) {
+          clearStatusCache();
+          clearOutbox();
+        }
         setSession(next);
         // Cleared on sign-out so the next account cannot inherit the previous
         // one's answer for the moment before its own fetch lands.

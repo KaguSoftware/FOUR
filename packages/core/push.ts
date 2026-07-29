@@ -58,7 +58,7 @@ export function splitPage(text: string): { title: string; body: string } {
   // A single-line page is all title and no body on Android, which renders as an
   // empty second row. Moving it to the body and titling it with the product
   // name is the lesser evil.
-  return body ? { title, body } : { title: "uptime", body: title };
+  return body ? { title, body } : { title: "four", body: title };
 }
 
 export function pushMessage(

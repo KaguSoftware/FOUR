@@ -6,27 +6,46 @@ import {
   settle,
   type OutboxItem,
 } from "@uptime/core";
+import { createStore } from "./store";
 import { supabase } from "./supabase";
 import { today } from "./status";
 
 /**
- * The outbox, persisted.
+ * The outbox, persisted and shared.
  *
  * The rules live in `@uptime/core/outbox` where they are tested; this file is
- * storage and network. Tapping a lever on the subway writes here first and
- * reaches Supabase whenever it can.
+ * storage, network, and who can see the queue. Tapping a lever on the subway
+ * writes here first and reaches Supabase whenever it can.
+ *
+ * **The store is in memory and AsyncStorage is the backup, not the other way
+ * round.** A write updates the store synchronously and persists in the
+ * background, so a tap shows up on the next frame rather than after a disk
+ * round trip. It also means the log SHEET and the dashboard share one queue —
+ * they are separate routes with separate component trees, and the sheet used to
+ * have no way to tell the dashboard anything except by writing to the server
+ * and hoping the dashboard refetched.
  *
  * **AsyncStorage, not SecureStore.** Nothing in this queue is a credential —
  * it is which levers were tapped — and SecureStore's 2048-byte value ceiling
  * would need the same chunking the session does, for no benefit.
  *
  * The queue is per user. Two accounts on one device must never flush each
- * other's taps, so the key carries the user id.
+ * other's taps, so the key carries the user id and the store is reset on any
+ * change of user.
  */
 
 const keyFor = (userId: string) => `outbox.v1.${userId}`;
 
-export async function readQueue(userId: string): Promise<OutboxItem[]> {
+const queueStore = createStore<OutboxItem[]>([]);
+/** Whose queue is in the store right now. */
+let loadedFor: string | null = null;
+
+export const outboxStore = {
+  get: queueStore.get,
+  subscribe: queueStore.subscribe,
+};
+
+async function readPersisted(userId: string): Promise<OutboxItem[]> {
   try {
     const raw = await AsyncStorage.getItem(keyFor(userId));
     if (!raw) return [];
@@ -39,25 +58,56 @@ export async function readQueue(userId: string): Promise<OutboxItem[]> {
   }
 }
 
-async function writeQueue(userId: string, queue: OutboxItem[]) {
-  await AsyncStorage.setItem(keyFor(userId), JSON.stringify(capped(queue)));
+/** Push the in-memory queue to disk. Never awaited by anything user-facing. */
+function persist(userId: string, queue: OutboxItem[]) {
+  AsyncStorage.setItem(keyFor(userId), JSON.stringify(capped(queue))).catch(
+    () => {
+      // Nothing useful to do. The queue is still correct in memory and will
+      // flush from there; the only cost is losing it if the app is killed.
+    },
+  );
 }
 
-/** Record an intent locally. Always succeeds — that is the point. */
-export async function queueWrite(
+/**
+ * Load this user's queue into the store.
+ *
+ * Idempotent per user, so the hook can call it on every mount. Switching users
+ * replaces the store outright rather than merging — one account's unsent taps
+ * are not the other's to send.
+ */
+export async function hydrate(userId: string) {
+  if (loadedFor === userId) return;
+  loadedFor = userId;
+  queueStore.set(await readPersisted(userId));
+}
+
+/** Forget everything on sign-out. */
+export function clearOutbox() {
+  loadedFor = null;
+  queueStore.set([]);
+}
+
+/**
+ * Record an intent. Synchronous by design — this is the whole reason a tap
+ * feels instant, and it is why it also works with no signal at all.
+ */
+export function queueWrite(
   userId: string,
   lever: string,
   op: "log" | "undo",
   detail: string | null,
-): Promise<OutboxItem[]> {
-  const next = enqueue(await readQueue(userId), {
-    logged_for: today(),
-    lever,
-    op,
-    detail,
-    queued_at: Date.now(),
-  });
-  await writeQueue(userId, next);
+): OutboxItem[] {
+  const next = capped(
+    enqueue(queueStore.get(), {
+      logged_for: today(),
+      lever,
+      op,
+      detail,
+      queued_at: Date.now(),
+    }),
+  );
+  queueStore.set(next);
+  persist(userId, next);
   return next;
 }
 
@@ -69,10 +119,13 @@ export async function queueWrite(
  * writes are idempotent — entries upsert on `(user_id, logged_for, lever)` —
  * so a retry after an ambiguous failure is an update, never a duplicate.
  *
- * Returns the queue that remains.
+ * Returns what remains WITHOUT publishing it to the store. The caller decides
+ * when the queue may shrink, because dropping a settled item before the
+ * refreshed server view has arrived puts the pre-undo state back on screen for
+ * the length of a round trip. See `use-outbox.ts`.
  */
 export async function flush(userId: string): Promise<OutboxItem[]> {
-  let queue = await readQueue(userId);
+  let queue = queueStore.get();
   if (queue.length === 0) return queue;
 
   for (const item of pending(queue)) {
@@ -82,10 +135,15 @@ export async function flush(userId: string): Promise<OutboxItem[]> {
     // of a phone that is already struggling for signal.
     if (!ok) break;
     queue = settle(queue, item);
-    await writeQueue(userId, queue);
+    persist(userId, queue);
   }
 
   return queue;
+}
+
+/** Publish a post-flush queue to every screen. */
+export function commitFlushed(queue: OutboxItem[]) {
+  queueStore.set(queue);
 }
 
 async function send(userId: string, item: OutboxItem): Promise<boolean> {

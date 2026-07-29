@@ -1,8 +1,13 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
 import { AppState } from "react-native";
 import * as Network from "expo-network";
-import type { OutboxItem } from "@uptime/core";
-import { flush, queueWrite, readQueue } from "./outbox";
+import {
+  commitFlushed,
+  flush,
+  hydrate,
+  outboxStore,
+  queueWrite,
+} from "./outbox";
 
 /**
  * The outbox, wired to the things that mean "try again".
@@ -18,8 +23,11 @@ import { flush, queueWrite, readQueue } from "./outbox";
  * someone watch a spinner for a write they cannot influence is the friction
  * this product exists to remove.
  */
-export function useOutbox(userId: string | undefined, onFlushed: () => void) {
-  const [queue, setQueue] = useState<OutboxItem[]>([]);
+export function useOutbox(
+  userId: string | undefined,
+  onFlushed: () => void | Promise<void>,
+) {
+  const queue = useSyncExternalStore(outboxStore.subscribe, outboxStore.get);
   // Guards against two flushes overlapping — a foreground event and a network
   // event often arrive together, and both would send the same item.
   const flushing = useRef(false);
@@ -28,16 +36,23 @@ export function useOutbox(userId: string | undefined, onFlushed: () => void) {
     if (!userId || flushing.current) return;
     flushing.current = true;
     try {
-      const before = await readQueue(userId);
-      if (before.length === 0) {
-        setQueue(before);
-        return;
-      }
+      const before = outboxStore.get();
+      if (before.length === 0) return;
+
       const after = await flush(userId);
-      setQueue(after);
-      // Only reload when something actually landed, so a failed flush does not
-      // spin the whole dashboard for nothing.
-      if (after.length < before.length) onFlushed();
+
+      // **Reload BEFORE publishing the shrunken queue.**
+      //
+      // The queue is an overlay on the server's view (`applyToDay`). Dropping a
+      // settled item first leaves the screen reading a `todayLevers` the server
+      // has not re-sent yet — so an undo would land, then the lever would pop
+      // back for the length of the round trip, then vanish again when the
+      // reload finally arrived. Three state changes for one tap.
+      //
+      // Holding the overlay until the truth has actually landed makes the two
+      // agree at the moment of the swap, so nothing visibly changes twice.
+      if (after.length < before.length) await onFlushed();
+      commitFlushed(after);
     } finally {
       flushing.current = false;
     }
@@ -45,8 +60,11 @@ export function useOutbox(userId: string | undefined, onFlushed: () => void) {
 
   useEffect(() => {
     if (!userId) return;
-    readQueue(userId).then(setQueue);
-    drain();
+    let cancelled = false;
+
+    hydrate(userId).then(() => {
+      if (!cancelled) drain();
+    });
 
     const net = Network.addNetworkStateListener((state) => {
       if (state.isInternetReachable) drain();
@@ -57,16 +75,37 @@ export function useOutbox(userId: string | undefined, onFlushed: () => void) {
     });
 
     return () => {
+      cancelled = true;
       net.remove();
       app.remove();
     };
   }, [userId, drain]);
 
-  /** Queue an intent and immediately try to send it. */
+  // Anything in the queue is something to try sending, wherever it came from.
+  //
+  // This is what covers writes made outside this hook — the log sheet is its
+  // own route with its own component tree, so it queues into the shared store
+  // and has nobody to call `drain()` on. Without this its taps would show
+  // instantly and then sit unsent until the app happened to background or the
+  // network blinked.
+  //
+  // It cannot spin: a flush that sends nothing returns the identical array, and
+  // the store suppresses a set to a value it already holds, so no notification
+  // and no re-run.
+  useEffect(() => {
+    if (queue.length > 0) drain();
+  }, [queue, drain]);
+
+  /**
+   * Queue an intent and try to send it.
+   *
+   * The queue write is synchronous, so the caller's next render already shows
+   * the tap. Sending is what happens afterwards, whenever it can.
+   */
   const write = useCallback(
-    async (lever: string, op: "log" | "undo", detail: string | null) => {
+    (lever: string, op: "log" | "undo", detail: string | null) => {
       if (!userId) return;
-      setQueue(await queueWrite(userId, lever, op, detail));
+      queueWrite(userId, lever, op, detail);
       drain();
     },
     [userId, drain],

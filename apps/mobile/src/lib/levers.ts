@@ -99,3 +99,24 @@ export async function archiveLever(
   if (error) return { ok: false, error: "Could not archive that lever." };
   return { ok: true };
 }
+
+/**
+ * Reorder the active levers. `ids` is the new order, first to last.
+ *
+ * This goes through an RPC rather than a set of updates, and it has to.
+ * Positions are unique among active levers, so any swap passes through a state
+ * where two rows want the same slot — and `position between 1 and 4` leaves
+ * nowhere to park a row while the others move. Two updates cannot express this
+ * and neither can one, against a constraint checked row by row.
+ *
+ * `reorder_levers` does the whole shuffle inside one transaction, against a
+ * DEFERRABLE exclusion constraint that is validated at COMMIT. See
+ * `supabase/migrations/20260729000000_lever_order.sql`.
+ */
+export async function reorderLevers(
+  ids: string[],
+): Promise<LeverResult> {
+  const { error } = await supabase.rpc("reorder_levers", { p_ids: ids });
+  if (error) return { ok: false, error: "Could not save that order." };
+  return { ok: true };
+}

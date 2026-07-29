@@ -9,6 +9,7 @@ import {
   toPosture,
   uptimeWindow,
   type Entry,
+  type LeverSpan,
   type Posture,
 } from "@uptime/core";
 
@@ -26,13 +27,38 @@ import {
  * does for reads.
  */
 
+/**
+ * An entry, plus when the row was written.
+ *
+ * Core's `Entry` is deliberately `logged_for`/`lever`/`detail` — every figure
+ * it derives keys on the DATE, never on write time. `created_at` is a UI
+ * concern only: it is how the undo row knows which of today's taps was last.
+ */
+export type LoggedEntry = Entry & { created_at: string };
+
 export type LeverRow = {
   id: string;
   key: string;
   label: string;
   position: number;
   archived: boolean;
+  created_at: string;
+  archived_at: string | null;
 };
+
+/**
+ * Lever lifespans, for shading past days the way they looked at the time.
+ *
+ * Timestamps are sliced to their date. That is the UTC date rather than the
+ * logical local one, so a lever created within four hours of midnight can land
+ * a day either side. It moves one day's denominator by one and nothing else —
+ * uptime, runs and every figure key on `entries` and are untouched.
+ */
+export const leverSpans = (levers: LeverRow[]): LeverSpan[] =>
+  levers.map((l) => ({
+    created_on: l.created_at.slice(0, 10),
+    archived_on: l.archived_at?.slice(0, 10) ?? null,
+  }));
 
 export type PlaybookItem = {
   id: string;
@@ -85,7 +111,10 @@ export async function loadStatus() {
         .maybeSingle(),
       supabase
         .from("entries")
-        .select("logged_for, lever, detail")
+        // `created_at` is what orders today's taps against each other. The
+        // undo row walks back most-recent-first, and `logged_for` is the same
+        // date for every entry it could undo.
+        .select("logged_for, lever, detail, created_at")
         .eq("user_id", user.id)
         .order("logged_for", { ascending: true }),
       supabase
@@ -97,9 +126,11 @@ export async function loadStatus() {
         .order("use_count", { ascending: false }),
       supabase
         .from("levers")
-        .select("id, key, label, position, archived")
+        // ARCHIVED ROWS INCLUDED, deliberately. The button list filters them
+        // out below, but the grid needs to know a lever existed on a past day
+        // in order to shade that day the way it looked at the time.
+        .select("id, key, label, position, archived, created_at, archived_at")
         .eq("user_id", user.id)
-        .eq("archived", false)
         .order("position", { ascending: true }),
       supabase
         .from("milestones")
@@ -123,8 +154,9 @@ export async function loadStatus() {
     onboarded: row.onboarded_at != null,
   };
 
-  const entries = (entryRes.data ?? []) as Entry[];
-  const levers = (leverRes.data ?? []) as LeverRow[];
+  const entries = (entryRes.data ?? []) as LoggedEntry[];
+  const allLevers = (leverRes.data ?? []) as LeverRow[];
+  const levers = allLevers.filter((l) => !l.archived);
   const playbook = (playbookRes.data ?? []) as PlaybookItem[];
   const { runs, outages } = deriveIntervals(entries, now);
 
@@ -140,7 +172,8 @@ export async function loadStatus() {
     entries,
     levers,
     playbook,
-    leverCount: levers.length,
+    /** For the grid: who existed when, archived included. */
+    leverSpans: leverSpans(allLevers),
     todayLevers: entries
       .filter((e) => e.logged_for === now)
       .map((e) => e.lever),
@@ -158,65 +191,16 @@ export async function loadStatus() {
 }
 
 /**
- * Log one lever for today.
+ * There is deliberately no `logEntry` / `undoEntry` here.
  *
- * Idempotent by design — the unique constraint on
- * `(user_id, logged_for, lever)` means re-tapping is an update, never a
- * duplicate. That property is what makes the offline outbox safe to retry.
+ * Both existed, and both were a second way to write an entry alongside `send()`
+ * in `lib/outbox.ts` — same upserts, same idempotency, different timing
+ * behaviour. The log sheet used this pair and awaited the network before it
+ * would dismiss; the dashboard used the outbox and felt instant. Two write
+ * paths meant two answers to "when does a tap count", so the slow one is gone.
+ *
+ * Everything that logs or undoes goes through `queueWrite`.
  */
-export async function logEntry(
-  userId: string,
-  lever: string,
-  detail?: string | null,
-) {
-  const day = today();
-  let playbookId: string | null = null;
-
-  const trimmed = detail?.trim();
-  if (trimmed) {
-    const label = trimmed.slice(0, 80);
-    const { data: item } = await supabase
-      .from("playbook")
-      .upsert(
-        { user_id: userId, lever, label },
-        { onConflict: "user_id,lever,label" },
-      )
-      .select("id, use_count")
-      .single();
-
-    if (item) {
-      playbookId = item.id;
-      await supabase
-        .from("playbook")
-        .update({
-          use_count: (item.use_count ?? 0) + 1,
-          last_used_at: new Date().toISOString(),
-        })
-        .eq("id", item.id);
-    }
-  }
-
-  return supabase.from("entries").upsert(
-    {
-      user_id: userId,
-      logged_for: day,
-      lever,
-      detail: trimmed || null,
-      playbook_id: playbookId,
-    },
-    { onConflict: "user_id,logged_for,lever" },
-  );
-}
-
-/** Undo today's entry for a lever. A mistake should cost one tap to fix. */
-export async function undoEntry(userId: string, lever: string) {
-  return supabase
-    .from("entries")
-    .delete()
-    .eq("user_id", userId)
-    .eq("logged_for", today())
-    .eq("lever", lever);
-}
 
 /**
  * Write the device's timezone back to `system_state`.

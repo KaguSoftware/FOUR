@@ -1,5 +1,5 @@
 ---
-name: uptime
+name: four
 description: Instrument panel for one system — a status readout you can log to in one tap.
 colors:
   bg: "#0d1013"
@@ -105,7 +105,7 @@ components:
     height: "44px"
 ---
 
-# Design System: uptime
+# Design System: four
 
 ## Overview
 
@@ -341,44 +341,55 @@ never flashes an indicator.
 
 ### The Day Grid (signature component)
 
-The product's most distinctive element. Thirty (or ninety) square cells, 15 per
-row, 3px apart. Fill lightness encodes **how many levers fired**, never which.
+The product's most distinctive element. Square cells — a Monday-first calendar
+month on Home, a dense 90-day block on History. **Fill lightness encodes how many
+levers fired**, never which.
 
 - **Down:** resting surface with a hairline border — present but unlit.
-- **Up:** a lightness step. The dimmest up-day is still unmistakably up.
-- **Today:** a 1px live-edge ring at 1px offset.
+- **Up:** a lightness step, solid across the whole cell, no border. The dimmest
+  up-day is still unmistakably up.
+- **Today:** a 2px ring that pulses slowly between `line-hi` and `ink`.
+- **Not yet (later this month):** an empty cell bordered in `surface`. A day
+  that has not happened is not a day that was missed.
 
-**The ramp is generated, not a fixed scale**, because the number of levers is
-user-defined. Steps are spaced evenly in OKLCH `L` — already perceptually
-uniform — from a floor of **0.51** to **0.95** (ink), one step per configured
-lever. A single lever gets ink alone.
+**The ramp is proportional, and generated rather than a fixed scale**, because
+the number of levers is user-defined. `L = 0.51 + (fired / leverCount) × 0.44`,
+so two of three levers sits two thirds of the way from the floor to ink rather
+than at the midpoint. Chroma eases from 0.008 to ink's 0.004 over the same span.
+Steps come from `gridFill()` in `@uptime/core`, so the phone and the web
+dashboard cannot disagree about how a day looked.
 
 | Levers | Steps (dimmest → all) |
 | --- | --- |
 | 1 | `#eceff1` |
-| 2 | `#63666b` · `#eceff1` |
-| 3 | `#63666b` · `#a4a8ad` · `#eceff1` |
-| 4 | `#63666b` · `#8f9397` · `#babec3` · `#eceff1` |
+| 2 | `#a5a8ab` · `#eceff1` |
+| 3 | `#8e9295` · `#bcbfc2` · `#eceff1` |
+| 4 | `#83868a` · `#a5a8ab` · `#c8cbce` · `#eceff1` |
 
 ### Named Rules
 
-**The 0.51 Floor.** The ramp bottoms out at `L 0.51` and never lower. The
-binding constraint is **not** the background — it is the **down cell**. At
-`L 0.49` the dimmest up-day measured 2.83:1 against a down cell, and up-versus-
-down is the single most important read in the grid. At 0.51 it measures 3.07:1.
-Any future change to the ramp re-checks against the down cell, not the ground.
+**The 0.51 Floor.** The scale is anchored at `L 0.51` and never goes below it.
+The binding constraint is **not** the background — it is the **down cell**.
+Nothing renders at the floor itself, because zero levers is a down day, so the
+dimmest thing ever drawn is one of four at `L 0.62`: **4.83:1 against a down
+cell**. An earlier ramp put its dimmest step on the floor at 3.07:1, and going
+lower still measured 2.83:1, which is why the anchor does not move. Any future
+change re-checks against the down cell, not the ground.
 
 **The No-Subdivision Rule.** Lightness may vary; **the cell is never divided.**
 Segmented level meters, quadrants and fractional fills draw the *absence* as a
 visible hole, and a hole reads as *you did not finish*. The product's thesis is
 that one lever is enough. A dim cell is still a whole cell — that is the
-distinction that makes a ramp acceptable where a segmented meter is not.
+distinction that makes a ramp acceptable where a segmented meter is not. This
+was briefly overridden on 2026-07-29 in favour of a proportional bar and
+reverted the same day: the bar was legible, and it was also the product telling
+someone their day was three-quarters missing.
 
-**Honest limit at four levers.** Adjacent steps separate by only 1.62:1 at the
-top of the ramp, so a four-lever grid reads as *more or less filled* at a
-glance rather than as an exact count. The important read — up versus down —
-holds at 3:1 or better everywhere. Down cells also carry a border that up cells
-do not, so state never rests on fill alone.
+**Honest limit at four levers.** Adjacent steps separate by 1.41–1.53:1, so a
+four-lever grid reads as *more or less filled* at a glance rather than as an
+exact count. Two levers separate by 2.07:1 and read cleanly. The important read
+— up versus down — holds at 4.8:1 or better everywhere. Down cells also carry a
+border that up cells do not, so state never rests on fill alone.
 
 ## Do's and Don'ts
 
@@ -402,10 +413,12 @@ do not, so state never rests on fill alone.
 - **Don't** subdivide a day cell — no segments, quadrants, or fractional fills.
   Anything that draws a remainder says "you did not finish", which is the one
   thing the grid must never say. Varying lightness is fine; a dim cell is still
-  a whole cell.
+  a whole cell. This was tried and reverted on 2026-07-29; see the rule above.
 - **Don't** take the grid ramp below `L 0.51`. The constraint is separation from
   a **down** cell, not from the background — check against the wrong one and the
   dimmest up-day disappears into a gap.
+- **Don't** treat a dim cell as a failure state anywhere in copy or colour. One
+  lever is still the entire bar. The dimmest up-day is a day that counted.
 - **Don't** put blur or translucency on content. System materials are permitted
   on system chrome only (see The System-Chrome Exception).
 - **Don't** give the healthy state a colour — quiet is the signal.

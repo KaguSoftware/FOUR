@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { Alert, Pressable, ScrollView, Switch, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Alert, Pressable, Switch, View } from "react-native";
 import {
   addDays,
   POSTURE_CHOICES,
@@ -8,18 +7,31 @@ import {
   type Posture,
 } from "@uptime/core";
 
-import { Body, Rule, Wordmark } from "@/components/ui";
-import { ChoiceCard } from "@/components/choice-card";
+import { Body, Label, Rule } from "@/components/ui";
 import { LeverManager } from "@/components/lever-manager";
+import { Screen } from "@/components/screen";
+import { Segmented } from "@/components/segmented";
 import { supabase } from "@/lib/supabase";
 import { useStatus } from "@/lib/use-status";
-import { color, size, space, TAP } from "@/theme";
+import { color, radius, size, space, TAP } from "@/theme";
 
 /** Local overrides held only until the server confirms them. */
 type Pending = { slammed?: boolean; weight?: boolean; posture?: Posture };
 
+/**
+ * Settings.
+ *
+ * Grouped into four sections, in the order they are actually used. Levers come
+ * first because they are the only thing here anyone changes more than once;
+ * posture, the two switches and the account rows follow.
+ *
+ * It used to be a flat stack of six blocks with a 24 / hairline / 24 separator
+ * between each — about 300pt of pure separator — led by a two-value setting
+ * rendered as two full explanatory cards taking another 300. Almost nothing was
+ * above the fold. The rules now live INSIDE a section, between peer rows, and
+ * the gap between sections does the separating.
+ */
 export default function SettingsScreen() {
-  const insets = useSafeAreaInsets();
   const { status, refresh } = useStatus();
   const [pending, setPending] = useState<Pending>({});
 
@@ -35,11 +47,9 @@ export default function SettingsScreen() {
   // ahead of the server, never lying about it.
   const slammed = pending?.slammed ?? status.slammed;
   const weightEnabled = pending?.weight ?? state.weight_enabled;
+  const posture = pending.posture ?? state.posture;
 
-  async function update(
-    patch: Record<string, unknown>,
-    optimistic: Pending,
-  ) {
+  async function update(patch: Record<string, unknown>, optimistic: Pending) {
     setPending((p) => ({ ...p, ...optimistic }));
     const { error } = await supabase
       .from("system_state")
@@ -68,122 +78,168 @@ export default function SettingsScreen() {
   }
 
   return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: color.bg }}
-      contentContainerStyle={{
-        paddingTop: insets.top + space[4],
-        paddingHorizontal: space[5],
-        paddingBottom: space[12],
-      }}
-    >
-      <View style={{ marginBottom: space[8] }}>
-        <Wordmark />
-      </View>
+    <Screen>
+      <Section title="levers" first>
+        <LeverManager
+          userId={state.user_id}
+          levers={levers}
+          onChanged={refresh}
+        />
+      </Section>
 
       {/* Posture. Settings is the ONLY place it lives — deliberately not on the
           takeover, even though someone having a bad week is exactly who would
           benefit from switching. Offering it there turns a rough moment into a
           configuration task. */}
-      <Body tone="ink">Alert posture</Body>
-      <Body tone="mute" style={{ marginTop: space[1], marginBottom: space[4], fontSize: size.xs }}>
-        How the system talks to you. {POSTURE_FOOTNOTE}
-      </Body>
+      <Section title="alerts">
+        <Body tone="ink" style={{ marginBottom: space[2] }}>
+          Alert posture
+        </Body>
 
-      <View style={{ gap: space[2] }}>
-        {POSTURE_CHOICES.map((choice) => (
-          <ChoiceCard
-            key={choice.value}
-            title={choice.title}
-            detail={choice.detail}
-            selected={choice.value === (pending.posture ?? state.posture)}
-            onPress={() =>
-              update({ posture: choice.value }, { posture: choice.value })
+        <Segmented
+          label="Alert posture"
+          options={POSTURE_CHOICES}
+          value={posture}
+          onChange={(next) => update({ posture: next }, { posture: next })}
+        />
+
+        {/* Only the SELECTED option's detail, not both. Two descriptions on
+            screen is a comparison, and this is a setting you already made.
+            The footnote stays in full: core marks it load-bearing, because
+            without it `soft` reads as the easier setting and the whole point
+            is that there is no easier setting. */}
+        <Note style={{ marginTop: space[3] }}>
+          {POSTURE_CHOICES.find((c) => c.value === posture)?.detail}{" "}
+          {POSTURE_FOOTNOTE}
+        </Note>
+
+        <View style={{ marginVertical: space[4] }}>
+          <Rule />
+        </View>
+
+        {/* React Native's Switch IS the platform control — a real UISwitch on
+            iOS and a Material switch on Android, with the OS owning its
+            gesture, animation and accessibility. Only track and thumb are
+            themed. */}
+        <Row
+          title="Slammed mode"
+          note={
+            slammed
+              ? `Raised thresholds until ${state.slammed_until}. Still one lever.`
+              : "Raises the alert thresholds for overloaded stretches. Never pauses the system; expires after 14 days."
+          }
+        >
+          <SettingSwitch
+            label="Slammed mode"
+            value={slammed}
+            onValueChange={(on) =>
+              update(
+                { slammed_until: on ? addDays(status.today, 14) : null },
+                { slammed: on },
+              )
             }
           />
-        ))}
-      </View>
+        </Row>
+      </Section>
 
-      <View style={{ marginVertical: space[6] }}>
-        <Rule />
-      </View>
+      <Section title="tracking">
+        <Row
+          title="Track weight"
+          note="Recorded and plotted, and that is the whole feature. It never affects uptime."
+        >
+          <SettingSwitch
+            label="Track weight"
+            value={weightEnabled}
+            onValueChange={(on) =>
+              update({ weight_enabled: on }, { weight: on })
+            }
+          />
+        </Row>
+      </Section>
 
-      {/* React Native's Switch IS the platform control — a real UISwitch on
-          iOS and a Material switch on Android, with the OS owning its gesture,
-          animation and accessibility. Only the track and thumb are themed. */}
-      <Row
-        title="Slammed mode"
-        note={
-          slammed
-            ? `Raised thresholds until ${state.slammed_until}. Still one lever, still ten minutes of anything.`
-            : "For genuinely overloaded stretches. Raises the alert thresholds; never pauses the system. Auto-expires after 14 days."
-        }
-      >
-        <SettingSwitch
-          label="Slammed mode"
-          value={slammed}
-          onValueChange={(on) =>
-            update(
-              { slammed_until: on ? addDays(status.today, 14) : null },
-              { slammed: on },
-            )
+      <Section title="account">
+        <Row title="Timezone" note={state.timezone} />
+
+        <View style={{ marginVertical: space[4] }}>
+          <Rule />
+        </View>
+
+        <Pressable
+          accessibilityRole="button"
+          onPress={() =>
+            // The platform's own alert, so the destructive action reads the way
+            // every other destructive action on this phone reads.
+            Alert.alert("Sign out?", "Your history stays on the account.", [
+              { text: "Cancel", style: "cancel" },
+              {
+                text: "Sign out",
+                style: "destructive",
+                onPress: () => supabase.auth.signOut(),
+              },
+            ])
           }
-        />
-      </Row>
+          style={({ pressed }) => ({
+            minHeight: TAP,
+            justifyContent: "center",
+            borderRadius: radius.md,
+            paddingHorizontal: pressed ? space[2] : 0,
+            marginHorizontal: pressed ? -space[2] : 0,
+            backgroundColor: pressed ? color.surface : "transparent",
+          })}
+        >
+          <Body tone="mute">Sign out</Body>
+        </Pressable>
+      </Section>
+    </Screen>
+  );
+}
 
-      <View style={{ marginVertical: space[6] }}>
-        <Rule />
-      </View>
+/**
+ * A group of related settings under a quiet heading.
+ *
+ * The heading is what replaced the hairline rules between blocks: a label
+ * carries the same separation for a fifth of the height, and unlike a rule it
+ * also says what the group is.
+ */
+function Section({
+  title,
+  children,
+  first = false,
+}: {
+  title: string;
+  children: React.ReactNode;
+  first?: boolean;
+}) {
+  return (
+    <View style={{ marginTop: first ? 0 : space[10] }}>
+      <Label style={{ marginBottom: space[3] }}>{title}</Label>
+      {children}
+    </View>
+  );
+}
 
-      <Row
-        title="Track weight"
-        note="Off by default. Recorded and plotted, and that is the whole feature — it never affects uptime, there is no goal and no interpretation. Switching it off hides it without deleting anything."
-      >
-        <SettingSwitch
-          label="Track weight"
-          value={weightEnabled}
-          onValueChange={(on) => update({ weight_enabled: on }, { weight: on })}
-        />
-      </Row>
-
-      <View style={{ marginVertical: space[6] }}>
-        <Rule />
-      </View>
-
-      <LeverManager
-        userId={state.user_id}
-        levers={levers}
-        onChanged={refresh}
-      />
-
-      <View style={{ marginVertical: space[6] }}>
-        <Rule />
-      </View>
-
-      <Row title="Timezone" note={state.timezone} />
-
-      <View style={{ marginVertical: space[6] }}>
-        <Rule />
-      </View>
-
-      <Pressable
-        accessibilityRole="button"
-        onPress={() =>
-          // The platform's own alert, so the destructive action reads the way
-          // every other destructive action on this phone reads.
-          Alert.alert("Sign out?", "Your history stays on the account.", [
-            { text: "Cancel", style: "cancel" },
-            {
-              text: "Sign out",
-              style: "destructive",
-              onPress: () => supabase.auth.signOut(),
-            },
-          ])
-        }
-        style={{ minHeight: TAP, justifyContent: "center" }}
-      >
-        <Body tone="mute">sign out</Body>
-      </Pressable>
-    </ScrollView>
+/**
+ * Small print.
+ *
+ * `Body` bakes in `lineHeight: size.sm * 1.55` = 20.15. Overriding `fontSize`
+ * to `xs` without also overriding the line height — which this screen did in
+ * five places — leaves 12px text sitting on 20pt lines, which is most of why
+ * the page felt loose.
+ */
+function Note({
+  children,
+  style,
+}: {
+  children: React.ReactNode;
+  style?: object;
+}) {
+  return (
+    <Body
+      tone="mute"
+      style={[{ fontSize: size.xs, lineHeight: size.xs * 1.5 }, style]}
+    >
+      {children}
+    </Body>
   );
 }
 
@@ -233,14 +289,12 @@ function Row({
   children?: React.ReactNode;
 }) {
   return (
-    <View style={{ flexDirection: "row", alignItems: "flex-start", gap: space[4] }}>
+    <View
+      style={{ flexDirection: "row", alignItems: "flex-start", gap: space[4] }}
+    >
       <View style={{ flex: 1 }}>
         <Body tone="ink">{title}</Body>
-        {note && (
-          <Body tone="mute" style={{ marginTop: space[1], fontSize: size.xs }}>
-            {note}
-          </Body>
-        )}
+        {note && <Note style={{ marginTop: space[1] }}>{note}</Note>}
       </View>
       {children}
     </View>

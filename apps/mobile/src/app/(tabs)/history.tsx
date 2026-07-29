@@ -1,7 +1,8 @@
-import { ScrollView, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Body, Label, Mono, Rule, Wordmark } from "@/components/ui";
+import { View } from "react-native";
+import { uptimeWindow } from "@uptime/core";
+import { Body, Label, Mono, Rule } from "@/components/ui";
 import { DayGrid } from "@/components/day-grid";
+import { Screen } from "@/components/screen";
 import { useStatus } from "@/lib/use-status";
 import { color, size, space } from "@/theme";
 
@@ -13,11 +14,10 @@ import { color, size, space } from "@/theme";
  * truncated and never reset.
  */
 export default function HistoryScreen() {
-  const insets = useSafeAreaInsets();
   const { status } = useStatus();
   if (!status) return <View style={{ flex: 1, backgroundColor: color.bg }} />;
 
-  const { entries, today, runs, outages, allTime, leverCount } = status;
+  const { entries, today, runs, outages, allTime, leverSpans } = status;
 
   // Interleaved by start date, newest first. Deliberately one list: two lists
   // would rank runs above outages and imply outages are the exceptional case.
@@ -26,25 +26,18 @@ export default function HistoryScreen() {
     ...outages.map((o) => ({ kind: "outage" as const, ...o })),
   ].sort((a, b) => (a.started_on < b.started_on ? 1 : -1));
 
-  return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: color.bg }}
-      contentContainerStyle={{
-        paddingTop: insets.top + space[4],
-        paddingHorizontal: space[5],
-        paddingBottom: space[12],
-      }}
-    >
-      <View style={{ marginBottom: space[8] }}>
-        <Wordmark />
-      </View>
+  // Named `span`, not `window` — that shadows the global and reads as a typo.
+  const span = uptimeWindow(entries, today, 90);
 
-      <DayGrid
-        entries={entries}
-        today={today}
-        leverCount={leverCount}
-        days={90}
-      />
+  return (
+    <Screen>
+      {/* The grid used to be 90 unlabelled squares. Status says what its own
+          grid covers; this one said nothing at all, so the span was a guess. */}
+      <Label style={{ marginBottom: space[3] }}>
+        last 90 days · {span.up} up
+      </Label>
+
+      <DayGrid entries={entries} today={today} spans={leverSpans} days={90} />
 
       {/* All-time figures are monotonic by construction — they only ever go up,
           so there is nothing here that a bad month can take away. */}
@@ -66,13 +59,29 @@ export default function HistoryScreen() {
               style={{
                 flexDirection: "row",
                 justifyContent: "space-between",
+                alignItems: "flex-start",
+                gap: space[3],
                 paddingVertical: space[3],
               }}
             >
-              <Body tone={e.kind === "run" ? "dim" : "degraded"}>
-                {e.kind === "run" ? "run" : "outage"}
-                <Body tone="mute">{"  "}{e.started_on}</Body>
-              </Body>
+              <View style={{ flex: 1 }}>
+                <Body tone={e.kind === "run" ? "dim" : "degraded"}>
+                  {e.kind === "run" ? "run" : "outage"}
+                </Body>
+                {/* Both ends, not just the start. An interval that showed only
+                    where it began read as ongoing whether it was or not — and
+                    "→ now" is the whole difference between a finished outage
+                    and the one you are currently in. */}
+                <Mono
+                  style={{
+                    fontSize: size.xs,
+                    color: color.inkMute,
+                    marginTop: space[1],
+                  }}
+                >
+                  {e.started_on} → {e.ended_on ?? "now"}
+                </Mono>
+              </View>
               <Body tone="mute">
                 <Mono style={{ color: color.inkDim, fontSize: size.xs }}>
                   {e.days}
@@ -84,7 +93,7 @@ export default function HistoryScreen() {
           </View>
         ))
       )}
-    </ScrollView>
+    </Screen>
   );
 }
 

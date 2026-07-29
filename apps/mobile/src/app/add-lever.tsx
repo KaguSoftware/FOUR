@@ -6,7 +6,7 @@ import { LEVER_LABEL_MAX, MAX_LEVERS } from "@uptime/core";
 
 import { Body, Label } from "@/components/ui";
 import { createLever } from "@/lib/levers";
-import { cachedStatus } from "@/lib/use-status";
+import { cachedStatus, refreshStatus } from "@/lib/use-status";
 import { color, radius, size, space, TAP } from "@/theme";
 
 /**
@@ -37,10 +37,24 @@ export default function AddLeverSheet() {
     setBusy(true);
     setError(null);
     const result = await createLever(userId, label);
+    if (!result.ok) {
+      setBusy(false);
+      return setError(result.error);
+    }
+
+    // Push the new lever into the shared status BEFORE dismissing.
+    //
+    // This used to rely on the dashboard refetching when it regained focus.
+    // That stopped being true when focus refreshes started skipping a recent
+    // load, and the symptom was the worst kind: the lever really was saved, so
+    // nothing looked broken — it just took until the next refetch to appear.
+    // Nothing here may depend on another screen deciding to reload.
+    await refreshStatus().catch(() => {
+      // The write succeeded; only the reload failed. Dismiss anyway rather
+      // than trap someone in a sheet over a lever that already exists — the
+      // dashboard's own next refresh will pick it up.
+    });
     setBusy(false);
-    if (!result.ok) return setError(result.error);
-    // The dashboard reloads on focus, so it already has the new lever by the
-    // time the sheet finishes dismissing.
     router.back();
   }
 

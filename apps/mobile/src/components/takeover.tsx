@@ -8,7 +8,7 @@ import {
   type Posture,
 } from "@uptime/core";
 import { Body, Label, Mono } from "./ui";
-import { color, radius, size, space, TAP } from "@/theme";
+import { color, radius, size, space, TAB_BAR, TAP } from "@/theme";
 import type { LeverRow, PlaybookItem } from "@/lib/status";
 
 /**
@@ -69,133 +69,157 @@ export function Takeover({
   }
 
   return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: color.bg }}
-      contentContainerStyle={{
-        paddingTop: insets.top + space[10],
-        paddingBottom: insets.bottom + space[8],
-        paddingHorizontal: space[5],
-      }}
-    >
-      {/* Top of the screen, not centred: the first thing your eye lands on. */}
-      <Text
-        style={{
-          fontFamily: "Inter_500Medium",
-          fontSize: size["2xl"],
-          color: color.down,
-          letterSpacing: -0.3,
+    <View style={{ flex: 1, backgroundColor: color.bg }}>
+      <ScrollView
+        style={{ flex: 1, backgroundColor: color.bg }}
+        // JS owns the insets here, same as `Screen` — see its docblock. Left
+        // automatic, UIKit adds its own on top a frame late and the screen jumps.
+        contentInsetAdjustmentBehavior="never"
+        contentContainerStyle={{
+          paddingTop: insets.top + space[10],
+          // The tab bar is still over this screen even though the takeover
+          // offers no navigation of its own, so "last run" needs the same
+          // allowance every other tab screen gets.
+          paddingBottom: insets.bottom + TAB_BAR + space[8],
+          paddingHorizontal: space[5],
         }}
       >
-        DOWN {down} DAYS
-      </Text>
+        {/* Top of the screen, not centred: the first thing your eye lands on. */}
+        <Text
+          style={{
+            fontFamily: "Inter_500Medium",
+            fontSize: size["2xl"],
+            color: color.down,
+            letterSpacing: -0.3,
+          }}
+        >
+          DOWN {down} DAYS
+        </Text>
 
-      {/* SOFT adds exactly one sentence here and STRICT adds none. It used to
+        {/* SOFT adds exactly one sentence here and STRICT adds none. It used to
           read "Get it back up." in both, which said the same thing as the list
           label below it. */}
-      {note && (
-        <Body tone="mute" style={{ marginTop: space[2] }}>
-          {note}
-        </Body>
-      )}
+        {note && (
+          <Body tone="mute" style={{ marginTop: space[2] }}>
+            {note}
+          </Body>
+        )}
 
-      <Label style={{ marginTop: space[8], marginBottom: space[2] }}>
-        {takeoverPrompt(posture)}
-      </Label>
+        <Label style={{ marginTop: space[8], marginBottom: space[2] }}>
+          {takeoverPrompt(posture)}
+        </Label>
 
-      <View style={{ gap: space[2] }}>
-        {options.map((item) => (
-          <Pressable
-            key={item.id}
-            accessibilityRole="button"
-            disabled={busy || todayLevers.includes(item.lever)}
-            onPress={() => log(item.lever, item.label)}
-            style={({ pressed }) => ({
-              minHeight: 64,
-              borderRadius: radius.md,
-              borderWidth: 1,
-              borderColor: color.lineHi,
-              backgroundColor: pressed ? color.line : color.surfaceHi,
-              justifyContent: "center",
-              paddingHorizontal: space[4],
-              opacity: todayLevers.includes(item.lever) ? 0.4 : 1,
-            })}
-          >
-            <Text
-              style={{
-                fontFamily: "Inter_400Regular",
-                fontSize: size.sm,
-                color: color.ink,
-              }}
-            >
-              {item.label}
-              {"  "}
-              <Text style={{ color: color.inkMute, fontSize: size.xs }}>
-                {/* The label, never the stored key — a key is a slug like
-                    `morning-pages` and nobody chose to read that. */}
-                {byKey.get(item.lever) ?? item.lever}
-              </Text>
-            </Text>
-          </Pressable>
-        ))}
-      </View>
-
-      {/* The floor. Logging with no detail attached still puts the day up —
-          the detail was always the optional half. */}
-      <Label style={{ marginTop: space[6], marginBottom: space[2] }}>
-        {options.length > 0 ? "or just mark it up" : "your levers"}
-      </Label>
-
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: space[2] }}>
-        {levers.map((lever, i) => {
-          const full = levers.length === 1 || (levers.length === 3 && i === 2);
-          const done = todayLevers.includes(lever.key);
-          return (
+        <View style={{ gap: space[2] }}>
+          {options.map((item) => (
             <Pressable
-              key={lever.key}
+              key={item.id}
               accessibilityRole="button"
-              accessibilityLabel={`Mark ${lever.label} up`}
-              disabled={busy || done}
-              onPress={() => log(lever.key, null)}
+              disabled={busy || todayLevers.includes(item.lever)}
+              onPress={() => log(item.lever, item.label)}
               style={({ pressed }) => ({
-                flexBasis: full ? "100%" : "47%",
-                flexGrow: 1,
-                minHeight: TAP,
+                minHeight: 64,
                 borderRadius: radius.md,
                 borderWidth: 1,
-                // Secondary to the options above, and the hierarchy is carried
-                // by fill and text weight — never by a fainter border. These
-                // have no fill, so the stroke is the entire button and owes
-                // WCAG 1.4.11's 3:1. `line` measures 1.45:1; `lineHi` 3.33:1.
                 borderColor: color.lineHi,
-                backgroundColor: pressed ? color.surfaceHi : "transparent",
-                alignItems: "center",
+                backgroundColor: pressed ? color.line : color.surfaceHi,
                 justifyContent: "center",
-                opacity: done ? 0.4 : 1,
+                paddingHorizontal: space[4],
+                opacity: todayLevers.includes(item.lever) ? 0.4 : 1,
               })}
             >
               <Text
-                numberOfLines={1}
                 style={{
                   fontFamily: "Inter_400Regular",
                   fontSize: size.sm,
-                  color: color.inkDim,
+                  color: color.ink,
                 }}
               >
-                {lever.label}
+                {item.label}
+                {"  "}
+                <Text style={{ color: color.inkMute, fontSize: size.xs }}>
+                  {/* The label, never the stored key — a key is a slug like
+                    `morning-pages` and nobody chose to read that. */}
+                  {byKey.get(item.lever) ?? item.lever}
+                </Text>
               </Text>
             </Pressable>
-          );
-        })}
-      </View>
+          ))}
+        </View>
 
-      {/* Reported as a completed thing with a final length. There is no counter
+        {/* The floor. Logging with no detail attached still puts the day up —
+          the detail was always the optional half. */}
+        <Label style={{ marginTop: space[6], marginBottom: space[2] }}>
+          {options.length > 0 ? "or just mark it up" : "your levers"}
+        </Label>
+
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: space[2] }}>
+          {levers.map((lever, i) => {
+            const full =
+              levers.length === 1 || (levers.length === 3 && i === 2);
+            const done = todayLevers.includes(lever.key);
+            return (
+              <Pressable
+                key={lever.key}
+                accessibilityRole="button"
+                accessibilityLabel={`Mark ${lever.label} up`}
+                disabled={busy || done}
+                onPress={() => log(lever.key, null)}
+                style={({ pressed }) => ({
+                  flexBasis: full ? "100%" : "47%",
+                  flexGrow: 1,
+                  minHeight: TAP,
+                  borderRadius: radius.md,
+                  borderWidth: 1,
+                  // Secondary to the options above, and the hierarchy is carried
+                  // by fill and text weight — never by a fainter border. These
+                  // have no fill, so the stroke is the entire button and owes
+                  // WCAG 1.4.11's 3:1. `line` measures 1.45:1; `lineHi` 3.33:1.
+                  borderColor: color.lineHi,
+                  backgroundColor: pressed ? color.surfaceHi : "transparent",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  opacity: done ? 0.4 : 1,
+                })}
+              >
+                <Text
+                  numberOfLines={1}
+                  style={{
+                    fontFamily: "Inter_400Regular",
+                    fontSize: size.sm,
+                    color: color.inkDim,
+                  }}
+                >
+                  {lever.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        {/* Reported as a completed thing with a final length. There is no counter
           here that got reset — that is the entire point. */}
-      {lastRun && (
-        <Body tone="mute" style={{ marginTop: space[8] }}>
-          last run: <Mono style={{ color: color.inkDim }}>{lastRun.days}</Mono>{" "}
-          days{lastDetail ? ` · ${lastDetail}` : ""}
-        </Body>
-      )}
-    </ScrollView>
+        {lastRun && (
+          <Body tone="mute" style={{ marginTop: space[8] }}>
+            last run:{" "}
+            <Mono style={{ color: color.inkDim }}>{lastRun.days}</Mono> days
+            {lastDetail ? ` · ${lastDetail}` : ""}
+          </Body>
+        )}
+      </ScrollView>
+
+      {/* DOWN N DAYS scrolling under the system clock is the last thing this
+        screen should do. Same solid scrim as every other screen. */}
+      <View
+        pointerEvents="none"
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          height: insets.top,
+          backgroundColor: color.bg,
+        }}
+      />
+    </View>
   );
 }

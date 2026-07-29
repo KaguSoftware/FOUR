@@ -16,7 +16,7 @@ export function Wordmark({ page }: { page?: string }) {
           letterSpacing: "-0.035em",
         }}
       >
-        uptime
+        four
       </span>
       {page && <span className="label">{page}</span>}
     </h1>

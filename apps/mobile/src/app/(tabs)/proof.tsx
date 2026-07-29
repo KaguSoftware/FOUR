@@ -3,15 +3,15 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  ScrollView,
   TextInput,
   View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect, useRouter } from "expo-router";
 import { DAILY_TREND_DAYS, NOTE_MAX } from "@uptime/core";
 
-import { Body, Label, Mono, Rule, Wordmark } from "@/components/ui";
+import { Body, Label, Mono, Rule } from "@/components/ui";
+import { field, noteField } from "@/components/fields";
+import { Screen } from "@/components/screen";
 import { Trend, WeightTrend } from "@/components/trend";
 import { useStatus } from "@/lib/use-status";
 import {
@@ -34,7 +34,6 @@ import { color, radius, size, space, TAP } from "@/theme";
  * Nothing on this screen can affect uptime. Skipping is free and says so.
  */
 export default function ProofScreen() {
-  const insets = useSafeAreaInsets();
   const router = useRouter();
   const { status } = useStatus();
   const [rows, setRows] = useState<SignalRow[]>([]);
@@ -69,18 +68,7 @@ export default function ProofScreen() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       style={{ flex: 1, backgroundColor: color.bg }}
     >
-      <ScrollView
-        contentContainerStyle={{
-          paddingTop: insets.top + space[4],
-          paddingHorizontal: space[5],
-          paddingBottom: space[12],
-        }}
-        keyboardShouldPersistTaps="handled"
-      >
-        <View style={{ marginBottom: space[8] }}>
-          <Wordmark />
-        </View>
-
+      <Screen>
         <DailyCheck
           userId={status.state.user_id}
           loggedToday={loggedToday}
@@ -154,7 +142,7 @@ export default function ProofScreen() {
             ))
           )}
         </View>
-      </ScrollView>
+      </Screen>
     </KeyboardAvoidingView>
   );
 }
@@ -234,7 +222,7 @@ function DailyCheck({
             inputMode="decimal"
             // No goal, no target, no comparison to a previous value. The field
             // takes a number and says nothing about it.
-            style={field}
+            style={[field, { backgroundColor: color.surface }]}
           />
         </View>
       )}
@@ -250,7 +238,7 @@ function DailyCheck({
         multiline
         maxLength={NOTE_MAX}
         textAlignVertical="top"
-        style={[field, { minHeight: 110, paddingTop: space[3] }]}
+        style={[noteField, { backgroundColor: color.surface }]}
       />
 
       <View
@@ -340,16 +328,3 @@ function Scale({
   );
 }
 
-const field = {
-  minHeight: TAP,
-  borderRadius: radius.md,
-  borderWidth: 1,
-  borderColor: color.line,
-  backgroundColor: color.surface,
-  paddingHorizontal: space[4],
-  color: color.ink,
-  fontFamily: "Inter_400Regular",
-  // 16 minimum on a touch device, or iOS zooms the view when it takes focus.
-  fontSize: 16,
-  lineHeight: 24,
-} as const;

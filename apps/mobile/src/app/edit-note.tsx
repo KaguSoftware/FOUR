@@ -5,6 +5,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { NOTE_MAX } from "@uptime/core";
 
 import { Body, Label, Mono } from "@/components/ui";
+import { noteField } from "@/components/fields";
 import { rewriteNote } from "@/lib/signals";
 import { cachedStatus } from "@/lib/use-status";
 import { color, radius, size, space, TAP } from "@/theme";
@@ -69,21 +70,17 @@ export default function EditNoteSheet() {
           textAlignVertical="top"
           placeholder="Empty this to delete the entry."
           placeholderTextColor={color.inkMute}
-          style={{
-            minHeight: 160,
-            maxHeight: 320,
-            borderRadius: radius.md,
-            borderWidth: 1,
-            borderColor: color.line,
-            backgroundColor: color.surfaceHi,
-            paddingHorizontal: space[4],
-            paddingTop: space[3],
-            paddingBottom: space[3],
-            color: color.ink,
-            fontFamily: "Inter_400Regular",
-            fontSize: 16,
-            lineHeight: 24,
-          }}
+          style={[
+            noteField,
+            {
+              // Taller than the daily check's: here the text is the whole
+              // point of the screen rather than one field among several. The
+              // sheet's own ground is `surface`, so the field sits above it.
+              minHeight: 160,
+              maxHeight: 320,
+              backgroundColor: color.surfaceHi,
+            },
+          ]}
         />
 
         <Pressable

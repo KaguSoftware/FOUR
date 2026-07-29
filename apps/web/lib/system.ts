@@ -14,6 +14,7 @@ import {
   DEFAULT_POSTURE,
   type Entry,
   type Lever,
+  type LeverSpan,
   type Posture,
 } from "@uptime/core";
 
@@ -31,6 +32,8 @@ export type LeverRow = {
   label: string;
   position: number;
   archived: boolean;
+  created_at: string;
+  archived_at: string | null;
 };
 
 export type SystemState = {
@@ -76,9 +79,11 @@ export async function getLevers(userId: string): Promise<LeverRow[]> {
   const supabase = await getSupabase();
   const { data, error } = await supabase
     .from("levers")
-    .select("id, key, label, position, archived")
+    // ARCHIVED ROWS INCLUDED. Callers that want the button list filter on
+    // `archived`; the day grid needs the archived ones too, because a lever
+    // that existed on a past day still sets that day's denominator.
+    .select("id, key, label, position, archived, created_at, archived_at")
     .eq("user_id", userId)
-    .eq("archived", false)
     .order("position", { ascending: true });
 
   if (error) {
@@ -88,10 +93,27 @@ export async function getLevers(userId: string): Promise<LeverRow[]> {
       label: key,
       position: i + 1,
       archived: false,
+      // A fallback lever has no history to speak for; dating it at the epoch
+      // makes it count for every day, which is the same conservative direction
+      // the migration's backfill takes.
+      created_at: "1970-01-01T00:00:00Z",
+      archived_at: null,
     }));
   }
   return (data ?? []) as LeverRow[];
 }
+
+/**
+ * Lever lifespans, for shading past days the way they looked at the time.
+ *
+ * See the mobile client's `leverSpans` — same slice, same caveat about the
+ * timestamp being UTC rather than the logical local day.
+ */
+export const leverSpans = (levers: LeverRow[]): LeverSpan[] =>
+  levers.map((l) => ({
+    created_on: l.created_at.slice(0, 10),
+    archived_on: l.archived_at?.slice(0, 10) ?? null,
+  }));
 
 export async function getSupabase() {
   return createClient(await cookies());
@@ -242,10 +264,12 @@ export async function getStatus() {
     entries,
     playbook,
     todayLevers: new Set(todayEntries.map((e) => e.lever)),
-    levers,
+    // The buttons. Archived levers are read but never offered.
+    levers: levers.filter((l) => !l.archived),
     posture: state.posture,
-    // Sets how many steps the day-grid ramp has.
-    leverCount: levers.length,
+    // For the grid: who existed when, archived included, so a past day keeps
+    // the shade it had rather than being re-scaled by today's lever count.
+    leverSpans: leverSpans(levers),
     uptime: uptimeWindow(entries, today),
     run: currentRun(entries, today),
     down: downDays(entries, today),

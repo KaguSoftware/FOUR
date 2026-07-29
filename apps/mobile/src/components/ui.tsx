@@ -19,7 +19,7 @@ export function Wordmark() {
         letterSpacing: -0.6,
       }}
     >
-      uptime
+      four
     </Text>
   );
 }

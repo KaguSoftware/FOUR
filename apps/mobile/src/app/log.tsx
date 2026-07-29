@@ -5,7 +5,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
 import { Body, Label } from "@/components/ui";
 import { cachedStatus } from "@/lib/use-status";
-import { logEntry } from "@/lib/status";
+import { queueWrite } from "@/lib/outbox";
 import { color, radius, size, space, TAP } from "@/theme";
 
 /**
@@ -44,13 +44,27 @@ export default function LogSheet() {
     .filter((p) => p.lever === lever)
     .slice(0, 3);
 
-  async function commit(detail: string | null) {
+  /**
+   * Log it, and get out of the way.
+   *
+   * This used to `await logEntry()` — up to three sequential Supabase round
+   * trips — before dismissing, so the sheet sat there while the network
+   * decided, and the dashboard behind it did not show the lever as logged
+   * until it happened to refetch. Undo felt instant next to it for one reason:
+   * undo went through the outbox and this did not.
+   *
+   * Now it queues, exactly like undo. The queue is shared and synchronous, so
+   * the dashboard has the tap before the sheet has finished closing, and the
+   * whole thing works with no signal at all — which is what the outbox was
+   * built for and what this path was quietly bypassing.
+   */
+  function commit(detail: string | null) {
     // One pick per sheet: the second tap is always an accident.
     if (chosen !== null || !status) return;
     setChosen(detail ?? "");
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    await logEntry(status.state.user_id, lever, detail);
     router.back();
+    queueWrite(status.state.user_id, lever, "log", detail);
   }
 
   return (

@@ -9,7 +9,9 @@ import { MaterialIcons } from "@expo/vector-icons";
 import * as Notifications from "expo-notifications";
 import { useRouter } from "expo-router";
 import { registerForPush } from "@/lib/push";
+import { reconcileReminder } from "@/lib/reminder";
 import { useSession } from "@/lib/session";
+import { useStatus } from "@/lib/use-status";
 import { color, size } from "@/theme";
 
 /**
@@ -39,6 +41,7 @@ import { color, size } from "@/theme";
  */
 export default function TabsLayout() {
   const { session } = useSession();
+  const { status } = useStatus();
   const router = useRouter();
   const userId = session?.user.id;
 
@@ -49,6 +52,15 @@ export default function TabsLayout() {
     // it re-stores the token, which is what catches an OS rotation.
     if (userId) registerForPush(userId);
   }, [userId]);
+
+  const reminderAt = status?.state.daily_reminder_at ?? null;
+  const statusLoaded = status !== null;
+  useEffect(() => {
+    // The device schedule follows the server column: a reinstall, a reboot or
+    // a change made on another device all land here. Never prompts — the
+    // silent reconcile path inside skips when permission is missing.
+    if (statusLoaded) reconcileReminder(reminderAt);
+  }, [statusLoaded, reminderAt]);
 
   useEffect(() => {
     // Tapping a page opens the app on the screen the page was about. The

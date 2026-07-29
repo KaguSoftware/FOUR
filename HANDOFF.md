@@ -114,18 +114,27 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 - **Renamed to `four`, 2026-07-29.** Display name only. App name, both wordmarks, web title, PWA manifest, and the push-notification title fallback. The `uptime` slug, the `uptime://` scheme, `com.kagusoftware.uptime` and the `@uptime/*` packages are all unchanged, and ~60 uses of "uptime" as the *metric* are untouched — including the persisted `uptime_80` / `uptime_90` milestone kinds.
 - **All six migrations applied to the live database, 2026-07-29.** `npx supabase migration list` shows local and remote matching.
 - **The device-testing round, 2026-07-29.** Screen scaffold with correct tab-bar and status-bar insets; the page-switch twitch; calendar-month grid on Home with today's cell pulsing; History captions and incident ranges; Settings split into an index and four sub-screens on a native stack; drag-to-reorder and drag-to-archive with fade-and-collapse motion; the undo control replaced by tapping a logged lever; the per-day grid denominator and its two follow-up bugs. All verified as `tsc` clean, 162 tests, `expo lint` clean, `expo export` bundling both platforms, and the web app building.
+- **The real-app Settings + Auth round, 2026-07-29.** Settings grew to the full surface: Alerts now holds the daily reminder (opt-in, native time picker, local scheduling via `lib/reminder.ts`) and a delivery block (permission status + send-a-test-alert); Tracking gained the kg/lb unit control; Account gained change email, change password, a passive sync row (outbox depth + staleness), export-as-JSON through the share sheet, and delete account (typed-email confirm → native alert → `delete_own_account()` RPC, migration `20260729030000`); a new About screen (version, privacy, terms, support mailto). Auth: sign-in rebuilt with Sign in with Apple (native button, nonce flow), Google (PKCE browser round-trip), and a 6-digit email OTP screen that doubles as forgot-password; onboarding is now five steps (rule+levers → posture → tracking → reminder → alerts priming before the OS prompt). New deps (all SDK 54 pins, Expo Go-safe): expo-apple-authentication, expo-crypto, expo-web-browser, datetimepicker, expo-file-system, expo-sharing. Verified: tsc clean ×3, 162 tests, 19 migration checks, expo lint clean, expo export both platforms. **Provider flows and the reminder are untested on device; the third-party providers are dead until the Supabase dashboard config below is done.**
 
 **Written but NOT verified end-to-end:**
 
 - **Vercel cron has never run.** The route works locally; the schedule is unproven.
 - **Push has never been delivered to a device.** Needs a development build; `expo-notifications` cannot issue a token without an EAS `projectId` and remote push does not work in Expo Go.
 - **Drag-to-reorder and drag-to-archive have not been used on a device** as of this writing. The RPC they depend on is applied; the gesture itself is unproven on hardware.
+- **The 2026-07-29 Settings/Auth surface is untested on hardware**: the daily reminder firing at its hour, the test alert, export's share sheet, change email/password round-trips, delete account against the live DB (migration not yet pushed), Apple / Google / OTP sign-in (all three also need the dashboard config below).
 - Plateau thresholds pass unit tests but have no longitudinal data behind them. `PLATEAU_WEEKS` (4) and `MIN_DAYS_PER_WEEK` (3) are educated guesses.
 
 **Blocked / needs the owner:**
 
 - **Rotate two credentials** — see Gotchas. Still outstanding from 2026-07-19.
 - **A development build** — see *Roadmap* step 15. This is the gate on push.
+- **`npx supabase db push` from the repo root** to apply `20260729030000_delete_account.sql` (19 harness checks green). Delete account fails politely until then.
+- **Supabase dashboard config for the new auth methods** (all app-side code is in and fails soft until this lands):
+  1. Auth → Providers → **Apple**: enable; *Client IDs* = `host.exp.Exponent,com.kagusoftware.uptime` (Expo Go's token audience and the real build's, both needed).
+  2. Auth → Providers → **Google**: enable with a Google Cloud OAuth client of type **Web application** whose authorized redirect URI is `https://yqphirnsvcqzstwjfshs.supabase.co/auth/v1/callback`.
+  3. Auth → URL Configuration → Redirect URLs: add `uptime://auth/callback` and the Expo Go form (log `Linking.createURL('auth/callback')` on device — it embeds the LAN IP, e.g. `exp://192.168.x.x:8081/--/auth/callback`).
+  4. Auth → Email Templates → **Magic Link**: add `{{ .Token }}` (keep `{{ .ConfirmationURL }}`), or the OTP screen's emails carry no code to type.
+  5. Custom SMTP before real users — the built-in sender is rate-limited to a handful of emails per hour.
 - Note for a fresh chat: `apps/web/.env.local` is **not** on this machine, so the web dev server and the dev scripts cannot run here. Tests, typecheck, lint, both builds and `supabase db push` all work without it — `apps/mobile/.env.local` **does** exist.
 
 ## File map (key files)
@@ -156,6 +165,11 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 | `apps/mobile/src/lib/outbox.ts` | The queue: in-memory store, AsyncStorage as backup, and the **only** entry write path in the app. |
 | `apps/mobile/src/lib/supabase.ts` | Keychain-backed session storage. Chunks the session because SecureStore caps a value at 2048 bytes on Android. |
 | `apps/mobile/src/lib/status.ts` | The client-side port of `getStatus()`. Five queries, everything else derived by core. |
+| `apps/mobile/src/lib/reminder.ts` | The daily reminder: local scheduling, silent app-start reconcile, the test alert. The only file allowed to prompt for notification permission outside onboarding. |
+| `apps/mobile/src/lib/oauth.ts` | Apple (nonce flow → `signInWithIdToken`) and Google (PKCE browser round-trip → `exchangeCodeForSession`). |
+| `apps/mobile/src/lib/export.ts` | The whole account as one JSON file through the share sheet. Raw rows, never derived figures. |
+| `apps/mobile/src/components/button.tsx` | THE button — extracted from five drifting inline copies. Use it instead of a bare Pressable. |
+| `supabase/migrations/20260729030000_delete_account.sql` | `delete_own_account()` — security definer, no parameters, target comes from the JWT. Apple-required. |
 | `apps/mobile/src/components/screen.tsx` | Every tab screen's frame. Owns the safe-area insets, the tab-bar allowance and the status-bar scrim. |
 | `apps/mobile/src/components/lever-buttons.tsx` | The lever grid, with long-press drag-to-reorder and drag-to-archive. |
 | `apps/mobile/src/app/_layout.tsx` | The auth + onboarding gate via `Stack.Protected`, plus `GestureHandlerRootView`. |
@@ -182,8 +196,9 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 14. ~~Offline outbox~~ — done 2026-07-28. Every lever tap on mobile goes through it, online or not. Rules in `packages/core/outbox.ts` (17 tests), storage and flushing in `apps/mobile/src/lib/outbox.ts`.
 15. ~~Device-testing round one~~ — done 2026-07-29. Chrome insets and the page-switch twitch, the note field, the Settings rewrite, the rename to `four`, the calendar-month grid, today's pulse, History captions and ranges, universal undo, lever drag-to-reorder / drag-to-archive, and the per-day grid denominator. All migrations applied.
 16. ~~Settings sub-screens, archive motion, and the grid-denominator fixes~~ — done 2026-07-29. Settings is now `app/(tabs)/settings/` — an index of value-stating rows pushing into `levers` / `alerts` / `tracking` / `account` on a native `Stack`, so the transitions, back button and edge-swipe are the platform's. Archiving fades and collapses, with the rest of the list carried up by `LinearTransition`. The undo control is gone: a logged lever stays tappable and its sheet offers "add what else you did" or "remove today's <lever>".
-17. **← ACTIVE: a development build.** `eas init` is done (project `3570cebf…`, owner `parsa-mansouri`). What remains: `eas env:create` for the two `EXPO_PUBLIC_` vars, then `eas build --profile development`. **iOS needs an Apple Developer account ($99/yr)**; Android builds a free APK. Push cannot be tested before this.
-18. Then: Sign in with Apple (required once any third-party sign-in ships) · a real app icon · a privacy policy at `/privacy` · store listings.
+17. ~~Real-app Settings + Auth + Onboarding~~ — done 2026-07-29. Full settings surface (reminder, delivery, unit, change email/password, sync, export, delete account, About), Apple + Google + email-OTP sign-in, five-step onboarding. Pending on the owner: the Supabase dashboard config and `db push` listed under *Blocked*.
+18. **← ACTIVE: a development build.** `eas init` is done (project `3570cebf…`, owner `parsa-mansouri`). What remains: `eas env:create` for the two `EXPO_PUBLIC_` vars, then `eas build --profile development`. **iOS needs an Apple Developer account ($99/yr)**; Android builds a free APK. Push cannot be tested before this. (The Apple Developer account also unlocks Sign in with Apple on the real bundle id.)
+19. Then: a real app icon · **`/privacy` and `/terms` pages on the web app** (the mobile About screen already links to both — they 404 until written) · store listings.
 
 ## Deliberately partial — grows later (scope ledger)
 
@@ -198,7 +213,9 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 | Posture | Chosen at onboarding, changeable in Settings, wired into the takeover sentence and the milestone panel | Same two touchpoints on mobile | Done on web |
 | Mobile `/proof` | Full: daily check, journal, trend, optional weight, the log | Unchanged | Done |
 | Mobile levers | Full: create, rename, archive, with native alerts | Unchanged | Done |
-| Mobile auth | Email + password | Sign in with Apple (**required by review once any third-party sign-in ships**) + Google | Before submission |
+| Mobile auth | **Email + password, Sign in with Apple, Google, and a 6-digit email code** (the code doubles as forgot-password: sign in by code, set a new password in Settings). All built 2026-07-29; Apple/Google/OTP are inert until the Supabase dashboard config in *Blocked* is done | Verified on device, with custom SMTP | Config, then device test |
+| Daily reminder | **Mobile: opt-in toggle + native time picker in Alerts and onboarding; local notification, reconciled on app start.** Web: none | Unchanged — the reminder is a phone thing | Mobile done 2026-07-29 |
+| Account management | **Mobile: change email, change password, export JSON, delete account (RPC + typed confirm), sync row, About/privacy/terms/support.** Web: none of it | Web gets parity eventually | Mobile done 2026-07-29 |
 | App icon | Expo's default artwork | Real icon + splash | Before submission |
 | Widgets | None | Interactive Home/Lock Screen widget: tap a lever without opening the app | v1.1 — SwiftUI + Glance, App Groups |
 | Alerts | Telegram | Native push, same escalation ladder | Step 8 |
@@ -207,7 +224,8 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 | Outage annotation | `annotateOutage` action exists; no UI | Tap an outage in `/history` to label it | After real outages exist |
 | Undo | **Mobile: there is no undo control.** A logged lever stays tappable; its sheet offers "add what else you did" or "remove today's <lever>". Web: still a per-lever undo | Same on web | Mobile done 2026-07-29 |
 | Lever order | **Mobile: long-press and drag.** Drag to the trash to archive | Same on web (the RPC is shared and ready) | Mobile done 2026-07-29 |
-| Settings layout | **Mobile: an index pushing into four sub-screens on a native stack.** Web: one flat page | Same on web | Mobile done 2026-07-29 |
+| Settings layout | **Mobile: an index pushing into eight sub-screens on a native stack** (levers, alerts, tracking, account, change-email, change-password, delete-account, about). Web: one flat page | Same shape on web | Mobile done 2026-07-29 |
+| Weight unit | **Mobile: kg/lb segmented in Tracking** (display only, never converts). Web: no control | Same on web | Mobile done 2026-07-29 |
 | Archive motion | **Mobile: fade + collapse, with the list carried up.** Web: instant | Same on web | Mobile done 2026-07-29 |
 | Settings "accessibility" section | None. The owner named it as an example of the pattern; there is nothing real to put in it — reduce-motion and text size are OS settings the app already honours | **Ask before inventing one** | Undecided |
 | Home grid | **Mobile: the real calendar month**, today pulsing. History keeps the dense trailing 90 | Same on web | Mobile done 2026-07-29 |
@@ -216,6 +234,14 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 
 ## Gotchas / open issues
 
+- **React Native's `Switch` ships `alignSelf: 'flex-start'` as a default style** (`Switch.js:267` in RN 0.81). It silently beats the parent row's `alignItems: "center"`, so every switch pinned to the top of its row while the label sat centered. `SwitchRow` passes `style={{ alignSelf: "center" }}` — caller style composes after the default, so it wins. Any future bare `Switch` needs the same override.
+- **Never `Link asChild` around a Pressable whose `style` is a function.** expo-router 6's `asChild` cloning drops a function-form `style` instead of invoking it, so the child renders with NO styles at all — `LinkRow` shipped this way and every settings row drew as an unstyled stacked column (title / value / chevron on separate lines, no padding) while `ValueRow` and `ActionRow` on the same screen were fine. Found by comparing the three row types in one screenshot, 2026-07-29. `LinkRow` now uses `router.push` in `onPress` and sets `accessibilityRole="link"` by hand. If a Link wrapper is ever genuinely needed, give the child a static style object.
+- **The mobile Supabase client is PKCE now** (`flowType: "pkce"` in `apps/mobile/src/lib/supabase.ts`) — required by the Google browser round-trip's `exchangeCodeForSession`. Password/OTP/Apple are unaffected; the web app has its own client and is untouched. Hermes has no WebCrypto, so auth-js logs a "code challenge method will default to plain" warning on device — expected, not a bug.
+- **Apple sign-in has two token audiences.** Expo Go mints tokens for `host.exp.Exponent`; a real build mints them for `com.kagusoftware.uptime`. The Supabase Apple provider's *Client IDs* field must list **both**, comma-separated, or whichever world is missing fails verification.
+- **The OTP screen types a code the default email does not contain.** Supabase's Magic Link template ships with only `{{ .ConfirmationURL }}`; add `{{ .Token }}` or the 6-digit phase is unanswerable.
+- **The migration harness now runs migrations in true chronological order and loads `btree_gist`.** It used to run "everything except custom_levers" first, which broke the moment `lever_order` (newer than custom_levers, touches its table) existed — and PGlite ships `btree_gist` as an opt-in extension, which the deferrable EXCLUDE needs. Both fixed 2026-07-29; 19 checks.
+- **`expo-file-system` 19 is the new object API** (`File`, `Paths`) — `writeAsStringAsync`/`cacheDirectory` moved to `expo-file-system/legacy`. `lib/export.ts` uses the new one.
+- **Only `lib/reminder.ts`'s `syncReminder`/`sendTestAlert` may raise the notification permission prompt in settings** — the app-start `reconcileReminder` path deliberately never prompts. Keep that split: a permission dialog at launch, apropos of nothing, is the wrong first impression.
 - **THE CROSS-SCREEN SYNC TRAP (2026-07-29) — read this before touching any mobile data hook.** `useStatus` was a module-level `let cached` wrapped in a per-screen `useState`, so `refresh()` updated the variable and *the calling screen only*. Nothing was subscribed. A focus refresh on every tab was silently covering for it — everyone re-fetched, so everyone converged. Adding a 30s staleness guard removed the cover and produced **three separate bug reports that looked unrelated**: logging took ~30s to show, the Track-weight toggle "did nothing", and adding a lever "did nothing". All one cause. It is now a real store (`lib/store.ts` + `useSyncExternalStore`). **Never reintroduce a bare module variable read through `useState`, and never let a screen depend on another screen deciding to reload** — the sheets can call `refreshStatus()` directly for exactly this reason.
 - **The outbox must reload BEFORE it shrinks the queue.** The queue is an overlay on the server's view (`applyToDay`). Dropping a settled item first hands the screen back a `todayLevers` the server has not re-sent, so an undo landed, the lever reappeared for the length of the round trip, then vanished again — three visible state changes for one tap. `drain()` awaits `onFlushed()` first. Do not "simplify" that ordering.
 - **There is exactly one entry write path: the outbox.** `logEntry`/`undoEntry` used to exist in `lib/status.ts` alongside `send()` in `lib/outbox.ts` — same upserts, different timing. The log sheet used the slow one and awaited the network before dismissing; the dashboard used the outbox and felt instant. They are gone. Anything that logs or undoes calls `queueWrite`.

@@ -105,6 +105,12 @@ function RootNavigator({ fontsLoaded }: { fontsLoaded: boolean }) {
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
       </Stack.Protected>
 
+      {/* Outside every guard: the OAuth redirect can arrive in either auth
+          state, and an unmatched route in the middle of a sign-in reads as a
+          crash. It renders nothing — it just forwards to whichever branch the
+          gate has open. */}
+      <Stack.Screen name="auth/callback" options={{ headerShown: false }} />
+
       <Stack.Protected guard={!!session && onboarded === false}>
         <Stack.Screen
           name="onboarding"

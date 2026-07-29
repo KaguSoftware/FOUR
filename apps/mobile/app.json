@@ -10,7 +10,8 @@
     "backgroundColor": "#0d1013",
     "ios": {
       "bundleIdentifier": "com.kagusoftware.uptime",
-      "supportsTablet": false
+      "supportsTablet": false,
+      "usesAppleSignIn": true
     },
     "android": {
       "package": "com.kagusoftware.uptime",
@@ -39,7 +40,10 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
-      ]
+      ],
+      "expo-apple-authentication",
+      "expo-web-browser",
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true,

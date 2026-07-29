@@ -41,6 +41,10 @@ export default function SettingsLayout() {
       <Stack.Screen name="alerts" options={{ title: "Alerts" }} />
       <Stack.Screen name="tracking" options={{ title: "Tracking" }} />
       <Stack.Screen name="account" options={{ title: "Account" }} />
+      <Stack.Screen name="change-password" options={{ title: "Change password" }} />
+      <Stack.Screen name="change-email" options={{ title: "Change email" }} />
+      <Stack.Screen name="delete-account" options={{ title: "Delete account" }} />
+      <Stack.Screen name="about" options={{ title: "About" }} />
     </Stack>
   );
 }

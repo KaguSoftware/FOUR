@@ -16,11 +16,14 @@
  * never match, which is fine because this connects as the owner.
  */
 import { PGlite } from "@electric-sql/pglite";
+import { btree_gist } from "@electric-sql/pglite/contrib/btree_gist";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 const DIR = "supabase/migrations";
-const db = new PGlite();
+// btree_gist backs the deferrable EXCLUDE constraint in the lever-order
+// migration; PGlite ships it as a loadable extension rather than built in.
+const db = new PGlite({ extensions: { btree_gist } });
 
 const ok = (m) => console.log(`  PASS  ${m}`);
 const bad = (m) => {
@@ -33,13 +36,27 @@ await db.exec(`
   create table auth.users (id uuid primary key default gen_random_uuid());
   create or replace function auth.uid() returns uuid language sql stable as $$ select null::uuid $$;
 `);
+// The roles Supabase provisions. The delete-account migration grants and
+// revokes against them, so the stub needs them to exist — PGlite is plain
+// Postgres and ships with neither.
+await db.exec(`
+  do $$ begin
+    if not exists (select 1 from pg_roles where rolname = 'anon') then create role anon nologin; end if;
+    if not exists (select 1 from pg_roles where rolname = 'authenticated') then create role authenticated nologin; end if;
+  end $$;
+`);
 console.log("stubbed auth schema\n");
 
 const files = readdirSync(DIR).filter((f) => f.endsWith(".sql")).sort();
 
 // --- run everything up to (but not including) the custom-levers migration ---
+// Migrations run in true chronological order: the ones BEFORE custom_levers
+// now, then the seed (which has to exist before the backfill runs), then
+// custom_levers, then everything after it. The earlier version of this loop
+// ran "everything except custom_levers" first, which broke the moment a
+// migration newer than custom_levers touched the table it creates.
 const LEVERS = files.find((f) => f.includes("custom_levers"));
-for (const f of files.filter((f) => f !== LEVERS)) {
+const apply = async (f) => {
   try {
     await db.exec(readFileSync(join(DIR, f), "utf8"));
     console.log(`applied  ${f}`);
@@ -47,7 +64,8 @@ for (const f of files.filter((f) => f !== LEVERS)) {
     console.log(`FAILED   ${f}\n  ${e.message}`);
     process.exit(1);
   }
-}
+};
+for (const f of files.slice(0, files.indexOf(LEVERS))) await apply(f);
 
 // --- seed the awkward cases the backfill has to survive --------------------
 console.log("\nseeding pre-migration data...");
@@ -82,7 +100,7 @@ await db.exec(`
 `);
 console.log("seeded 4 users covering: both levers, entries-only, playbook-only, empty\n");
 
-// --- the migration under test ----------------------------------------------
+// --- the migration under test, then everything after it ---------------------
 console.log(`applying ${LEVERS}...`);
 try {
   await db.exec(readFileSync(join(DIR, LEVERS), "utf8"));
@@ -91,6 +109,8 @@ try {
   console.log(`MIGRATION FAILED:\n  ${e.message}`);
   process.exit(1);
 }
+for (const f of files.slice(files.indexOf(LEVERS) + 1)) await apply(f);
+console.log();
 
 // --- assertions -------------------------------------------------------------
 console.log("checks:");
@@ -187,6 +207,37 @@ onboarded[0].n === 1 ? ok("pre-existing accounts are marked onboarded") : bad("e
 // Posture defaults to strict.
 const posture = await q(`select posture from public.system_state where user_id = '${b}'`);
 posture[0].posture === "strict" ? ok("posture defaults to strict") : bad(`posture was ${posture[0].posture}`);
+
+// --- the delete-account RPC -------------------------------------------------
+// The cascade itself is proven above ("THE ONE THAT MATTERS"); these check the
+// bridge a signed-in client actually calls.
+const rpc = await q(`
+  select p.prosecdef
+  from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+  where n.nspname = 'public' and p.proname = 'delete_own_account'
+`);
+rpc.length === 1 && rpc[0].prosecdef
+  ? ok("delete_own_account exists and is security definer")
+  : bad(rpc.length ? "delete_own_account is not security definer" : "delete_own_account missing");
+
+const anonCan = await q(`select has_function_privilege('anon', 'public.delete_own_account()', 'execute') as can`);
+anonCan[0].can === false ? ok("anon cannot execute delete_own_account") : bad("anon can call account deletion");
+
+const authCan = await q(`select has_function_privilege('authenticated', 'public.delete_own_account()', 'execute') as can`);
+authCan[0].can === true ? ok("authenticated can execute delete_own_account") : bad("signed-in users cannot delete their account");
+
+// End to end: point the stubbed auth.uid() at the fresh signup (already
+// asserted above), call the RPC, and the whole account must be gone.
+const fresh5 = "55555555-5555-5555-5555-555555555555";
+await db.exec(`create or replace function auth.uid() returns uuid language sql stable as $$ select '${fresh5}'::uuid $$`);
+await db.exec(`select public.delete_own_account()`);
+const gone = await q(`select
+  (select count(*) from auth.users where id = '${fresh5}')::int as users,
+  (select count(*) from public.system_state where user_id = '${fresh5}')::int as state`);
+gone[0].users === 0 && gone[0].state === 0
+  ? ok("delete_own_account removes the caller's account, and only via the JWT")
+  : bad(`RPC left rows behind: users=${gone[0].users} state=${gone[0].state}`);
+await db.exec(`create or replace function auth.uid() returns uuid language sql stable as $$ select null::uuid $$`);
 
 console.log(process.exitCode ? "\nRESULT: FAILURES ABOVE" : "\nRESULT: all checks passed");
 await db.close();

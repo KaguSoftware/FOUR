@@ -1,7 +1,11 @@
 import type { ReactNode } from "react";
-import { Pressable, Switch, View } from "react-native";
+import { Platform, Pressable, Switch, View } from "react-native";
+import DateTimePicker, {
+  DateTimePickerAndroid,
+  type DateTimePickerEvent,
+} from "@react-native-community/datetimepicker";
 import { MaterialIcons } from "@expo/vector-icons";
-import { Link } from "expo-router";
+import { useRouter } from "expo-router";
 import type { Href } from "expo-router";
 
 import { Body, Label, Rule } from "./ui";
@@ -23,6 +27,20 @@ import { color, radius, size, space, TAP } from "@/theme";
  * Each row states its current value on the right, so the index answers most
  * questions without being opened at all.
  */
+
+/**
+ * Row text sits on a tighter line box than paragraph text.
+ *
+ * `Body` bakes `lineHeight: 1.55` for prose, and on iOS the extra leading goes
+ * ABOVE the glyphs — TextKit pins the baseline to the bottom of the line box.
+ * Inside a vertically-centered row that skew is visible: the label rides a few
+ * pixels low while a Switch or picker beside it is genuinely centered, so
+ * every toggle looked misaligned with its own label (reported on device,
+ * 2026-07-29). A line box close to the glyph height centers cleanly — the same
+ * reason `Segmented` sets no lineHeight at all. Prose (`Note`) keeps the
+ * reading leading; this is for single-line row text only.
+ */
+const rowText = { lineHeight: size.sm * 1.25 } as const;
 
 /** A titled group of rows, hairline-separated. */
 export function Group({
@@ -60,44 +78,53 @@ export function RowRule() {
 /**
  * A row that opens a screen.
  *
- * `Link` with `asChild` rather than an `onPress` that calls `router.push`: it
- * keeps the platform's own press-and-navigate behaviour, and gives the row a
- * real link role in the accessibility tree.
+ * `router.push` in `onPress`, NOT `Link asChild`. The Link version shipped and
+ * rendered every one of these rows as an unstyled column — title, value and
+ * chevron stacked, no padding — because `asChild` cloning does not survive a
+ * function-form `style` on the child Pressable: the function is dropped rather
+ * than invoked, and with it every declared style. `ValueRow` (plain View) and
+ * `ActionRow` (plain Pressable) were fine on the same screen, which is what
+ * narrowed it. The link role in the accessibility tree is kept by hand.
  */
 export function LinkRow({
   title,
   value,
   href,
+  destructive = false,
 }: {
   title: string;
   value?: string;
   href: Href;
+  /** The sign-out red — for rows that open a screen you should read twice. */
+  destructive?: boolean;
 }) {
+  const router = useRouter();
   return (
-    <Link href={href} asChild>
-      <Pressable
-        accessibilityRole="link"
-        accessibilityLabel={value ? `${title}, ${value}` : title}
-        style={({ pressed }) => ({
-          minHeight: TAP + space[2],
-          flexDirection: "row",
-          alignItems: "center",
-          gap: space[3],
-          paddingHorizontal: space[4],
-          backgroundColor: pressed ? color.surfaceHi : "transparent",
-        })}
+    <Pressable
+      accessibilityRole="link"
+      accessibilityLabel={value ? `${title}, ${value}` : title}
+      onPress={() => router.push(href)}
+      style={({ pressed }) => ({
+        minHeight: TAP + space[2],
+        flexDirection: "row",
+        alignItems: "center",
+        gap: space[3],
+        paddingHorizontal: space[4],
+        backgroundColor: pressed ? color.surfaceHi : "transparent",
+      })}
+    >
+      <Body
+        style={[rowText, { flex: 1, color: destructive ? color.down : color.ink }]}
       >
-        <Body tone="ink" style={{ flex: 1 }}>
-          {title}
+        {title}
+      </Body>
+      {value && (
+        <Body tone="mute" numberOfLines={1} style={[rowText, { maxWidth: "50%" }]}>
+          {value}
         </Body>
-        {value && (
-          <Body tone="mute" numberOfLines={1} style={{ maxWidth: "50%" }}>
-            {value}
-          </Body>
-        )}
-        <MaterialIcons name="chevron-right" size={20} color={color.inkMute} />
-      </Pressable>
-    </Link>
+      )}
+      <MaterialIcons name="chevron-right" size={20} color={color.inkMute} />
+    </Pressable>
   );
 }
 
@@ -121,27 +148,119 @@ export function SwitchRow({
         paddingHorizontal: space[4],
       }}
     >
-      <Body tone="ink" style={{ flex: 1 }}>
+      <Body tone="ink" style={[rowText, { flex: 1 }]}>
         {title}
       </Body>
       {/* React Native's Switch IS the platform control — a real UISwitch on
           iOS and a Material switch on Android, with the OS owning its gesture,
           animation and accessibility. Only the track and thumb are themed.
 
-          The track goes all the way to `ink` when on. Tinting it `line-hi`
-          measured 2.29:1 against the off state — technically different, and
-          the owner could not tell on a real phone. This palette reserves every
-          bright hue for status, so a switch cannot borrow the usual green;
-          going the other way gives 16.52:1 against the page versus 1.45:1 off. */}
+          The on-track was `ink` with a `bg` thumb — until a real phone showed
+          iOS 26 IGNORES thumbTintColor: the thumb is white, always, so an ink
+          track swallowed it whole (owner report, 2026-07-29). With a white
+          thumb forced, the track must separate from BOTH the thumb and the
+          off state, and `ink-mute` is the only neutral that does: measured
+          3.48:1 against the white thumb and 3.74:1 against the `line` off
+          track. This palette reserves every bright hue for status, so the
+          switch still cannot borrow the usual green. `thumbColor` stays `ink`
+          for the platforms that do honour it — same two ratios there. */}
       <Switch
         value={value}
         onValueChange={onValueChange}
         accessibilityLabel={title}
-        trackColor={{ false: color.line, true: color.ink }}
-        thumbColor={color.bg}
+        trackColor={{ false: color.line, true: color.inkMute }}
+        thumbColor={color.ink}
         // iOS draws the off-state track from this rather than trackColor.false.
         ios_backgroundColor={color.line}
+        // React Native's Switch injects `alignSelf: 'flex-start'` as a DEFAULT
+        // style (Switch.js:267), which beats the row's alignItems and pinned
+        // every switch to the top of its row while the label sat centered —
+        // "all toggles vertically misaligned" on device, 2026-07-29. Caller
+        // style composes after the default, so this wins.
+        style={{ alignSelf: "center" }}
       />
+    </View>
+  );
+}
+
+/**
+ * A row carrying a time. The control is the platform's own picker.
+ *
+ * On iOS the compact `UIDatePicker` sits inline where a value would — tapping
+ * it opens the system's time popover, themed dark to match the app's only
+ * appearance. Android has no inline idiom for this, so the row shows the value
+ * and opens the Material time dialog, which is what every Android clock app
+ * does. Values are Postgres `time` strings ("HH:MM:SS") end to end; the Date
+ * object exists only for the picker's benefit and its calendar day is
+ * meaningless.
+ */
+export function TimeRow({
+  title,
+  value,
+  onChange,
+}: {
+  title: string;
+  /** "HH:MM:SS" */
+  value: string;
+  onChange: (time: string) => void;
+}) {
+  const [h, m] = value.split(":");
+  const asDate = new Date(2000, 0, 1, Number(h) || 0, Number(m) || 0);
+
+  const pick = (event: DateTimePickerEvent, date?: Date) => {
+    if (event.type === "dismissed" || !date) return;
+    const pad = (n: number) => String(n).padStart(2, "0");
+    onChange(`${pad(date.getHours())}:${pad(date.getMinutes())}:00`);
+  };
+
+  return (
+    <View
+      style={{
+        minHeight: TAP + space[2],
+        flexDirection: "row",
+        alignItems: "center",
+        gap: space[4],
+        paddingHorizontal: space[4],
+      }}
+    >
+      <Body tone="ink" style={[rowText, { flex: 1 }]}>
+        {title}
+      </Body>
+      {Platform.OS === "android" ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${title}, ${value.slice(0, 5)}`}
+          onPress={() =>
+            DateTimePickerAndroid.open({
+              value: asDate,
+              mode: "time",
+              is24Hour: true,
+              onChange: pick,
+            })
+          }
+          style={({ pressed }) => ({
+            minHeight: TAP,
+            justifyContent: "center",
+            paddingHorizontal: space[3],
+            borderRadius: radius.sm,
+            backgroundColor: pressed ? color.surfaceHi : "transparent",
+          })}
+        >
+          <Body tone="mute" style={rowText}>
+            {value.slice(0, 5)}
+          </Body>
+        </Pressable>
+      ) : (
+        <DateTimePicker
+          value={asDate}
+          mode="time"
+          display="compact"
+          themeVariant="dark"
+          accentColor={color.ink}
+          onChange={pick}
+          accessibilityLabel={title}
+        />
+      )}
     </View>
   );
 }
@@ -158,10 +277,12 @@ export function ValueRow({ title, value }: { title: string; value: string }) {
         paddingHorizontal: space[4],
       }}
     >
-      <Body tone="ink" style={{ flex: 1 }}>
+      <Body tone="ink" style={[rowText, { flex: 1 }]}>
         {title}
       </Body>
-      <Body tone="mute">{value}</Body>
+      <Body tone="mute" style={rowText}>
+        {value}
+      </Body>
     </View>
   );
 }
@@ -187,7 +308,7 @@ export function ActionRow({
         backgroundColor: pressed ? color.surfaceHi : "transparent",
       })}
     >
-      <Body style={{ color: destructive ? color.down : color.ink }}>
+      <Body style={[rowText, { color: destructive ? color.down : color.ink }]}>
         {title}
       </Body>
     </Pressable>

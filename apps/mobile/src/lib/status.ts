@@ -76,6 +76,8 @@ export type SystemState = {
   weight_unit: "kg" | "lb";
   posture: Posture;
   onboarded: boolean;
+  /** Postgres `time` as "HH:MM:SS"; null means off, which is the default. */
+  daily_reminder_at: string | null;
 };
 
 /**
@@ -105,7 +107,7 @@ export async function loadStatus() {
       supabase
         .from("system_state")
         .select(
-          "user_id, timezone, slammed_until, weight_enabled, weight_unit, posture, onboarded_at",
+          "user_id, timezone, slammed_until, weight_enabled, weight_unit, posture, onboarded_at, daily_reminder_at",
         )
         .eq("user_id", user.id)
         .maybeSingle(),
@@ -152,6 +154,7 @@ export async function loadStatus() {
     // No row yet means the signup trigger has not run — treat that as
     // un-onboarded rather than crashing, and let onboarding create it.
     onboarded: row.onboarded_at != null,
+    daily_reminder_at: (row.daily_reminder_at as string | null) ?? null,
   };
 
   const entries = (entryRes.data ?? []) as LoggedEntry[];

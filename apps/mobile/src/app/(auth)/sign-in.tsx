@@ -1,15 +1,27 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   TextInput,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Body, Label, Wordmark } from "@/components/ui";
+import * as AppleAuthentication from "expo-apple-authentication";
+import * as WebBrowser from "expo-web-browser";
+import { useRouter } from "expo-router";
+
+import { Button } from "@/components/button";
+import { field } from "@/components/fields";
+import { Body, Label, Rule, Wordmark } from "@/components/ui";
+import { signInWithApple, signInWithGoogle } from "@/lib/oauth";
 import { supabase } from "@/lib/supabase";
 import { color, radius, size, space, TAP } from "@/theme";
+
+// Closes the auth popup on platforms where the browser hands control back
+// without resolving the session itself. A no-op everywhere else.
+WebBrowser.maybeCompleteAuthSession();
 
 type Mode = "in" | "up";
 
@@ -19,21 +31,29 @@ type Mode = "in" | "up";
  * Both are the same two fields, so they are one screen with a mode rather than
  * two routes. Nothing here decides where you land afterwards — the root layout
  * reads the session and whether the account is onboarded, so a session created
- * any other way (a magic link today, Apple or Google later) takes the same
+ * any way at all (password, Apple, Google, an emailed code) takes the same
  * route without this file knowing about it.
  *
- * SCOPE(v1): email and password only.
- * GROWS LATER → Sign in with Apple (mandatory for App Store review once any
- * third-party sign-in ships) and Google, both via `signInWithIdToken`.
+ * Apple renders Apple's own button — the HIG requires it, and review checks.
+ * It only appears when the device can actually do it, so Android and old iOS
+ * simply never see the option rather than seeing it fail.
  */
 export default function SignInScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const [mode, setMode] = useState<Mode>("in");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [appleReady, setAppleReady] = useState(false);
+
+  useEffect(() => {
+    if (Platform.OS === "ios") {
+      AppleAuthentication.isAvailableAsync().then(setAppleReady);
+    }
+  }, []);
 
   async function submit() {
     if (busy) return;
@@ -67,109 +87,159 @@ export default function SignInScreen() {
     }
   }
 
-  const field = {
-    minHeight: TAP,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: color.line,
-    backgroundColor: color.surface,
-    paddingHorizontal: space[4],
-    color: color.ink,
-    fontFamily: "Inter_400Regular",
-    // 16 minimum, or iOS zooms the view when the field takes focus.
-    fontSize: 16,
-  } as const;
+  async function withProvider(run: () => Promise<{ ok: boolean; reason?: string; canceled?: boolean }>) {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    const res = await run();
+    setBusy(false);
+    // Closing the sheet is a decision, not a failure.
+    if (!res.ok && !res.canceled) setError(res.reason ?? "sign-in failed");
+  }
 
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : undefined}
-      style={{
-        flex: 1,
-        backgroundColor: color.bg,
-        paddingHorizontal: space[5],
-        paddingTop: insets.top + space[12],
-        paddingBottom: insets.bottom + space[6],
-      }}
+      style={{ flex: 1, backgroundColor: color.bg }}
     >
-      <Wordmark />
-      <Body tone="mute" style={{ marginTop: space[2], marginBottom: space[10] }}>
-        Authentication required.
-      </Body>
+      <ScrollView
+        contentContainerStyle={{
+          flexGrow: 1,
+          paddingHorizontal: space[5],
+          paddingTop: insets.top + space[12],
+          paddingBottom: insets.bottom + space[6],
+        }}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Wordmark />
+        <Body tone="mute" style={{ marginTop: space[2], marginBottom: space[10] }}>
+          Authentication required.
+        </Body>
 
-      {notice ? (
-        <Body tone="dim">{notice}</Body>
-      ) : (
-        <View style={{ gap: space[3] }}>
-          <TextInput
-            value={email}
-            onChangeText={setEmail}
-            placeholder="email"
-            placeholderTextColor={color.inkMute}
-            autoCapitalize="none"
-            autoComplete="email"
-            keyboardType="email-address"
-            inputMode="email"
-            style={field}
-          />
-          <TextInput
-            value={password}
-            onChangeText={setPassword}
-            placeholder="password"
-            placeholderTextColor={color.inkMute}
-            secureTextEntry
-            autoCapitalize="none"
-            // Tells the password manager to offer a generated password on
-            // sign-up and the saved one on sign-in.
-            autoComplete={mode === "up" ? "new-password" : "current-password"}
-            onSubmitEditing={submit}
-            returnKeyType="go"
-            style={field}
-          />
+        {notice ? (
+          <Body tone="dim">{notice}</Body>
+        ) : (
+          <View style={{ gap: space[3] }}>
+            <TextInput
+              value={email}
+              onChangeText={setEmail}
+              placeholder="email"
+              placeholderTextColor={color.inkMute}
+              accessibilityLabel="Email"
+              autoCapitalize="none"
+              autoComplete="email"
+              keyboardType="email-address"
+              inputMode="email"
+              textContentType="emailAddress"
+              returnKeyType="next"
+              style={[field, { backgroundColor: color.surface }]}
+            />
+            <TextInput
+              value={password}
+              onChangeText={setPassword}
+              placeholder="password"
+              placeholderTextColor={color.inkMute}
+              accessibilityLabel="Password"
+              secureTextEntry
+              autoCapitalize="none"
+              // Tells the password manager to offer a generated password on
+              // sign-up and the saved one on sign-in.
+              autoComplete={mode === "up" ? "new-password" : "current-password"}
+              textContentType={mode === "up" ? "newPassword" : "password"}
+              onSubmitEditing={submit}
+              returnKeyType="go"
+              style={[field, { backgroundColor: color.surface }]}
+            />
 
-          {error && (
-            <Body tone="down" accessibilityRole="alert">
-              {error}
-            </Body>
-          )}
+            {error && (
+              <Body tone="down" accessibilityRole="alert">
+                {error}
+              </Body>
+            )}
 
-          <Pressable
-            accessibilityRole="button"
-            disabled={busy}
-            onPress={submit}
-            style={({ pressed }) => ({
-              minHeight: TAP,
-              borderRadius: radius.md,
-              borderWidth: 1,
-              borderColor: color.lineHi,
-              backgroundColor: pressed ? color.line : color.surfaceHi,
-              alignItems: "center",
-              justifyContent: "center",
-              opacity: busy ? 0.5 : 1,
-            })}
-          >
-            <Label style={{ color: color.ink }}>
-              {busy ? "…" : mode === "in" ? "sign in" : "create account"}
-            </Label>
-          </Pressable>
+            <Button
+              title={mode === "in" ? "sign in" : "create account"}
+              onPress={submit}
+              busy={busy}
+              tall
+            />
 
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => {
-              setMode(mode === "in" ? "up" : "in");
-              setError(null);
-            }}
-            style={{
-              minHeight: TAP,
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <Body tone="mute" style={{ fontSize: size.xs }}>
-              {mode === "in" ? "or create an account" : "or sign in"}
-            </Body>
-          </Pressable>
-        </View>
-      )}
+            {/* One quiet row for the two email alternatives. The emailed code
+                doubles as the forgot-password path: sign in with the code,
+                then set a new password in Settings. */}
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => {
+                  setMode(mode === "in" ? "up" : "in");
+                  setError(null);
+                }}
+                style={{ minHeight: TAP, justifyContent: "center" }}
+              >
+                <Body tone="mute" style={{ fontSize: size.xs }}>
+                  {mode === "in" ? "or create an account" : "or sign in"}
+                </Body>
+              </Pressable>
+
+              <Pressable
+                accessibilityRole="button"
+                onPress={() =>
+                  router.push({
+                    pathname: "/email-otp",
+                    params: { email: email.trim() },
+                  })
+                }
+                style={{ minHeight: TAP, justifyContent: "center" }}
+              >
+                <Body tone="mute" style={{ fontSize: size.xs }}>
+                  email me a code
+                </Body>
+              </Pressable>
+            </View>
+
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: space[3],
+                marginVertical: space[2],
+              }}
+            >
+              <Rule style={{ flex: 1 }} />
+              <Label>or</Label>
+              <Rule style={{ flex: 1 }} />
+            </View>
+
+            {appleReady && (
+              <AppleAuthentication.AppleAuthenticationButton
+                buttonType={
+                  mode === "up"
+                    ? AppleAuthentication.AppleAuthenticationButtonType.CONTINUE
+                    : AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN
+                }
+                buttonStyle={
+                  AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
+                }
+                cornerRadius={radius.md}
+                onPress={() => withProvider(signInWithApple)}
+                style={{ height: 48 }}
+              />
+            )}
+
+            <Button
+              title="continue with google"
+              onPress={() => withProvider(signInWithGoogle)}
+            />
+          </View>
+        )}
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }

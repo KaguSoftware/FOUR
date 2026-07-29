@@ -125,6 +125,13 @@ export const supabase = createClient(url, publishableKey, {
     // No URL to detect on native. Leaving this on makes the client parse
     // window.location, which does not exist here.
     detectSessionInUrl: false,
+    // PKCE, for the Google browser round-trip: `exchangeCodeForSession` only
+    // works in this mode, and the code verifier survives the app being
+    // backgrounded because it persists through the storage adapter above.
+    // Password, OTP and Apple sign-in are unaffected. Hermes has no WebCrypto,
+    // so auth-js logs a warning and falls back to the `plain` challenge
+    // method — expected, and still a one-time single-use code.
+    flowType: "pkce",
   },
 });
 

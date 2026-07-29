@@ -1,8 +1,10 @@
 import { View } from "react-native";
+import Constants from "expo-constants";
 import { POSTURE_CHOICES } from "@uptime/core";
 
 import { Screen } from "@/components/screen";
 import { Group, LinkRow, RowRule } from "@/components/settings-ui";
+import { reminderLabel } from "@/lib/reminder";
 import { useStatus } from "@/lib/use-status";
 import { color } from "@/theme";
 
@@ -14,19 +16,28 @@ import { color } from "@/theme";
  * an index over a wall: the summary IS the interface, and you push in only when
  * you want to change something.
  *
- * Two groups, not four. The first holds what the product does; the second holds
- * the account. Section headings over single rows are grammar rather than
- * structure — the grouping already says it.
+ * Two groups. The first holds what the product does; the second holds the
+ * account and the app itself. Section headings over single rows are grammar
+ * rather than structure — the grouping already says it.
  */
 export default function SettingsIndex() {
   const { status } = useStatus();
 
   if (!status) return <View style={{ flex: 1, backgroundColor: color.bg }} />;
-  const { state, levers } = status;
+  const { state, levers, user } = status;
 
   const posture =
     POSTURE_CHOICES.find((c) => c.value === state.posture)?.title ??
     state.posture;
+
+  // "Strict · 21:00 · slammed" — posture always, then whatever else is on.
+  const alerts = [
+    posture,
+    state.daily_reminder_at && reminderLabel(state.daily_reminder_at),
+    status.slammed && "slammed",
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <Screen>
@@ -39,15 +50,13 @@ export default function SettingsIndex() {
           href="/(tabs)/settings/levers"
         />
         <RowRule />
-        <LinkRow
-          title="Alerts"
-          value={status.slammed ? `${posture} · slammed` : posture}
-          href="/(tabs)/settings/alerts"
-        />
+        <LinkRow title="Alerts" value={alerts} href="/(tabs)/settings/alerts" />
         <RowRule />
         <LinkRow
           title="Tracking"
-          value={state.weight_enabled ? "Weight on" : "Weight off"}
+          value={
+            state.weight_enabled ? `Weight · ${state.weight_unit}` : "Weight off"
+          }
           href="/(tabs)/settings/tracking"
         />
       </Group>
@@ -55,8 +64,14 @@ export default function SettingsIndex() {
       <Group>
         <LinkRow
           title="Account"
-          value={state.timezone}
+          value={user.email ?? "—"}
           href="/(tabs)/settings/account"
+        />
+        <RowRule />
+        <LinkRow
+          title="About"
+          value={Constants.expoConfig?.version ?? "—"}
+          href="/(tabs)/settings/about"
         />
       </Group>
     </Screen>

@@ -1,6 +1,15 @@
 # four
 
-Uptime monitor for one body.
+
+## Build - the two commands
+
+`cd C:\Users\p.mansouri\Desktop\kagu\uptime\apps\mobile`
+`npx eas-cli@latest build --profile production --platform ios`
+then when it finishes:
+
+
+`npx eas-cli@latest submit --platform ios --latest`
+Both should run without prompts now — credentials and the App Store Connect API key are stored on EAS. ~15 min build, then 5–15 min of Apple processing before the build appears in TestFlight.
 
 Named for the ceiling: four levers, of which any **one** keeps the day up. The
 product is `four`; the metric it derives is still called uptime, and so are
@@ -156,3 +165,4 @@ mobile app: multi-user accounts, up to four **user-defined** levers instead of
 the hardcoded `gym`/`food` pair, and native push replacing Telegram — with the
 escalation ladder unchanged. See `HANDOFF.md` for current status and the
 scope ledger.
+

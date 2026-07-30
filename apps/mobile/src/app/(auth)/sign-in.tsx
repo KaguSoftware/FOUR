@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as AppleAuthentication from "expo-apple-authentication";
+import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
 import { useRouter } from "expo-router";
 
@@ -74,6 +75,12 @@ export default function SignInScreen() {
       const { data, error } = await supabase.auth.signUp({
         email: email.trim(),
         password,
+        // Say where the confirmation link should land. Without this, Supabase
+        // falls back to the project's Site URL — which belongs to the WEB app,
+        // so a phone signup would confirm the account and then dump the user in
+        // a browser. `createURL` resolves to `uptime://auth/callback` in a real
+        // build and the `exp://` LAN form in Expo Go; both are allowlisted.
+        options: { emailRedirectTo: Linking.createURL("auth/callback") },
       });
       if (error) return setError(error.message.toLowerCase());
 

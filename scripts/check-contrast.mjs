@@ -71,43 +71,17 @@ const ENFORCED = [
   ["onboarding · add-a-lever (dashed)", "ink-mute", "bg", TEXT],
   ["onboarding · continue button", "ink", "surface-hi", TEXT],
   ["onboarding · continue button border", "line-hi", "bg", NONTEXT],
-  ["onboarding · step counter 1/2", "ink-mute", "bg", TEXT],
-  ["posture · SELECTED title", "ink", "surface-hi", TEXT],
-  ["posture · SELECTED detail", "ink-mute", "surface-hi", TEXT],
-  ["posture · SELECTED check mark", "ink", "surface-hi", NONTEXT],
-  ["posture · SELECTED border (state)", "line-hi", "bg", NONTEXT],
-  ["posture · unselected title", "ink-dim", "surface", TEXT],
-  ["posture · unselected detail", "ink-mute", "surface", TEXT],
-  ["posture · footnote", "ink-mute", "bg", TEXT],
-  ["milestone SOFT · panel title", "ink", "surface", TEXT],
-  ["milestone SOFT · panel note", "ink-mute", "surface", TEXT],
-  ["milestone STRICT · flat line", "ink-dim", "bg", TEXT],
+  ["onboarding · step counter", "ink-mute", "bg", TEXT],
+  ["milestone · flat line", "ink-dim", "bg", TEXT],
   ["takeover · DOWN N DAYS", "down", "bg", TEXT],
-  ["takeover · posture sentence", "ink-mute", "bg", TEXT],
   ["takeover · prompt label", "ink-mute", "bg", TEXT],
   ["takeover · mark-it-up lever text", "ink-dim", "bg", TEXT],
   // The button has NO fill, so this stroke is the entire button. It owes 3:1.
   ["takeover · mark-it-up lever border", "line-hi", "bg", NONTEXT],
-  ["settings · posture heading", "ink", "bg", TEXT],
   ["login · create-account button", "ink", "surface-hi", TEXT],
 ];
 
 const EXEMPT = [
-  [
-    "posture · selected vs unselected fill",
-    "surface-hi", "surface",
-    "Selection is carried by the ✓ (13.86:1) and by the border stepping line → line-hi (1.45 → 3.33 against the page). The fill shift is reinforcement, and state never rests on it.",
-  ],
-  [
-    "posture · unselected card border",
-    "line", "bg",
-    "A quiet divider on a filled card, not a boundary anything depends on — the card is identifiable by its fill and its text, and the state that matters (selected) is the one drawn at 3.33:1.",
-  ],
-  [
-    "milestone SOFT · panel border",
-    "line", "bg",
-    "Non-interactive container. Nothing is identified or operated by this stroke.",
-  ],
   [
     "onboarding · resting field border",
     "line", "bg",

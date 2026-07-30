@@ -4,19 +4,16 @@ import { color, radius, size, space, TAP } from "@/theme";
 /**
  * A compact multiple-choice control.
  *
- * This exists because Settings was drowning. Posture is a two-value boolean and
- * it was rendered as two stacked `ChoiceCard`s with full explanatory copy —
- * about 300pt, close to half the viewport, sitting above everything else on the
- * screen. Onboarding still uses the cards, and should: first run is where the
- * difference has to be taught. Settings is for someone who already knows which
- * one they picked and wants to change it.
+ * This exists because Settings was drowning: a two-value choice rendered as
+ * stacked cards with full explanatory copy ate close to half the viewport.
+ * Settings is for someone who already knows which value they want.
  *
- * **Selection rests on three signals, not one.** `choice-card.tsx` documents why
- * and the same reasoning applies here: fill alone measured 1.10:1 on the web
- * version and was effectively invisible. The treatment is lifted from the
- * `Scale` control on the Proof screen, which is already measured — `line` fill,
- * a 2px `line-hi` border, and `ink` text at 11.37:1 — so this matches something
- * the app already ships rather than inventing a fourth selected-state idiom.
+ * **Selection rests on three signals, not one.** Fill alone measured 1.10:1 on
+ * the web version and was effectively invisible. The treatment is lifted from
+ * the `Scale` control on the Proof screen, which is already measured — `line`
+ * fill, a 2px `line-hi` border, and `ink` text at 11.37:1 — so this matches
+ * something the app already ships rather than inventing a fourth
+ * selected-state idiom.
  *
  * No colour: every bright hue in this palette is reserved for status.
  */

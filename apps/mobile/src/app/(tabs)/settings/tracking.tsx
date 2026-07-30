@@ -78,10 +78,7 @@ export default function TrackingScreen() {
         />
       </Group>
       <Note>
-        Off by default. Recorded and plotted on Proof, and that is the whole
-        feature — it never affects uptime, there is no goal and no
-        interpretation of the trend. Switching it off hides it without deleting
-        anything.
+        Never affects uptime. Off hides it without deleting anything.
       </Note>
 
       {weightEnabled && (
@@ -95,10 +92,7 @@ export default function TrackingScreen() {
             value={unit}
             onChange={(next) => update({ weight_unit: next }, { unit: next })}
           />
-          <Note>
-            A label, not a conversion. The numbers you have logged stay exactly
-            as you typed them.
-          </Note>
+          <Note>A label, not a conversion.</Note>
         </>
       )}
     </Screen>

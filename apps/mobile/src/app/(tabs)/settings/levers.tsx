@@ -1,7 +1,6 @@
 
 import { Loading } from "@/components/states";
 import { Screen } from "@/components/screen";
-import { Note } from "@/components/settings-ui";
 import { LeverManager } from "@/components/lever-manager";
 import { useStatus } from "@/lib/use-status";
 
@@ -10,6 +9,7 @@ import { useStatus } from "@/lib/use-status";
  *
  * The dashboard offers adding, because that is where you notice one is missing,
  * and long-press dragging for order and archiving. Everything else lives here.
+ * The manager carries its own one-line header; nothing is repeated below it.
  */
 export default function LeversScreen() {
   const { status, refresh } = useStatus();
@@ -23,11 +23,6 @@ export default function LeversScreen() {
         levers={status.levers}
         onChanged={refresh}
       />
-      <Note>
-        One tap on any of these keeps the day up — not all of them, one.
-        Renaming is free: the history follows. Archiving keeps every day you
-        already logged and only stops the button being offered.
-      </Note>
     </Screen>
   );
 }

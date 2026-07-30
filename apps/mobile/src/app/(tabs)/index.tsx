@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { Alert, RefreshControl, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import * as Localization from "expo-localization";
-import { applyToDay, MILESTONE_COPY, milestonePanel } from "@uptime/core";
+import { applyToDay, MILESTONE_COPY } from "@uptime/core";
 
 import { Body, Label, Mono } from "@/components/ui";
 import { DayGrid } from "@/components/day-grid";
@@ -13,7 +13,8 @@ import { useStatus } from "@/lib/use-status";
 import { useOutbox } from "@/lib/use-outbox";
 import { archiveLever, reorderLevers } from "@/lib/levers";
 import { syncTimeZone, type LeverRow } from "@/lib/status";
-import { color, radius, size, space } from "@/theme";
+import { markWalkthroughSeen, walkthroughSeen } from "@/lib/walkthrough";
+import { color, size, space } from "@/theme";
 
 export default function StatusScreen() {
   const router = useRouter();
@@ -42,6 +43,30 @@ export default function StatusScreen() {
       syncTimeZone(userId, deviceZone);
     }
   }, [userId, storedZone]);
+
+  // First open on this device: explain the system once, then never again —
+  // marked seen BEFORE the push so no failure mode replays it on every mount.
+  // Reopening lives in Settings → About. See lib/walkthrough.ts for why this
+  // is a device flag rather than a column.
+  //
+  // NEVER over the takeover. Someone 3+ days down gets the recovery screen,
+  // whole and unavoidable — a tutorial sliding over it would displace the one
+  // screen that must not be displaced. The flag is not burned either, so the
+  // guide arrives once the system is back up.
+  const inTakeover =
+    (status?.down ?? 0) >= 3 && (status?.entries.length ?? 0) > 0;
+  useEffect(() => {
+    if (!userId || inTakeover) return;
+    let live = true;
+    walkthroughSeen(userId).then((seen) => {
+      if (!live || seen) return;
+      markWalkthroughSeen(userId);
+      router.push("/how-it-works");
+    });
+    return () => {
+      live = false;
+    };
+  }, [userId, inTakeover, router]);
 
   if (!status) {
     return (
@@ -96,7 +121,6 @@ export default function StatusScreen() {
         todayLevers={shownAsLogged}
         lastRun={lastRun}
         lastDetail={lastDetail(entries)}
-        posture={state.posture}
         busy={false}
         onLog={(lever, detail) => write(lever, "log", detail)}
       />
@@ -155,8 +179,13 @@ export default function StatusScreen() {
         </Body>
       )}
 
+      {/* Good news, delivered in the identical flat line an alert would use —
+          that symmetry is what stops it reading as praise. No colour, no
+          motion, no badge, nothing awarded. */}
       {liveMilestone && MILESTONE_COPY[liveMilestone] && (
-        <Milestone kind={liveMilestone} posture={state.posture} />
+        <Body tone="dim" style={{ marginTop: space[3] }}>
+          {MILESTONE_COPY[liveMilestone]}
+        </Body>
       )}
 
       {down > 0 && (
@@ -235,48 +264,6 @@ function confirmArchive(
         },
       },
     ],
-  );
-}
-
-/**
- * Good news, and the only other place posture is visible. STRICT delivers it in
- * the identical flat line an alert would use — that symmetry is what stops it
- * reading as praise. SOFT may acknowledge it in a panel. No colour, no motion,
- * no badge, nothing awarded in either.
- */
-function Milestone({
-  kind,
-  posture,
-}: {
-  kind: string;
-  posture: Parameters<typeof milestonePanel>[0];
-}) {
-  const panel = milestonePanel(posture, kind);
-
-  if (!panel) {
-    return (
-      <Body tone="dim" style={{ marginTop: space[3] }}>
-        {MILESTONE_COPY[kind]}
-      </Body>
-    );
-  }
-
-  return (
-    <View
-      style={{
-        marginTop: space[4],
-        padding: space[3],
-        borderRadius: radius.md,
-        borderWidth: 1,
-        borderColor: color.line,
-        backgroundColor: color.surface,
-      }}
-    >
-      <Body tone="ink">{panel.title}</Body>
-      <Body tone="mute" style={{ marginTop: space[1] }}>
-        {panel.note}
-      </Body>
-    </View>
   );
 }
 

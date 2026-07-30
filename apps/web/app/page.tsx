@@ -1,6 +1,6 @@
 import { NavLink } from "./components/nav-link";
 import { requireStatus } from "@/lib/system";
-import { MILESTONE_COPY, milestonePanel, type Posture } from "@uptime/core";
+import { MILESTONE_COPY } from "@uptime/core";
 import { DayGrid } from "./components/day-grid";
 import { Levers } from "./components/levers";
 import { Takeover } from "./components/takeover";
@@ -17,7 +17,6 @@ export default async function StatusPage() {
     entries,
     playbook,
     todayLevers,
-    posture,
     uptime,
     run,
     down,
@@ -39,7 +38,6 @@ export default async function StatusPage() {
         todayLevers={[...todayLevers]}
         lastRun={lastRun}
         lastDetail={lastDetail(entries)}
-        posture={posture}
       />
     );
   }
@@ -84,13 +82,13 @@ export default async function StatusPage() {
           </p>
         )}
 
-        {/* Good news, and the only other place posture is visible. In STRICT it
-            arrives in the identical flat line an alert would use — that
-            symmetry is what stops it reading as praise. In SOFT it may be
-            acknowledged in a panel, and that is the whole difference: no
-            colour, no motion, no badge, nothing awarded in either. */}
+        {/* Good news, delivered in the identical flat line an alert would use —
+            that symmetry is what stops it reading as praise. No colour, no
+            motion, no badge, nothing awarded. */}
         {liveMilestone && MILESTONE_COPY[liveMilestone] && (
-          <Milestone kind={liveMilestone} posture={posture} />
+          <p className="text-ink-dim mt-3 text-xs leading-relaxed">
+            {MILESTONE_COPY[liveMilestone]}
+          </p>
         )}
 
         {down > 0 && (
@@ -144,21 +142,6 @@ export default async function StatusPage() {
         ))}
       </nav>
     </main>
-  );
-}
-
-function Milestone({ kind, posture }: { kind: string; posture: Posture }) {
-  const panel = milestonePanel(posture, kind);
-
-  if (!panel) {
-    return <p className="text-ink-dim mt-3 text-xs">{MILESTONE_COPY[kind]}</p>;
-  }
-
-  return (
-    <div className="border-line bg-surface mt-4 rounded border p-3">
-      <p className="text-ink text-sm">{panel.title}</p>
-      <p className="text-ink-mute mt-1 text-xs leading-relaxed">{panel.note}</p>
-    </div>
   );
 }
 

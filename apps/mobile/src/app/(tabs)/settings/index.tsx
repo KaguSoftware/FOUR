@@ -1,5 +1,4 @@
 import Constants from "expo-constants";
-import { POSTURE_CHOICES } from "@uptime/core";
 
 import { Loading } from "@/components/states";
 import { Screen } from "@/components/screen";
@@ -25,18 +24,15 @@ export default function SettingsIndex() {
   if (!status) return <Loading />;
   const { state, levers, user } = status;
 
-  const posture =
-    POSTURE_CHOICES.find((c) => c.value === state.posture)?.title ??
-    state.posture;
-
-  // "Strict · 21:00 · slammed" — posture always, then whatever else is on.
-  const alerts = [
-    posture,
-    state.daily_reminder_at && reminderLabel(state.daily_reminder_at),
-    status.slammed && "slammed",
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  // "21:00 · slammed" — whatever is on. Nothing on still states the truth:
+  // the pager needs no configuration and cannot be turned off.
+  const alerts =
+    [
+      state.daily_reminder_at && reminderLabel(state.daily_reminder_at),
+      status.slammed && "slammed",
+    ]
+      .filter(Boolean)
+      .join(" · ") || "pager only";
 
   return (
     <Screen>

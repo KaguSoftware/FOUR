@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { KeyboardAvoidingView, Platform, TextInput, View } from "react-native";
+import { useHeaderHeight } from "@react-navigation/elements";
 import { useRouter } from "expo-router";
 
 import { Button } from "@/components/button";
@@ -23,6 +24,10 @@ const MIN_LENGTH = 8;
  */
 export default function ChangePasswordScreen() {
   const router = useRouter();
+  // This screen sits under a shown native header. `padding` measures from the
+  // window, so without the header's height the avoidance is short by exactly
+  // that much and the focused field can sit under the keyboard.
+  const headerHeight = useHeaderHeight();
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -46,6 +51,7 @@ export default function ChangePasswordScreen() {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : undefined}
+      keyboardVerticalOffset={headerHeight}
       style={{ flex: 1, backgroundColor: color.bg }}
     >
       <Screen underHeader>
@@ -100,9 +106,8 @@ export default function ChangePasswordScreen() {
         </View>
 
         <Note>
-          Takes effect immediately, everywhere the account is signed in. If you
-          came in through Apple, Google or an emailed code, this sets the
-          account&apos;s first password.
+          Applies everywhere immediately. Also sets a first password for Apple
+          or Google accounts.
         </Note>
       </Screen>
     </KeyboardAvoidingView>

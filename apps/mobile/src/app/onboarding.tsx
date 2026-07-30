@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
+  AccessibilityInfo,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -11,20 +12,15 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Localization from "expo-localization";
 import {
-  DEFAULT_POSTURE,
   LEVER_LABEL_MAX,
   MAX_LEVERS,
-  POSTURE_CHOICES,
-  POSTURE_FOOTNOTE,
   uniqueLeverKey,
   validateLeverLabel,
-  type Posture,
 } from "@uptime/core";
 
 import { Button } from "@/components/button";
 import { field } from "@/components/fields";
 import { Body, Label, Wordmark } from "@/components/ui";
-import { ChoiceCard } from "@/components/choice-card";
 import { Segmented } from "@/components/segmented";
 import { Group, Note, RowRule, SwitchRow, TimeRow } from "@/components/settings-ui";
 import { registerForPush } from "@/lib/push";
@@ -33,7 +29,7 @@ import { supabase } from "@/lib/supabase";
 import { useSession } from "@/lib/session";
 import { color, radius, size, space, TAP } from "@/theme";
 
-const STEPS = 5;
+const STEPS = 4;
 const DEFAULT_REMINDER = "21:00:00";
 
 const UNIT_CHOICES = [
@@ -42,18 +38,17 @@ const UNIT_CHOICES = [
 ] as const;
 
 /**
- * First run, in five screens.
+ * First run, in four screens.
  *
  * The first states the rule before it asks for anything, because "one of these,
  * not all" is the single idea someone has to accept for the rest of the product
  * to make sense. It also explains, without a tour, why there is no streak
  * counter anywhere in the app.
  *
- * Then posture — framed as how the system talks, never as difficulty — then
- * the two opt-ins (weight, the daily reminder), both defaulting off because
- * off IS the product's default, and finally the pager. That last screen exists
- * so the iOS notification prompt lands with its reason on screen: by then the
- * user has chosen levers and knows what a page would be about.
+ * Then the two opt-ins (weight, the daily reminder), both defaulting off
+ * because off IS the product's default, and finally the pager. That last screen
+ * exists so the iOS notification prompt lands with its reason on screen: by
+ * then the user has chosen levers and knows what a page would be about.
  *
  * Nothing is written until the last tap. A half-finished account cannot open
  * the app at all, so there is no intermediate state worth saving.
@@ -63,12 +58,25 @@ export default function OnboardingScreen() {
   const { session, markOnboarded } = useSession();
   const [step, setStep] = useState(0);
   const [labels, setLabels] = useState<string[]>([""]);
-  const [posture, setPosture] = useState<Posture>(DEFAULT_POSTURE);
   const [weightOn, setWeightOn] = useState(false);
   const [weightUnit, setWeightUnit] = useState<"kg" | "lb">("kg");
   const [reminderAt, setReminderAt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const scroll = useRef<ScrollView>(null);
+
+  // A step change is a page change: reset the scroll — a long step scrolled
+  // to reach its CTA must not hand its offset to the next one — and tell a
+  // screen reader, since swapping a subtree under local state is silent.
+  const prevStep = useRef(step);
+  useEffect(() => {
+    if (prevStep.current === step) return;
+    prevStep.current = step;
+    scroll.current?.scrollTo({ y: 0, animated: false });
+    AccessibilityInfo.announceForAccessibility(
+      `Step ${step + 1} of ${STEPS}`,
+    );
+  }, [step]);
 
   const named = labels.map((l) => l.trim()).filter(Boolean);
 
@@ -97,7 +105,6 @@ export default function OnboardingScreen() {
     const { error: stateError } = await supabase.from("system_state").upsert(
       {
         user_id: userId,
-        posture,
         timezone: Localization.getCalendars()[0]?.timeZone ?? "UTC",
         weight_enabled: weightOn,
         weight_unit: weightUnit,
@@ -157,6 +164,11 @@ export default function OnboardingScreen() {
       style={{ flex: 1, backgroundColor: color.bg }}
     >
       <ScrollView
+        ref={scroll}
+        // JS owns the insets, same as `Screen` — left automatic, UIKit adds its
+        // own keyboard inset on top of the KAV's padding a frame late, which is
+        // the keyboard twitch the sign-in screen had.
+        contentInsetAdjustmentBehavior="never"
         contentContainerStyle={{
           flexGrow: 1,
           paddingHorizontal: space[5],
@@ -281,35 +293,6 @@ export default function OnboardingScreen() {
 
         {step === 1 && (
           <>
-            <Text style={[heading, { marginBottom: space[8] }]}>
-              How should this system talk to you?
-            </Text>
-
-            <View style={{ gap: space[2] }}>
-              {POSTURE_CHOICES.map((choice) => (
-                <ChoiceCard
-                  key={choice.value}
-                  title={choice.title}
-                  detail={choice.detail}
-                  selected={choice.value === posture}
-                  onPress={() => setPosture(choice.value)}
-                />
-              ))}
-            </View>
-
-            {/* Load-bearing. Without it SOFT reads as the easier setting, and
-                the whole point is that there is no easier setting. */}
-            <Body tone="mute" style={{ marginTop: space[4], fontSize: size.xs }}>
-              {POSTURE_FOOTNOTE}
-            </Body>
-
-            <Cta label="continue" onPress={() => setStep(2)} />
-            <StepBack onPress={() => setStep(0)} label="← back to levers" />
-          </>
-        )}
-
-        {step === 2 && (
-          <>
             <Text style={heading}>Keep a number alongside the system?</Text>
             <Body tone="mute" style={{ marginTop: space[3] }}>
               Optional, and structurally separate: weight is recorded next to
@@ -342,12 +325,12 @@ export default function OnboardingScreen() {
               changeable in Settings at any time.
             </Note>
 
-            <Cta label="continue" onPress={() => setStep(3)} />
-            <StepBack onPress={() => setStep(1)} label="← back to posture" />
+            <Cta label="continue" onPress={() => setStep(2)} />
+            <StepBack onPress={() => setStep(0)} label="← back to levers" />
           </>
         )}
 
-        {step === 3 && (
+        {step === 2 && (
           <>
             <Text style={heading}>Want a daily nudge?</Text>
             <Body tone="mute" style={{ marginTop: space[3] }}>
@@ -375,12 +358,12 @@ export default function OnboardingScreen() {
               )}
             </Group>
 
-            <Cta label="continue" onPress={() => setStep(4)} />
-            <StepBack onPress={() => setStep(2)} label="← back to tracking" />
+            <Cta label="continue" onPress={() => setStep(3)} />
+            <StepBack onPress={() => setStep(1)} label="← back to tracking" />
           </>
         )}
 
-        {step === 4 && (
+        {step === 3 && (
           <>
             <Text style={heading}>
               When the system goes down, it pages you.
@@ -417,7 +400,7 @@ export default function OnboardingScreen() {
                 not now — start without alerts
               </Body>
             </Pressable>
-            <StepBack onPress={() => setStep(3)} label="← back to reminder" />
+            <StepBack onPress={() => setStep(2)} label="← back to reminder" />
           </>
         )}
 
@@ -426,6 +409,31 @@ export default function OnboardingScreen() {
             {error}
           </Body>
         )}
+
+        {/* The escape hatch.
+            This screen is deliberately unskippable — there is nothing behind
+            it and the account has no levers until it completes — but
+            "unskippable" must never mean "trapped". A session whose user no
+            longer exists lands here and CANNOT finish: every write fails and
+            retrying is hopeless. Signing out is the only honest way back to
+            sign-in. Quiet, and last, because for everyone else it is the wrong
+            direction. (Owner, 2026-07-30: deleted their auth row mid-setup and
+            had no exit.) */}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Sign out and start over"
+          onPress={() => supabase.auth.signOut({ scope: "local" })}
+          style={{
+            minHeight: TAP,
+            marginTop: space[6],
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Body tone="mute" style={{ fontSize: size.xs }}>
+            sign out
+          </Body>
+        </Pressable>
       </ScrollView>
     </KeyboardAvoidingView>
   );

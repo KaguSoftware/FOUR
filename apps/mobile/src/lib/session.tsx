@@ -46,6 +46,29 @@ async function fetchOnboarded(userId: string): Promise<boolean> {
   return data?.onboarded_at != null;
 }
 
+/**
+ * Is the stored session still backed by a real user?
+ *
+ * `getSession()` reads the keychain and asks nobody, so a session whose user
+ * has been deleted still looks perfectly valid: the gate lets them in, decides
+ * they are un-onboarded (the `system_state` row went with the user), and parks
+ * them on a screen where every write fails. That is not hypothetical — the
+ * owner deleted their own auth row mid-setup on 2026-07-30 and the app trapped
+ * them in "Could not save that. Try again." with no exit.
+ *
+ * `getUser()` asks the server, so it is the only thing that can tell the
+ * difference. **Only an explicit auth rejection counts.** A network failure
+ * must never sign anyone out — this app is built to work in a gym basement,
+ * and resolving "offline" to "signed out" would throw away the keychain
+ * session and the unsent outbox with it.
+ */
+async function userStillExists(): Promise<boolean> {
+  const { error } = await supabase.auth.getUser();
+  if (!error) return true;
+  const status = (error as { status?: number }).status;
+  return status !== 401 && status !== 403;
+}
+
 export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [onboarded, setOnboarded] = useState<boolean | null>(null);
@@ -63,6 +86,17 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     let active = true;
 
     supabase.auth.getSession().then(async ({ data }) => {
+      if (!active) return;
+
+      // Validate before trusting it — see `userStillExists`. `scope: "local"`
+      // so the keychain is cleared even though the server call is guaranteed to
+      // fail (the user it would authenticate is gone).
+      if (data.session && !(await userStillExists())) {
+        await supabase.auth.signOut({ scope: "local" });
+        if (active) setLoading(false);
+        return;
+      }
+
       if (!active) return;
       setSession(data.session);
       setOnboarded(

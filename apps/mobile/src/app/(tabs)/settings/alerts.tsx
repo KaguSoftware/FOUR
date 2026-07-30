@@ -2,17 +2,10 @@ import { useCallback, useState } from "react";
 import { Alert, Linking } from "react-native";
 import * as Notifications from "expo-notifications";
 import { useFocusEffect } from "expo-router";
-import {
-  addDays,
-  POSTURE_CHOICES,
-  POSTURE_FOOTNOTE,
-  type Posture,
-} from "@uptime/core";
+import { addDays } from "@uptime/core";
 
-import { Body, Label } from "@/components/ui";
 import { Loading } from "@/components/states";
 import { Screen } from "@/components/screen";
-import { Segmented } from "@/components/segmented";
 import {
   ActionRow,
   Group,
@@ -25,24 +18,16 @@ import {
 import { cancelReminder, sendTestAlert, syncReminder } from "@/lib/reminder";
 import { supabase } from "@/lib/supabase";
 import { useStatus } from "@/lib/use-status";
-import { space } from "@/theme";
 
 /** Local overrides held only until the server confirms them. */
 type Pending = {
   slammed?: boolean;
-  posture?: Posture;
   reminder?: string | null;
 };
 
 const DEFAULT_REMINDER = "21:00:00";
 
 /**
- * How the system talks to you, and when.
- *
- * Posture lives here and ONLY here — deliberately not on the takeover, even
- * though someone having a bad week is exactly who would benefit from switching.
- * Offering it there turns a rough moment into a configuration task.
- *
  * Two channels share this screen and must not blur: the PAGER is the server's,
  * fires when the system is down, and has no off switch — that channel is the
  * product. The REMINDER is a local nudge at a chosen time, off by default,
@@ -78,7 +63,6 @@ export default function AlertsScreen() {
   // fails, which is the honest version of optimistic: the UI is ahead of the
   // server, never lying about it.
   const slammed = pending.slammed ?? status.slammed;
-  const posture = pending.posture ?? state.posture;
   const reminder =
     pending.reminder !== undefined ? pending.reminder : state.daily_reminder_at;
 
@@ -161,25 +145,7 @@ export default function AlertsScreen() {
 
   return (
     <Screen underHeader>
-      <Label style={{ marginBottom: space[3] }}>posture</Label>
-      <Segmented
-        label="Alert posture"
-        options={POSTURE_CHOICES}
-        value={posture}
-        onChange={(next) => update({ posture: next }, { posture: next })}
-      />
-
-      {/* Only the SELECTED option's detail. Two descriptions on screen is a
-          comparison, and this is a setting you already made. The footnote stays
-          in full: core marks it load-bearing, because without it `soft` reads as
-          the easier setting, and the whole point is that there is no easier
-          setting. */}
-      <Note>
-        {POSTURE_CHOICES.find((c) => c.value === posture)?.detail}{" "}
-        {POSTURE_FOOTNOTE}
-      </Note>
-
-      <Group title="thresholds">
+      <Group title="thresholds" first>
         <SwitchRow
           title="Slammed mode"
           value={slammed}
@@ -193,8 +159,13 @@ export default function AlertsScreen() {
       </Group>
       <Note>
         {slammed
-          ? `Raised thresholds until ${state.slammed_until}. Still one lever, still ten minutes of anything.`
-          : "For genuinely overloaded stretches. Raises the alert thresholds; never pauses the system. Expires on its own after 14 days."}
+          ? // The date the OPTIMISTIC switch implies, not just the server's.
+            // `slammed` flips on tap while `slammed_until` stays null until the
+            // write and the reload both land, so interpolating the column alone
+            // read "Raised thresholds until null." for the whole round trip.
+            // The fallback is the same expression the write sends.
+            `Raised thresholds until ${state.slammed_until ?? addDays(status.today, 14)}.`
+          : "Raises the alert thresholds for 14 days. Never pauses the system."}
       </Note>
 
       <Group title="daily reminder">
@@ -210,11 +181,6 @@ export default function AlertsScreen() {
           </>
         )}
       </Group>
-      <Note>
-        Off by default — the monitor is a pager, not a nag. When on, this
-        device nudges you once a day at the time you pick. Nothing is sent
-        anywhere.
-      </Note>
 
       <Group title="delivery">
         {permission === "denied" ? (
@@ -228,19 +194,7 @@ export default function AlertsScreen() {
         <RowRule />
         <ActionRow title="Send a test alert" onPress={onTestAlert} />
       </Group>
-      <Note>
-        Pages arrive on the lock screen when the system has been down. A pager
-        you have never seen fire is not a pager — send yourself a test.
-      </Note>
-
-      <Body
-        tone="mute"
-        style={{ fontSize: 12, lineHeight: 18, marginTop: space[8] }}
-      >
-        Neither posture nor slammed mode changes what counts as up, any number
-        on any screen, or when the pager fires. The pager itself has no off
-        switch — it is the product.
-      </Body>
+      <Note>The pager has no off switch — it is the product.</Note>
     </Screen>
   );
 }

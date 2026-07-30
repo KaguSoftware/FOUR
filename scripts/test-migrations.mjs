@@ -204,9 +204,11 @@ fresh[0].levers === 0 && fresh[0].playbook === 0 && fresh[0].state === 1
 const onboarded = await q(`select count(*)::int as n from public.system_state where user_id = '${b}' and onboarded_at is not null`);
 onboarded[0].n === 1 ? ok("pre-existing accounts are marked onboarded") : bad("existing account would be shown onboarding");
 
-// Posture defaults to strict.
-const posture = await q(`select posture from public.system_state where user_id = '${b}'`);
-posture[0].posture === "strict" ? ok("posture defaults to strict") : bad(`posture was ${posture[0].posture}`);
+// Posture was removed on 2026-07-30 — the app is strict-only, and the column
+// goes with it. Nothing may still reference it.
+const posture = await q(`select count(*)::int as n from information_schema.columns
+  where table_schema = 'public' and table_name = 'system_state' and column_name = 'posture'`);
+posture[0].n === 0 ? ok("posture column dropped") : bad("posture column still exists");
 
 // --- the delete-account RPC -------------------------------------------------
 // The cascade itself is proven above ("THE ONE THAT MATTERS"); these check the

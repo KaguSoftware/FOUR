@@ -7,14 +7,12 @@ import {
   appendDetail,
   canAddLever,
   logicalDate,
-  toPosture,
   uniqueLeverKey,
   validateLeverLabel,
   DETAIL_MAX,
   MAX_LEVERS,
   NOTE_MAX,
   type Lever,
-  type Posture,
 } from "@uptime/core";
 
 /**
@@ -403,16 +401,13 @@ export async function archiveLever(id: string): Promise<LeverResult> {
 }
 
 /**
- * Finish first-run setup: write the levers, record the posture, open the app.
+ * Finish first-run setup: write the levers, open the app.
  *
  * One action rather than a step-per-write, because a half-finished account is
  * the worst state this product can be in — the dashboard is gated behind
  * `onboarded`, so a partial run would lock the user out of their own app.
  */
-export async function completeOnboarding(
-  labels: string[],
-  posture: Posture,
-): Promise<LeverResult> {
+export async function completeOnboarding(labels: string[]): Promise<LeverResult> {
   const { supabase, user } = await requireUser();
 
   const state = await getSystemState(user.id);
@@ -463,28 +458,11 @@ export async function completeOnboarding(
 
   const { error: stateError } = await supabase
     .from("system_state")
-    .update({ posture: toPosture(posture), onboarded_at: new Date().toISOString() })
+    .update({ onboarded_at: new Date().toISOString() })
     .eq("user_id", user.id);
   if (stateError) {
     return { ok: false, error: "Could not finish setup. Try again." };
   }
-
-  revalidatePath("/", "layout");
-  return { ok: true };
-}
-
-/**
- * Change posture later. Promised on the onboarding screen ("change it any time
- * in Settings"), so it is part of that screen's contract, not a nice-to-have.
- */
-export async function setPosture(posture: Posture): Promise<LeverResult> {
-  const { supabase, user } = await requireUser();
-
-  const { error } = await supabase
-    .from("system_state")
-    .update({ posture: toPosture(posture) })
-    .eq("user_id", user.id);
-  if (error) return { ok: false, error: "Could not change that." };
 
   revalidatePath("/", "layout");
   return { ok: true };

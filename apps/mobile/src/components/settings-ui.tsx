@@ -204,13 +204,21 @@ export function TimeRow({
   value: string;
   onChange: (time: string) => void;
 }) {
+  // The Date is a carrier of DIGITS, never an instant: built in UTC, shown in
+  // UTC (`timeZoneName` below), read back in UTC. It used to be built with
+  // local-time rules on a year-2000 base day — and Hermes and the native
+  // picker can disagree about a zone's rules on a date that old (Istanbul was
+  // UTC+2 in 2000, UTC+3 now), so the instant shifted crossing the bridge and
+  // a picked 13:20 was stored as 14:20 while the picker itself, converting
+  // back the other way, kept showing 13:20. Owner report, 2026-07-30. Pinning
+  // both sides to UTC leaves no rules to disagree about.
   const [h, m] = value.split(":");
-  const asDate = new Date(2000, 0, 1, Number(h) || 0, Number(m) || 0);
+  const asDate = new Date(Date.UTC(2000, 0, 1, Number(h) || 0, Number(m) || 0));
 
   const pick = (event: DateTimePickerEvent, date?: Date) => {
     if (event.type === "dismissed" || !date) return;
     const pad = (n: number) => String(n).padStart(2, "0");
-    onChange(`${pad(date.getHours())}:${pad(date.getMinutes())}:00`);
+    onChange(`${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}:00`);
   };
 
   return (
@@ -235,6 +243,7 @@ export function TimeRow({
               value: asDate,
               mode: "time",
               is24Hour: true,
+              timeZoneName: "UTC",
               onChange: pick,
             })
           }
@@ -257,6 +266,7 @@ export function TimeRow({
           display="compact"
           themeVariant="dark"
           accentColor={color.ink}
+          timeZoneName="UTC"
           onChange={pick}
           accessibilityLabel={title}
         />

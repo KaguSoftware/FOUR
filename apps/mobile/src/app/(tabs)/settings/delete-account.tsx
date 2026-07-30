@@ -6,6 +6,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { useHeaderHeight } from "@react-navigation/elements";
 
 import { Button } from "@/components/button";
 import { field } from "@/components/fields";
@@ -34,6 +35,9 @@ import { color, space } from "@/theme";
  */
 export default function DeleteAccountScreen() {
   const { status } = useStatus();
+  // Under a shown native header, `padding` under-avoids by exactly the
+  // header's height without this — see change-password.
+  const headerHeight = useHeaderHeight();
   const [typed, setTyped] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -78,19 +82,14 @@ export default function DeleteAccountScreen() {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : undefined}
+      keyboardVerticalOffset={headerHeight}
       style={{ flex: 1, backgroundColor: color.bg }}
     >
       <Screen underHeader>
         <Body tone="ink">This deletes the account and everything on it.</Body>
         <Body tone="mute" style={{ marginTop: space[3] }}>
-          Every entry, every run and outage, the playbook, the journal, the
-          weight line, the settings — all of it, permanently, from the server.
-          This is the one action here with no archive behind it.
-        </Body>
-        <Body tone="mute" style={{ marginTop: space[3] }}>
-          If you only want a break, just stop opening the app. The account
-          costs nothing by existing, and coming back is the thing it is built
-          for. Want a copy first? Account → Export my data.
+          Every entry, note and setting — permanently, from the server. Want a
+          copy first? Export it from Account.
         </Body>
 
         <Label style={{ marginTop: space[8], marginBottom: space[3] }}>

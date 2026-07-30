@@ -8,14 +8,11 @@ import {
   downDays,
   lastCompletedRun,
   logicalDate,
-  toPosture,
   uptimeWindow,
   ACTIVE_LEVERS,
-  DEFAULT_POSTURE,
   type Entry,
   type Lever,
   type LeverSpan,
-  type Posture,
 } from "@uptime/core";
 
 export type PlaybookItem = {
@@ -43,8 +40,6 @@ export type SystemState = {
   telegram_chat_id: string | null;
   weight_enabled: boolean;
   weight_unit: "kg" | "lb";
-  /** How the system talks to you. Never changes a number — see core/posture. */
-  posture: Posture;
   /**
    * Whether first-run setup is finished. **Derived, not the raw column.**
    *
@@ -128,7 +123,7 @@ export async function getSupabase() {
  */
 const BASE_COLUMNS = "user_id, timezone, slammed_until, telegram_chat_id";
 const WEIGHT_COLUMNS = "weight_enabled, weight_unit";
-const ONBOARDING_COLUMNS = "posture, onboarded_at";
+const ONBOARDING_COLUMNS = "onboarded_at";
 
 /**
  * Column sets, widest first — one rung per migration that might not have landed.
@@ -164,7 +159,6 @@ function toSystemState(
     telegram_chat_id: (row.telegram_chat_id as string | null) ?? null,
     weight_enabled: row.weight_enabled === true,
     weight_unit: row.weight_unit === "lb" ? "lb" : "kg",
-    posture: hasOnboarding ? toPosture(row.posture) : DEFAULT_POSTURE,
     onboarded: hasOnboarding ? row.onboarded_at != null : true,
   };
 }
@@ -266,7 +260,6 @@ export async function getStatus() {
     todayLevers: new Set(todayEntries.map((e) => e.lever)),
     // The buttons. Archived levers are read but never offered.
     levers: levers.filter((l) => !l.archived),
-    posture: state.posture,
     // For the grid: who existed when, archived included, so a past day keeps
     // the shade it had rather than being re-scaled by today's lever count.
     leverSpans: leverSpans(levers),

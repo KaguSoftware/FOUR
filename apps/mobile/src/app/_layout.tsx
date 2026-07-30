@@ -128,6 +128,18 @@ function RootNavigator({ fontsLoaded }: { fontsLoaded: boolean }) {
         <Stack.Screen name="log" options={SHEET} />
         <Stack.Screen name="add-lever" options={SHEET} />
         <Stack.Screen name="edit-note" options={SHEET} />
+        {/* The walkthrough. A full-height native modal, NOT the formSheet
+            options above: `fitToContents` measures content once, and a
+            three-step screen whose steps differ in height would resize under
+            the finger — the documented sheet-jolt. */}
+        <Stack.Screen
+          name="how-it-works"
+          options={{
+            presentation: "modal",
+            headerShown: false,
+            contentStyle: { backgroundColor: color.bg },
+          }}
+        />
       </Stack.Protected>
 
       {/* Outside every guard, and deliberately LAST. The OAuth redirect can

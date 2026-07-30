@@ -8,7 +8,6 @@ import {
   ActionRow,
   Group,
   LinkRow,
-  Note,
   RowRule,
   ValueRow,
 } from "@/components/settings-ui";
@@ -71,12 +70,9 @@ export default function AccountScreen() {
           href="/(tabs)/settings/change-password"
         />
         <RowRule />
+        {/* Read from the device and synced automatically; the pager uses it. */}
         <ValueRow title="Timezone" value={state.timezone} />
       </Group>
-      <Note>
-        The timezone is read from this device and kept in sync automatically.
-        The pager uses it, so it has to match the day you are looking at.
-      </Note>
 
       <Group title="data">
         {/* Passive reporting only. The queue flushes itself on network, on
@@ -84,13 +80,10 @@ export default function AccountScreen() {
             imply it needs one. */}
         <ValueRow title="Sync" value={syncLabel(waiting)} />
         <RowRule />
+        {/* One JSON file of raw entries, through the share sheet — anyone
+            holding the entries can re-derive every figure the app shows. */}
         <ActionRow title="Export my data" onPress={onExport} />
       </Group>
-      <Note>
-        Everything the account has ever written, as one JSON file, through the
-        share sheet. Raw entries rather than derived numbers — anyone holding
-        the entries can re-derive every figure the app shows.
-      </Note>
 
       {/* Silence is the default — this block exists only when something was
           actually lost. A tap the server refused is a day the user believes is

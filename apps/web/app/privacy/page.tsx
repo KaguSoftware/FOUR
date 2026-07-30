@@ -80,8 +80,8 @@ export default function PrivacyPage() {
           server is. Read from your device, never from your IP address.
         </Item>
         <Item term="Your settings">
-          Your levers and their names, whether you chose strict or soft, whether
-          slammed mode is on, and your reminder time.
+          Your levers and their names, whether slammed mode is on, and your
+          reminder time.
         </Item>
       </Section>
 

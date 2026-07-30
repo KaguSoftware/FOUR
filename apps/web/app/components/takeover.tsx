@@ -4,12 +4,7 @@ import { NavLink } from "./nav-link";
 import { useState, useTransition } from "react";
 import { logEntry } from "@/app/actions";
 import type { LeverRow, PlaybookItem } from "@/lib/system";
-import {
-  takeoverNote,
-  takeoverPrompt,
-  type Interval,
-  type Posture,
-} from "@uptime/core";
+import { type Interval } from "@uptime/core";
 
 /**
  * Re-entry. This replaces the dashboard entirely when down 3+ days.
@@ -25,10 +20,6 @@ import {
  *     it is empty for every new account now that signup seeds nothing — so
  *     "just mark it up" is not a nicety here, it is the floor. A takeover with
  *     no reachable action would be the worst dead end this product could have.
- *
- * Posture reaches the words and nothing else. Both versions report the same
- * days down, the same last run, and the same options in the same order — SOFT
- * adds one sentence and relabels the list. See `core/posture.ts`.
  */
 export function Takeover({
   down,
@@ -37,7 +28,6 @@ export function Takeover({
   todayLevers,
   lastRun,
   lastDetail,
-  posture,
 }: {
   down: number;
   levers: LeverRow[];
@@ -45,7 +35,6 @@ export function Takeover({
   todayLevers: string[];
   lastRun: Interval | null;
   lastDetail: string | null;
-  posture: Posture;
 }) {
   const [pending, startTransition] = useTransition();
   const [chosen, setChosen] = useState<string | null>(null);
@@ -68,7 +57,6 @@ export function Takeover({
   const showLevers = options.length === 0 || levers.length === 1 || expanded;
 
   const byKey = new Map(levers.map((l) => [l.key, l.label]));
-  const note = takeoverNote(posture, { down, hasLastRun: lastRun !== null });
 
   function log(id: string, lever: string, detail: string | null) {
     if (chosen !== null) return; // one tap; the second is always an accident
@@ -85,18 +73,7 @@ export function Takeover({
       <h1 className="text-down mb-1.5 text-2xl font-medium tracking-tight">
         DOWN {down} DAYS
       </h1>
-      {/* SOFT adds exactly one sentence here and STRICT adds none — that is the
-          whole visible difference on this screen. It used to read "Get it back
-          up." in both, which said the same thing as the list label below it;
-          two lines of the same instruction on the screen that matters most is
-          worse than one. */}
-      {note && (
-        <p className="text-ink-mute mb-6 text-sm leading-relaxed">{note}</p>
-      )}
-
-      <p className={`label mb-2 ${note ? "" : "mt-8"}`}>
-        {takeoverPrompt(posture)}
-      </p>
+      <p className="label mt-8 mb-2">Minimum to get back up</p>
 
       <div className="flex flex-col gap-2">
         {options.map((item) => (

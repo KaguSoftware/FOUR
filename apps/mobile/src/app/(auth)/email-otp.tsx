@@ -117,6 +117,9 @@ export default function EmailOtpScreen() {
             placeholderTextColor={color.inkMute}
             accessibilityLabel="Email"
             autoCapitalize="none"
+            // An email never wants QuickType — see sign-in's email field.
+            autoCorrect={false}
+            spellCheck={false}
             autoComplete="email"
             keyboardType="email-address"
             inputMode="email"

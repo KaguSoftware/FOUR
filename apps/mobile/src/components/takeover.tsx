@@ -1,12 +1,7 @@
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
-import {
-  takeoverNote,
-  takeoverPrompt,
-  type Interval,
-  type Posture,
-} from "@uptime/core";
+import { type Interval } from "@uptime/core";
 import { Body, Label, Mono } from "./ui";
 import { color, radius, size, space, TAB_BAR, TAP } from "@/theme";
 import type { LeverRow, PlaybookItem } from "@/lib/status";
@@ -24,9 +19,6 @@ import type { LeverRow, PlaybookItem } from "@/lib/status";
  *     new account, so "just mark it up" is the floor of this screen, not a
  *     nicety. A takeover with nothing tappable is the worst dead end this
  *     product could ship.
- *
- * Posture reaches the words and nothing else — same days down, same last run,
- * same options in the same order. SOFT adds one sentence.
  */
 export function Takeover({
   down,
@@ -35,7 +27,6 @@ export function Takeover({
   todayLevers,
   lastRun,
   lastDetail,
-  posture,
   busy,
   onLog,
 }: {
@@ -45,7 +36,6 @@ export function Takeover({
   todayLevers: string[];
   lastRun: Interval | null;
   lastDetail: string | null;
-  posture: Posture;
   busy: boolean;
   onLog: (lever: string, detail: string | null) => void;
 }) {
@@ -61,7 +51,6 @@ export function Takeover({
     .slice(0, 3);
 
   const byKey = new Map(levers.map((l) => [l.key, l.label]));
-  const note = takeoverNote(posture, { down, hasLastRun: lastRun !== null });
 
   function log(lever: string, detail: string | null) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -96,17 +85,8 @@ export function Takeover({
           DOWN {down} DAYS
         </Text>
 
-        {/* SOFT adds exactly one sentence here and STRICT adds none. It used to
-          read "Get it back up." in both, which said the same thing as the list
-          label below it. */}
-        {note && (
-          <Body tone="mute" style={{ marginTop: space[2] }}>
-            {note}
-          </Body>
-        )}
-
         <Label style={{ marginTop: space[8], marginBottom: space[2] }}>
-          {takeoverPrompt(posture)}
+          Minimum to get back up
         </Label>
 
         <View style={{ gap: space[2] }}>

@@ -3,8 +3,11 @@ import {
   evaluateFade,
   evaluatePlateau,
   isoWeekKey,
+  MILESTONE_COPY,
   pendingMilestones,
   pickMilestone,
+  RUN_MILESTONES,
+  UPTIME_MILESTONES,
 } from "./monitor";
 import { addDays, type Entry } from "./uptime";
 
@@ -254,5 +257,40 @@ describe("isoWeekKey", () => {
     const b = isoWeekKey("2026-01-05");
     expect(a < b).toBe(true);
     expect(a.startsWith("2026-")).toBe(true);
+  });
+});
+
+describe("milestone copy", () => {
+  it("exists for every milestone that can fire", () => {
+    // A milestone kind without copy would render as a blank line — the monitor
+    // and the dashboards both index MILESTONE_COPY by the kinds these two
+    // arrays generate, so the three must never drift apart.
+    for (const d of RUN_MILESTONES) {
+      expect(MILESTONE_COPY[`run_${d}`], `run_${d}`).toBeTruthy();
+      expect(MILESTONE_COPY[`run_${d}`]).toContain(String(d));
+    }
+    for (const p of UPTIME_MILESTONES) {
+      expect(MILESTONE_COPY[`uptime_${p}`], `uptime_${p}`).toBeTruthy();
+      expect(MILESTONE_COPY[`uptime_${p}`]).toContain(String(p));
+    }
+    expect(Object.keys(MILESTONE_COPY)).toHaveLength(
+      RUN_MILESTONES.length + UPTIME_MILESTONES.length,
+    );
+  });
+
+  /**
+   * The guard that keeps milestones from drifting into the category this
+   * product rejects. A milestone notices; it does not reward.
+   *
+   * Scanning the copy is a blunt check, and that is why it works: the first
+   * person to write "streak" or "reward" into a milestone string gets a red
+   * test rather than a code review that may or may not happen.
+   */
+  it("uses none of the vocabulary of scoring", () => {
+    const BANNED =
+      /\b(badge|badges|point|points|score|scored|streak|streaks|reward|rewards|award|awarded|congrat\w*|leaderboard|coin|coins|level up|unlocked?|trophy|achievement)\b/i;
+    for (const line of Object.values(MILESTONE_COPY)) {
+      expect(line, line).not.toMatch(BANNED);
+    }
   });
 });

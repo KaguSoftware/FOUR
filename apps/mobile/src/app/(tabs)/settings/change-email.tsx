@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { KeyboardAvoidingView, Platform, TextInput, View } from "react-native";
+import { useHeaderHeight } from "@react-navigation/elements";
 
 import { Button } from "@/components/button";
 import { field } from "@/components/fields";
@@ -27,6 +28,9 @@ const looksLikeEmail = (s: string) => /^\S+@\S+\.\S+$/.test(s.trim());
  */
 export default function ChangeEmailScreen() {
   const { status, refresh } = useStatus();
+  // Under a shown native header, `padding` under-avoids by exactly the
+  // header's height without this — see change-password.
+  const headerHeight = useHeaderHeight();
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
@@ -56,6 +60,7 @@ export default function ChangeEmailScreen() {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : undefined}
+      keyboardVerticalOffset={headerHeight}
       style={{ flex: 1, backgroundColor: color.bg }}
     >
       <Screen underHeader>
@@ -64,10 +69,7 @@ export default function ChangeEmailScreen() {
             <Body tone="dim">
               Confirmation sent to {current} and {next}.
             </Body>
-            <Note>
-              Open both. The address changes once the two links have been
-              tapped; until then, {current} keeps working.
-            </Note>
+            <Note>Open both. Until then, {current} keeps working.</Note>
           </>
         ) : (
           <View style={{ gap: space[3] }}>
@@ -81,6 +83,9 @@ export default function ChangeEmailScreen() {
               placeholder="new address"
               placeholderTextColor={color.inkMute}
               autoCapitalize="none"
+              // An email never wants QuickType — see sign-in's email field.
+              autoCorrect={false}
+              spellCheck={false}
               autoComplete="email"
               keyboardType="email-address"
               inputMode="email"
@@ -105,10 +110,11 @@ export default function ChangeEmailScreen() {
               />
             </View>
 
+            {/* Both-links confirmation is what stops a stolen phone from
+                quietly re-homing the account. */}
             <Note style={{ paddingHorizontal: 0 }}>
-              A link goes to the old address and one to the new. The change
-              lands after both are opened — that is what stops a stolen phone
-              from quietly re-homing the account.
+              A link goes to each address. The change lands when both are
+              opened.
             </Note>
           </View>
         )}

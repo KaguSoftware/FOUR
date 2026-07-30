@@ -4,11 +4,10 @@ import { color } from "@/theme";
 /**
  * Settings is a stack, not a page.
  *
- * It used to be one screen holding every setting, which meant the two things
- * anyone actually changes — levers and posture — were buried under everything
- * else, and a two-value control was eating half the viewport. Splitting it into
- * an index of four groups puts each subject on its own screen and lets the
- * index state the current value of each without opening anything.
+ * It used to be one screen holding every setting, which meant the thing anyone
+ * actually changes — levers — was buried under everything else. Splitting it
+ * into an index of four groups puts each subject on its own screen and lets
+ * the index state the current value of each without opening anything.
  *
  * **The transitions are the platform's own.** A native stack gives the push
  * animation, the back button, the header, the edge-swipe / predictive-back

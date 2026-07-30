@@ -133,9 +133,16 @@ export function LeverManager({
   return (
     <View>
       <Label style={{ marginBottom: space[2] }}>levers</Label>
-      <Body tone="mute" style={{ marginBottom: space[3], fontSize: size.xs }}>
-        One tap on any of these keeps the day up — not all of them, one. Rename
-        freely; archiving keeps every day you already logged.
+      <Body
+        tone="mute"
+        // xs text needs an xs line box — Note's docblock records why.
+        style={{
+          marginBottom: space[3],
+          fontSize: size.xs,
+          lineHeight: size.xs * 1.5,
+        }}
+      >
+        One tap keeps the day up. Rename or archive freely — history stays.
       </Body>
 
       {/* Archiving is the one thing on this screen that changes the shape of
@@ -242,7 +249,14 @@ export function LeverManager({
       ))}
 
       {full ? (
-        <Body tone="mute" style={{ marginTop: space[3], fontSize: size.xs }}>
+        <Body
+          tone="mute"
+          style={{
+            marginTop: space[3],
+            fontSize: size.xs,
+            lineHeight: size.xs * 1.5,
+          }}
+        >
           {MAX_LEVERS} is the maximum. Archive one to add another.
         </Body>
       ) : (

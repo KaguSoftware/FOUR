@@ -4,48 +4,35 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { completeOnboarding } from "@/app/actions";
 import { Wordmark } from "@/app/components/wordmark";
-import {
-  MAX_LEVERS,
-  POSTURE_CHOICES,
-  POSTURE_FOOTNOTE,
-  DEFAULT_POSTURE,
-  type Posture,
-} from "@uptime/core";
+import { MAX_LEVERS } from "@uptime/core";
 
 /**
- * First run, in two screens.
+ * First run, in one screen.
  *
- * The first states the rule before it asks for anything, because "one of these,
- * not all" is the single idea someone has to accept for the rest of the product
- * to make sense. It also explains, without a tour, why there is no streak
- * counter anywhere in the app.
- *
- * The second picks posture. Framed as how the system talks, never as difficulty
- * — and the line about the bar being identical is what stops SOFT reading as
- * the easier option.
+ * It states the rule before it asks for anything, because "one of these, not
+ * all" is the single idea someone has to accept for the rest of the product to
+ * make sense. It also explains, without a tour, why there is no streak counter
+ * anywhere in the app.
  *
  * Nothing is written until the last tap. A half-finished account cannot open
  * the app at all, so there is no intermediate state worth saving.
  */
 export function Onboarding() {
   const router = useRouter();
-  const [step, setStep] = useState<0 | 1>(0);
   const [labels, setLabels] = useState<string[]>([""]);
-  const [posture, setPosture] = useState<Posture>(DEFAULT_POSTURE);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
   const named = labels.map((l) => l.trim()).filter(Boolean);
 
-  function toStep(next: 0 | 1) {
-    setError(null);
-    setStep(next);
-  }
-
   function finish() {
+    if (named.length === 0) {
+      setError("Name at least one lever — one is enough.");
+      return;
+    }
     setError(null);
     start(async () => {
-      const result = await completeOnboarding(named, posture);
+      const result = await completeOnboarding(named);
       if (!result.ok) {
         setError(result.error);
         return;
@@ -59,47 +46,33 @@ export function Onboarding() {
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-5 pt-[max(3rem,calc(env(safe-area-inset-top)+1.5rem))] pb-[max(2rem,env(safe-area-inset-bottom))]">
-      <header className="mb-10 flex items-baseline justify-between">
+      <header className="mb-10">
         <Wordmark />
-        <span className="label">{step + 1} / 2</span>
       </header>
 
-      {step === 0 ? (
-        <Levers
-          labels={labels}
-          onChange={setLabels}
-          onContinue={() => {
-            if (named.length === 0) {
-              setError("Name at least one lever — one is enough.");
-              return;
-            }
-            toStep(1);
-          }}
-        />
-      ) : (
-        <PostureStep
-          posture={posture}
-          onPick={setPosture}
-          onBack={() => toStep(0)}
-          onStart={finish}
-          pending={pending}
-        />
-      )}
+      <Levers
+        labels={labels}
+        onChange={setLabels}
+        onContinue={finish}
+        pending={pending}
+      />
 
       {error && <p className="text-degraded mt-4 text-xs">{error}</p>}
     </main>
   );
 }
 
-/** 06·A — the rule, then the levers. The rule comes first, always. */
+/** The rule, then the levers. The rule comes first, always. */
 function Levers({
   labels,
   onChange,
   onContinue,
+  pending,
 }: {
   labels: string[];
   onChange: (next: string[]) => void;
   onContinue: () => void;
+  pending: boolean;
 }) {
   function set(i: number, value: string) {
     onChange(labels.map((l, n) => (n === i ? value : l)));
@@ -186,97 +159,13 @@ function Levers({
         <div className="mt-auto pt-10">
           <button
             type="submit"
-            className="border-line-hi bg-surface-hi text-ink hover:bg-line active:bg-line-hi min-h-14 w-full rounded border text-sm font-medium tracking-wide uppercase transition-colors"
+            disabled={pending}
+            className="border-line-hi bg-surface-hi text-ink hover:bg-line active:bg-line-hi min-h-14 w-full rounded border text-sm font-medium tracking-wide uppercase transition-colors disabled:opacity-50"
           >
-            continue
+            {pending ? "setting up…" : "start"}
           </button>
         </div>
       </form>
-    </>
-  );
-}
-
-/** 06·B — posture. How the system talks, never how hard it is. */
-function PostureStep({
-  posture,
-  onPick,
-  onBack,
-  onStart,
-  pending,
-}: {
-  posture: Posture;
-  onPick: (p: Posture) => void;
-  onBack: () => void;
-  onStart: () => void;
-  pending: boolean;
-}) {
-  return (
-    <>
-      <p className="text-ink mb-8 text-lg leading-snug">
-        How should this system talk to you?
-      </p>
-
-      <fieldset className="flex flex-col gap-2">
-        <legend className="sr-only">Alert posture</legend>
-        {POSTURE_CHOICES.map((choice) => {
-          const on = choice.value === posture;
-          return (
-            <label
-              key={choice.value}
-              className={[
-                "cursor-pointer rounded border p-4 transition-colors",
-                on
-                  ? "border-line-hi bg-surface-hi"
-                  : "border-line bg-surface hover:bg-surface-hi",
-              ].join(" ")}
-            >
-              <input
-                type="radio"
-                name="posture"
-                value={choice.value}
-                checked={on}
-                onChange={() => onPick(choice.value)}
-                className="sr-only"
-              />
-              <span className="flex items-center justify-between">
-                <span className={on ? "text-ink text-sm" : "text-ink-dim text-sm"}>
-                  {choice.title}
-                </span>
-                {/* Selection is a mark as well as a fill — state never rests on
-                    colour alone. */}
-                <span className="text-ink text-sm">{on ? "✓" : ""}</span>
-              </span>
-              <span className="text-ink-mute mt-1.5 block text-xs leading-relaxed">
-                {choice.detail}
-              </span>
-            </label>
-          );
-        })}
-      </fieldset>
-
-      {/* Load-bearing. Without it, SOFT reads as the easier setting — and the
-          whole point is that there is no easier setting. */}
-      <p className="text-ink-mute mt-4 text-xs leading-relaxed">
-        {POSTURE_FOOTNOTE}
-      </p>
-
-      <div className="mt-auto pt-10">
-        <button
-          onClick={onStart}
-          disabled={pending}
-          className="border-line-hi bg-surface-hi text-ink hover:bg-line active:bg-line-hi min-h-14 w-full rounded border text-sm font-medium tracking-wide uppercase transition-colors disabled:opacity-50"
-        >
-          {pending ? "setting up…" : "start"}
-        </button>
-
-        <button
-          onClick={onBack}
-          disabled={pending}
-          className="text-ink-mute hover:text-ink-dim active:text-ink mt-1 min-h-11 w-full text-xs transition-colors disabled:opacity-50"
-        >
-          ← back to levers
-        </button>
-      </div>
     </>
   );
 }

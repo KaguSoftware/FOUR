@@ -6,11 +6,9 @@ import {
   downDays,
   lastCompletedRun,
   logicalDateLocal,
-  toPosture,
   uptimeWindow,
   type Entry,
   type LeverSpan,
-  type Posture,
 } from "@uptime/core";
 
 /**
@@ -74,7 +72,6 @@ export type SystemState = {
   slammed_until: string | null;
   weight_enabled: boolean;
   weight_unit: "kg" | "lb";
-  posture: Posture;
   onboarded: boolean;
   /** Postgres `time` as "HH:MM:SS"; null means off, which is the default. */
   daily_reminder_at: string | null;
@@ -107,7 +104,7 @@ export async function loadStatus() {
       supabase
         .from("system_state")
         .select(
-          "user_id, timezone, slammed_until, weight_enabled, weight_unit, posture, onboarded_at, daily_reminder_at",
+          "user_id, timezone, slammed_until, weight_enabled, weight_unit, onboarded_at, daily_reminder_at",
         )
         .eq("user_id", user.id)
         .maybeSingle(),
@@ -150,7 +147,6 @@ export async function loadStatus() {
     slammed_until: (row.slammed_until as string | null) ?? null,
     weight_enabled: row.weight_enabled === true,
     weight_unit: row.weight_unit === "lb" ? "lb" : "kg",
-    posture: toPosture(row.posture),
     // No row yet means the signup trigger has not run — treat that as
     // un-onboarded rather than crashing, and let onboarding create it.
     onboarded: row.onboarded_at != null,

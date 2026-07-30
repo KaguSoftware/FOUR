@@ -1,5 +1,6 @@
 import { Linking, View } from "react-native";
 import Constants from "expo-constants";
+import { useRouter } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 
 import { Screen } from "@/components/screen";
@@ -29,6 +30,7 @@ const SUPPORT = "parsaa.mansourii@gmail.com";
 const open = (path: string) => WebBrowser.openBrowserAsync(`${SITE}${path}`);
 
 export default function AboutScreen() {
+  const router = useRouter();
   const version = Constants.expoConfig?.version ?? "—";
 
   return (
@@ -43,6 +45,13 @@ export default function AboutScreen() {
 
       <Group first>
         <ValueRow title="Version" value={version} />
+        <RowRule />
+        {/* The walkthrough, on demand. It auto-opens exactly once per device
+            (see lib/walkthrough.ts); this row is the way back to it. */}
+        <ActionRow
+          title="How four works"
+          onPress={() => router.push("/how-it-works")}
+        />
       </Group>
 
       <Group>
@@ -59,10 +68,7 @@ export default function AboutScreen() {
           }
         />
       </Group>
-      <Note>
-        Support opens your mail app with the version filled in — say what the
-        screen did, not what you expected, and it gets fixed faster.
-      </Note>
+      <Note>Say what the screen did — it gets fixed faster.</Note>
     </Screen>
   );
 }

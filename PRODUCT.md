@@ -122,11 +122,10 @@ Stated on its own terms, not against any competitor. Confirmed 2026-07-28.
 - Multi-user accounts, open signup.
 - Native push replacing the current Telegram channel, escalation ladder intact.
 - Daily reminder **off by default**, opt-in only.
-- **Posture (`STRICT` / `SOFT`)** — chosen at onboarding, changeable in
-  Settings. See Brand Commitments for exactly what it may and may not change.
-  Shipping on web as of 2026-07-28, reaching exactly two screens: one added
-  sentence on the takeover, and whether a milestone is acknowledged in a panel
-  or delivered in the identical flat line an alert would use.
+- ~~Posture (`STRICT` / `SOFT`)~~ — **removed 2026-07-30.** Shipped 2026-07-28,
+  cut two days later by owner decision: the app is strict-only, one voice. The
+  removal was cheap precisely because posture was built to be copy-only; the
+  constraint that mattered survives as the milestone rule below.
 - **Proof ships in v1** (confirmed 2026-07-28, reversing the earlier cut). The
   daily felt-state check-in and its trend are core, not optional.
 - **The proof trend plots daily points**, matching the daily sampling rate.
@@ -192,36 +191,24 @@ of these is wrong:**
 - Dark-only. Confirmed rationale: the app is opened at 6am and at 11pm, and a
   white screen at either hour is hostile.
 
-### Posture — `STRICT` / `SOFT` (confirmed 2026-07-28)
+### One voice — strict only (posture removed 2026-07-30)
 
-The product is personalized: the user chooses how the system talks to them.
-This is framed as **alert posture**, not "tone" — a monitoring system with a
-configurable severity policy is native to the metaphor, not a dilution of it.
+`STRICT` / `SOFT` posture shipped 2026-07-28 and was removed two days later by
+owner decision. The app speaks in one voice: the blunt ops register. A
+milestone arrives in the identical flat line an alert would use — that
+symmetry is what stops it reading as praise — and the takeover reports facts
+with no added comfort.
 
-| | `STRICT` (default) | `SOFT` |
-| --- | --- | --- |
-| Re-entry takeover | Blunt. `DOWN 4 DAYS`, last run, the lightest things that worked. No comfort. | Same structure and same facts, warmer framing. The break is named as ordinary. |
-| Milestones | Identical flat register to an alert. No colour, no motion, no acknowledgment. | Acknowledged as good news. Allowed a distinct treatment. |
-| Alerts, thresholds, escalation | Identical in both | Identical in both |
+What survives the removal, permanently:
 
-**What posture may change:** wording, and whether good news is acknowledged as
-good news.
-
-**What posture may NEVER change — these are invariant in both modes:**
-
-- What counts as up. One lever, any quality, no minimum.
-- Every number: uptime window, run length, days down, all-time figures.
-- The escalation ladder and its thresholds.
-- The anti-shame invariants — no rendered zeros, monotonic all-time figures,
-  graceful degradation.
-- **`SOFT` is not gamification.** No badges, no confetti, no coins, no points,
-  no streaks, no leaderboards, no celebratory animation. Softer means warmer
-  words and permission to acknowledge a milestone. Anything that turns progress
-  into a score is out of scope in both modes, permanently. This is the line
-  that keeps `SOFT` from drifting into the category the product rejects.
-
-Posture is chosen during onboarding rather than buried in settings, so it is a
-deliberate choice from the first screen, and is changeable at any time.
+- **A milestone notices; it never rewards.** No badges, no confetti, no coins,
+  no points, no streaks, no leaderboards, no celebratory animation, no colour,
+  no motion. Anything that turns progress into a score is out of scope.
+  `monitor.test.ts` scans every milestone string for the vocabulary of scoring,
+  so drift fails the build rather than a review.
+- Copy may never change what counts as up, any number, the escalation ladder,
+  or the anti-shame invariants — that was posture's contract, and it now
+  simply describes all copy.
 
 ## Evidence on Hand
 

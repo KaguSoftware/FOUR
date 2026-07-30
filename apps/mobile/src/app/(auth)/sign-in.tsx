@@ -104,6 +104,10 @@ export default function SignInScreen() {
       style={{ flex: 1, backgroundColor: color.bg }}
     >
       <ScrollView
+        // JS owns the insets, same as `Screen` — left automatic, UIKit adds its
+        // own keyboard inset on top of the KAV's padding a frame late, and the
+        // two fighting is the keyboard/QuickType-bar twitch while typing.
+        contentInsetAdjustmentBehavior="never"
         contentContainerStyle={{
           flexGrow: 1,
           paddingHorizontal: space[5],
@@ -128,6 +132,11 @@ export default function SignInScreen() {
               placeholderTextColor={color.inkMute}
               accessibilityLabel="Email"
               autoCapitalize="none"
+              // An email never wants QuickType. Leaving these on made iOS
+              // show/hide the suggestion bar while typing, and every toggle
+              // re-fires keyboardWillShow — half of the twitch.
+              autoCorrect={false}
+              spellCheck={false}
               autoComplete="email"
               keyboardType="email-address"
               inputMode="email"

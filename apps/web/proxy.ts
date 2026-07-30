@@ -1,7 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/utils/supabase/proxy";
 
-const PUBLIC_PATHS = ["/login", "/auth"];
+/**
+ * `/privacy` is public because App Review reads it while signed out, and
+ * because a policy behind a sign-in wall is not a policy. Apple also requires
+ * the URL to resolve for anyone before external TestFlight testing is allowed.
+ */
+const PUBLIC_PATHS = ["/login", "/auth", "/privacy"];
 
 export async function proxy(request: NextRequest) {
   const { supabase, response } = createClient(request);

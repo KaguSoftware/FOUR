@@ -11,7 +11,10 @@
     "ios": {
       "bundleIdentifier": "com.kagusoftware.uptime",
       "supportsTablet": false,
-      "usesAppleSignIn": true
+      "usesAppleSignIn": true,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.kagusoftware.uptime",
@@ -38,7 +41,7 @@
         {
           "backgroundColor": "#0d1013",
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "imageWidth": 160
         }
       ],
       "expo-apple-authentication",

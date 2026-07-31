@@ -93,32 +93,46 @@ export function DayGrid({
   onPressDay?: (date: string) => void;
 }) {
   const fired = firedByDate(entries);
-  const [width, setWidth] = useState(0);
-  const cell =
-    width > 0 ? (width - GAP * (TRAILING_COLS - 1)) / TRAILING_COLS : 0;
 
   const start = addDays(today, -(days - 1));
   const cells = Array.from({ length: days }, (_, i) => addDays(start, i));
 
+  /**
+   * Chunked into explicit rows, never left to `flexWrap`.
+   *
+   * The column count is a design decision (see the docblock). Wrapping makes it
+   * whatever happens to fit — and with a measured, fractional cell width, ten
+   * cells plus nine gaps can total a hair MORE than the container after
+   * rounding, so the tenth wraps and the grid silently renders nine across.
+   * That shipped once. Rows are explicit now and the cells size themselves with
+   * `flex: 1`, which fills the width exactly and cannot round wrong.
+   */
+  const rows: string[][] = [];
+  for (let i = 0; i < cells.length; i += TRAILING_COLS) {
+    rows.push(cells.slice(i, i + TRAILING_COLS));
+  }
+
   return (
     <View
-      onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
-      style={{ flexDirection: "row", flexWrap: "wrap", gap: GAP }}
       accessibilityLabel={`Last ${days} days. ${fired.size} logged.`}
+      style={{ gap: GAP }}
     >
-      {cells.map((date) => (
-        <DayCell
-          key={date}
-          date={date}
-          size={cell}
-          fill={gridFill(fired.get(date)?.size ?? 0, leversOn(spans, date))}
-          isToday={date === today}
-          onPress={onPressDay}
-          // Home's cells land near 31pt — under the 44pt minimum, and the
-          // reason History's calendar is the comfortable place to open a day.
-          // No hitSlop: at a 6pt gap the slop regions would overlap and the
-          // tap would become a guess between two days.
-        />
+      {rows.map((row, r) => (
+        <View key={r} style={{ flexDirection: "row", gap: GAP }}>
+          {row.map((date) => (
+            <DayCell
+              key={date}
+              date={date}
+              fill={gridFill(fired.get(date)?.size ?? 0, leversOn(spans, date))}
+              isToday={date === today}
+              onPress={onPressDay}
+              // Home's cells land near 31pt — under the 44pt minimum, and the
+              // reason History's calendar is the comfortable place to open a
+              // day. No hitSlop: at a 6pt gap the slop regions would overlap
+              // and the tap would become a guess between two days.
+            />
+          ))}
+        </View>
       ))}
     </View>
   );
@@ -176,7 +190,6 @@ function MonthView({
   spans: LeverSpan[];
   onPressDay?: (date: string) => void;
 }) {
-  const [width, setWidth] = useState(0);
   const month = monthGrid(anchor);
 
   // Days already past, so the current month does not count its own future as
@@ -185,11 +198,15 @@ function MonthView({
     (d) => d !== null && d <= today && (fired.get(d)?.size ?? 0) > 0,
   ).length;
 
-  const cell = width > 0 ? (width - GAP * (MONTH_COLS - 1)) / MONTH_COLS : 0;
+  // `monthGrid` pads to whole weeks, so this is always exact rows of seven —
+  // which is what lets every cell be `flex: 1` and fill the width exactly.
+  const weeks: (string | null)[][] = [];
+  for (let i = 0; i < month.cells.length; i += MONTH_COLS) {
+    weeks.push(month.cells.slice(i, i + MONTH_COLS));
+  }
 
   return (
     <View
-      onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
       accessibilityLabel={`${month.label} ${month.year}. ${upThisMonth} logged.`}
     >
       <View
@@ -212,8 +229,10 @@ function MonthView({
         {WEEKDAY_INITIALS.map((d, i) => (
           <Mono
             key={i}
+            // `flex: 1`, matching the cells below, so a header always sits over
+            // its own column whatever the screen width.
             style={{
-              width: cell,
+              flex: 1,
               textAlign: "center",
               fontSize: size["2xs"],
               color: color.inkMute,
@@ -224,31 +243,41 @@ function MonthView({
         ))}
       </View>
 
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: GAP }}>
-        {month.cells.map((date, i) => {
-          // Padding from the neighbouring month. Drawn as nothing at all — a
-          // day outside this month has no state, and an empty bordered cell
-          // here would read as a missed day.
-          if (date === null) {
-            return (
-              <View key={`pad-${i}`} style={{ width: cell, height: cell }} />
-            );
-          }
+      <View style={{ gap: GAP }}>
+        {weeks.map((week, w) => (
+          <View key={w} style={{ flexDirection: "row", gap: GAP }}>
+            {week.map((date, i) => {
+              // Padding from the neighbouring month. Drawn as nothing at all —
+              // a day outside this month has no state, and an empty bordered
+              // cell here would read as a missed day.
+              if (date === null) {
+                return (
+                  <View
+                    key={`pad-${w}-${i}`}
+                    style={{ flex: 1, aspectRatio: 1 }}
+                  />
+                );
+              }
 
-          return (
-            <DayCell
-              key={date}
-              date={date}
-              size={cell}
-              fill={gridFill(fired.get(date)?.size ?? 0, leversOn(spans, date))}
-              isToday={date === today}
-              // Days later this month have not happened yet. Also not a down
-              // day: a calendar has to say "not yet" without saying "missed".
-              future={date > today}
-              onPress={onPressDay}
-            />
-          );
-        })}
+              return (
+                <DayCell
+                  key={date}
+                  date={date}
+                  fill={gridFill(
+                    fired.get(date)?.size ?? 0,
+                    leversOn(spans, date),
+                  )}
+                  isToday={date === today}
+                  // Days later this month have not happened yet. Also not a
+                  // down day: a calendar has to say "not yet" without saying
+                  // "missed".
+                  future={date > today}
+                  onPress={onPressDay}
+                />
+              );
+            })}
+          </View>
+        ))}
       </View>
     </View>
   );
@@ -264,14 +293,12 @@ function MonthView({
  */
 function DayCell({
   date,
-  size: cell,
   fill,
   isToday,
   future = false,
   onPress,
 }: {
   date: string;
-  size: number;
   fill: string | null;
   isToday: boolean;
   future?: boolean;
@@ -281,12 +308,14 @@ function DayCell({
   // not read as "you are here" on a real phone, and Home — the screen opened
   // to decide whether today is done — is where that has to land hardest.
   if (isToday) {
-    return <TodayCell size={cell} fill={fill} date={date} onPress={onPress} />;
+    return <TodayCell fill={fill} date={date} onPress={onPress} />;
   }
 
   const style = {
-    width: cell,
-    height: cell,
+    // The row is a fixed number of cells wide, so equal flex divides it exactly
+    // — no measurement, and no rounding that can push a cell onto a new line.
+    flex: 1,
+    aspectRatio: 1,
     borderRadius: radius.sm,
     backgroundColor: future ? "transparent" : (fill ?? color.surface),
     // A down day is an outline; an up day is a fill. Today keeps the brighter
@@ -334,12 +363,10 @@ const PULSE_MS = 1800;
  * Motion, since an indefinite loop is precisely what that setting is for.
  */
 function TodayCell({
-  size: cell,
   fill,
   date,
   onPress,
 }: {
-  size: number;
   fill: string | null;
   date: string;
   onPress?: (date: string) => void;
@@ -382,10 +409,13 @@ function TodayCell({
     ),
   }));
 
+  // The outer element carries the `flex: 1` that divides the row; the animated
+  // box fills it. Splitting them keeps the flex sizing off the element whose
+  // style is being driven on the UI thread.
   const box = [
     {
-      width: cell,
-      height: cell,
+      width: "100%" as const,
+      aspectRatio: 1,
       borderRadius: radius.sm,
       backgroundColor: fill ?? color.surface,
       // 2px at both ends of the pulse, so the cell does not resize as it
@@ -397,13 +427,20 @@ function TodayCell({
     reduceMotion ? { borderColor: color.ink } : animated,
   ];
 
-  if (!onPress) return <Animated.View style={box} />;
+  if (!onPress) {
+    return (
+      <View style={{ flex: 1 }}>
+        <Animated.View style={box} />
+      </View>
+    );
+  }
 
   return (
     <Pressable
       onPress={() => onPress(date)}
       accessibilityRole="button"
       accessibilityLabel={`${date}, today: ${fill ? "up" : "down"}`}
+      style={({ pressed }) => [{ flex: 1 }, pressed && { opacity: 0.6 }]}
     >
       <Animated.View style={box} />
     </Pressable>

@@ -57,6 +57,12 @@ export default async function ProofPage() {
     rows.find((s) => s.observed_on === status.today && s.kind === "note")
       ?.detail ?? "";
 
+  // Today's scales, read back so a logged day looks different from an unlogged
+  // one. Without this the only evidence was a transient "Saved." message.
+  const todayValue = (kind: string) =>
+    rows.find((s) => s.observed_on === status.today && s.kind === kind)
+      ?.value ?? null;
+
   return (
     <main className="mx-auto w-full max-w-md px-5 pt-[max(2rem,calc(env(safe-area-inset-top)+0.75rem))] pb-[max(3rem,env(safe-area-inset-bottom))]">
       <header className="mb-8 flex items-baseline justify-between">
@@ -73,6 +79,8 @@ export default async function ProofPage() {
       <section className="border-line mb-8 border-b pb-8">
         <SignalCheck
           initialDetail={todayNote}
+          initialEnergy={todayValue("energy")}
+          initialSleep={todayValue("sleep")}
           loggedToday={alreadyToday}
           weight={
             status.state.weight_enabled

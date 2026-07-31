@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -74,6 +74,12 @@ export default function ProofScreen() {
   const scalars = rows.filter((r) => r.value !== null);
   const loggedToday = rows.some((r) => r.observed_on === status.today);
 
+  // What today already holds. The check-in reads these back so the screen can
+  // answer "did I do this today" without the user having to remember.
+  const todayValue = (kind: string) =>
+    rows.find((r) => r.observed_on === status.today && r.kind === kind)
+      ?.value ?? null;
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -83,6 +89,8 @@ export default function ProofScreen() {
         <DailyCheck
           userId={status.state.user_id}
           loggedToday={loggedToday}
+          savedEnergy={todayValue("energy")}
+          savedSleep={todayValue("sleep")}
           weightUnit={weightOn ? status.state.weight_unit : null}
           onSaved={load}
         />
@@ -172,24 +180,36 @@ export default function ProofScreen() {
  * observation — but people write these as a journal, and "you already checked
  * in this morning" is not a reason to refuse what happened this evening.
  *
- * The note field opens BLANK every time. Being handed back this morning's text
- * to edit is not how a journal is used. Writing again the same day appends
- * instead of replacing (`appendNote` in core), so nothing is lost — and editing
- * what is already there is a separate, deliberate act: tap the day in the log.
+ * **The scales show what today already holds.** They used to reset to blank on
+ * save, which left no way to tell a logged day from an unlogged one — the only
+ * evidence was a transient "Saved." and a one-word label change, both gone by
+ * the next time the screen was opened. Reading the stored values back means the
+ * question "did I already do this today" is answered by looking.
+ *
+ * The note field is the deliberate exception: it opens BLANK every time. Being
+ * handed back this morning's text to edit is not how a journal is used. Writing
+ * again the same day appends instead of replacing (`appendNote` in core), so
+ * nothing is lost — and editing what is already there is a separate act: tap
+ * the day in the log.
  */
 function DailyCheck({
   userId,
   loggedToday,
+  savedEnergy,
+  savedSleep,
   weightUnit,
   onSaved,
 }: {
   userId: string;
   loggedToday: boolean;
+  /** What today already holds, or null. Shown back, not just counted. */
+  savedEnergy: number | null;
+  savedSleep: number | null;
   weightUnit: "kg" | "lb" | null;
   onSaved: () => void;
 }) {
-  const [energy, setEnergy] = useState<number | null>(null);
-  const [sleep, setSleep] = useState<number | null>(null);
+  const [energy, setEnergy] = useState<number | null>(savedEnergy);
+  const [sleep, setSleep] = useState<number | null>(savedSleep);
   // Always blank. Writing again the same day APPENDS (see core's appendNote),
   // so nothing is lost — editing what is already there is a separate, explicit
   // act, reached by tapping the day in the log.
@@ -198,6 +218,22 @@ function DailyCheck({
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
+
+  /**
+   * Adopt the stored values only when they actually CHANGE.
+   *
+   * The screen reloads on every focus, so syncing on each render would throw
+   * away a selection the user made and had not saved yet — tab away, tab back,
+   * and their 4 is gone. Comparing against the last values seen from the server
+   * means a refresh that returns the same thing is a no-op, and only a real
+   * write (or a new day) moves the scales.
+   */
+  const lastSeen = useRef({ energy: savedEnergy, sleep: savedSleep });
+  useEffect(() => {
+    if (lastSeen.current.energy !== savedEnergy) setEnergy(savedEnergy);
+    if (lastSeen.current.sleep !== savedSleep) setSleep(savedSleep);
+    lastSeen.current = { energy: savedEnergy, sleep: savedSleep };
+  }, [savedEnergy, savedSleep]);
 
   const empty = !energy && !sleep && !note.trim() && !weight.trim();
 
@@ -224,12 +260,15 @@ function DailyCheck({
       return;
     }
 
+    // The NOTE clears; the scales do not. The note field is documented to open
+    // blank, and leaving the text in it made a second tap append the same
+    // entry twice. Energy and sleep are the opposite case: they are today's
+    // state, not a message, so blanking them threw away the only on-screen
+    // evidence that the day had been logged at all. `onSaved` reloads and the
+    // sync effect above confirms them from the server.
+    //
     // Cleared only on success, so a failed save leaves every field exactly as
-    // typed and the retry is one tap. On success they must clear: the note
-    // field is documented to open blank, and leaving the text in it made a
-    // second tap append the same entry twice.
-    setEnergy(null);
-    setSleep(null);
+    // typed and the retry is one tap.
     setNote("");
     setWeight("");
     setSaved(true);
@@ -241,8 +280,13 @@ function DailyCheck({
       <Label style={{ marginBottom: space[1] }}>
         {loggedToday ? "today" : "daily check"}
       </Label>
+      {/* States the fact when the day is done, so the answer to "did I already
+          do this" is on screen rather than in memory. Flat, not congratulatory
+          — see DESIGN.md on register. */}
       <Body tone="dim" style={{ marginBottom: space[4], fontSize: size.xs }}>
-        Skipping costs nothing. This never affects uptime.
+        {loggedToday
+          ? "Logged today. Anything you add appends to it."
+          : "Skipping costs nothing. This never affects uptime."}
       </Body>
 
       <Scale label="energy" value={energy} onChange={setEnergy} />

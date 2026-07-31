@@ -18,16 +18,25 @@ import { NOTE_MAX } from "@uptime/core";
 export function SignalCheck({
   weight: weightOpt,
   initialDetail = "",
+  initialEnergy = null,
+  initialSleep = null,
   loggedToday = false,
 }: {
   /** Omitted when the opt-in is off, which is the default. */
   weight?: { unit: "kg" | "lb" };
   /** Today's note, loaded back so writing again edits rather than replaces. */
   initialDetail?: string;
+  /**
+   * Today's scales, shown back rather than reset. Without these there is no
+   * way to tell a logged day from an unlogged one once the transient "Saved."
+   * has gone.
+   */
+  initialEnergy?: number | null;
+  initialSleep?: number | null;
   loggedToday?: boolean;
 } = {}) {
-  const [energy, setEnergy] = useState<number | null>(null);
-  const [sleep, setSleep] = useState<number | null>(null);
+  const [energy, setEnergy] = useState<number | null>(initialEnergy);
+  const [sleep, setSleep] = useState<number | null>(initialSleep);
   const [detail, setDetail] = useState(initialDetail);
   const [weight, setWeight] = useState("");
   const [done, setDone] = useState(false);
@@ -85,11 +94,14 @@ export function SignalCheck({
             return;
           }
 
-          // The scales reset because they are today's reading and it has landed.
-          // The note does not: on web it is prefilled with today's entry, so it
-          // is an edit-in-place field and clearing it would look like deletion.
-          setEnergy(null);
-          setSleep(null);
+          // Nothing resets but the weight box. The scales are today's state,
+          // not a message — blanking them threw away the only evidence on
+          // screen that the day had been logged, so the answer to "did I
+          // already do this" lived nowhere but the user's memory. The action
+          // revalidates `/proof`, which feeds the stored values back in as
+          // `initialEnergy` / `initialSleep`. The note likewise stays: on web
+          // it is prefilled with today's entry, so it is an edit-in-place
+          // field and clearing it would look like deletion.
           setWeight("");
           setSaved(true);
         });
@@ -97,7 +109,9 @@ export function SignalCheck({
     >
       <p className="label mb-1">{loggedToday ? "Today" : "Daily check"}</p>
       <p className="text-ink-dim mb-4 text-xs">
-        Skipping costs nothing. This never affects uptime.
+        {loggedToday
+          ? "Logged today. Anything you add appends to it."
+          : "Skipping costs nothing. This never affects uptime."}
       </p>
 
       <Scale label="energy" value={energy} onChange={setEnergy} />

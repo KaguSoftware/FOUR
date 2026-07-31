@@ -111,10 +111,20 @@
 }
 
 @layer utilities {
-  /* The day grid: 15 across reads as a readout rather than a tile wall, and
-     divides evenly into both the 30- and 90-day views. */
-  .grid-cols-15 {
-    grid-template-columns: repeat(15, minmax(0, 1fr));
+  /* The day grid, in its two shapes. Declared here rather than relied on from
+     Tailwind's numeric scale so the two counts the product actually uses
+     cannot silently stop being emitted.
+
+     10 is the dashboard's trailing block: 30 days in three even rows, and
+     deliberately NOT seven, so nothing invites reading a weekday pattern down
+     a column that the layout does not encode.
+     7 is history, where a column IS a weekday and that reading is the point. */
+  .grid-cols-10 {
+    grid-template-columns: repeat(10, minmax(0, 1fr));
+  }
+
+  .grid-cols-7 {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
   }
 
   /* Navigation pending dot. Starts invisible and only fades in after 120ms,

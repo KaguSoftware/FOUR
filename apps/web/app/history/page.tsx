@@ -1,5 +1,5 @@
 import { requireStatus } from "@/lib/system";
-import { DayGrid } from "../components/day-grid";
+import { MonthStack } from "../components/day-grid";
 import { BackLink } from "@/app/components/nav-link";
 import { Wordmark } from "@/app/components/wordmark";
 
@@ -41,9 +41,17 @@ export default async function HistoryPage() {
         <Figure label="runs" value={allTime.completedRuns} />
       </section>
 
-      <section className="mb-8">
-        <DayGrid entries={entries} today={today} spans={status.leverSpans} days={90} />
-        <p className="text-ink-mute mt-2 text-xs">last 90 days</p>
+      {/* Every month since the first entry. The per-month header says which
+          month and how much of it was up, so the span is never a guess — the
+          old ninety unlabelled squares said nothing about what they covered. */}
+      <section className="mb-10">
+        <MonthStack
+          entries={entries}
+          signals={status.signals}
+          today={today}
+          spans={status.leverSpans}
+          labels={status.leverLabels}
+        />
       </section>
 
       {rows.length === 0 ? (

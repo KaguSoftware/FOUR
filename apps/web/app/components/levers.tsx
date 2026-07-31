@@ -2,6 +2,7 @@
 
 import { useOptimistic, useState, useTransition } from "react";
 import { logEntry, undoEntry } from "@/app/actions";
+import { Sheet } from "./sheet";
 import type { LeverRow, PlaybookItem } from "@/lib/system";
 import type { Lever } from "@uptime/core";
 
@@ -191,87 +192,75 @@ function PlaybookSheet({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center sm:items-center"
-      role="dialog"
-      aria-modal="true"
-      aria-label={`Log ${lever}`}
-    >
-      <button
-        aria-label="Close"
-        onClick={onClose}
-        className="absolute inset-0 bg-black/60"
-      />
-      <div className="bg-surface border-line relative w-full max-w-sm rounded-t-lg border p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:rounded-lg">
-        <p className="label mb-3">{lever}</p>
+    <Sheet label={`Log ${lever}`} onClose={onClose}>
+      <p className="label mb-3">{lever}</p>
 
-        <div className="flex flex-col gap-2">
-          {items.slice(0, 3).map((item) => (
+      <div className="flex flex-col gap-2">
+        {items.slice(0, 3).map((item) => (
+          <button
+            key={item.id}
+            onClick={() => pick(item.label)}
+            disabled={chosen !== null}
+            className={[
+              "min-h-14 rounded border px-4 text-left text-sm transition-colors",
+              chosen === item.label
+                ? "border-line-hi bg-line text-ink"
+                : "border-line bg-surface-hi text-ink hover:bg-line active:bg-line-hi disabled:opacity-40",
+            ].join(" ")}
+          >
+            {item.label}
+            {chosen === item.label && (
+              <span className="text-ink-mute ml-2 text-xs">logging…</span>
+            )}
+          </button>
+        ))}
+
+        {typing ? (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              pick(custom.trim());
+            }}
+            className="flex gap-2"
+          >
+            <input
+              autoFocus
+              value={custom}
+              onChange={(e) => setCustom(e.target.value)}
+              placeholder="what did you do?"
+              aria-label="What did you do?"
+              className="bg-surface-hi border-line text-ink placeholder:text-ink-mute min-h-14 min-w-0 flex-1 rounded border px-4 text-sm outline-none"
+            />
             <button
-              key={item.id}
-              onClick={() => pick(item.label)}
+              type="submit"
               disabled={chosen !== null}
-              className={[
-                "min-h-14 rounded border px-4 text-left text-sm transition-colors",
-                chosen === item.label
-                  ? "border-line-hi bg-line text-ink"
-                  : "border-line bg-surface-hi text-ink hover:bg-line active:bg-line-hi disabled:opacity-40",
-              ].join(" ")}
+              className="border-line-hi bg-line text-ink min-h-14 rounded border px-4 text-sm disabled:opacity-40"
             >
-              {item.label}
-              {chosen === item.label && (
-                <span className="text-ink-mute ml-2 text-xs">logging…</span>
-              )}
+              log
             </button>
-          ))}
-
-          {typing ? (
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                pick(custom.trim());
-              }}
-              className="flex gap-2"
-            >
-              <input
-                autoFocus
-                value={custom}
-                onChange={(e) => setCustom(e.target.value)}
-                placeholder="what did you do?"
-                aria-label="What did you do?"
-                className="bg-surface-hi border-line text-ink placeholder:text-ink-mute min-h-14 min-w-0 flex-1 rounded border px-4 text-sm outline-none"
-              />
-              <button
-                type="submit"
-                disabled={chosen !== null}
-                className="border-line-hi bg-line text-ink min-h-14 rounded border px-4 text-sm disabled:opacity-40"
-              >
-                log
-              </button>
-            </form>
-          ) : (
-            <button
-              onClick={() => setTyping(true)}
-              disabled={chosen !== null}
-              className="border-line text-ink-mute hover:text-ink-dim min-h-14 rounded border border-dashed px-4 text-left text-sm transition-colors disabled:opacity-40"
-            >
-              something else
-            </button>
-          )}
-        </div>
-
-        <button
-          onClick={() => {
-            if (chosen !== null) return;
-            setChosen("");
-            onSkip();
-          }}
-          disabled={chosen !== null}
-          className="text-ink-mute hover:text-ink-dim active:text-ink min-h-11 w-full text-center text-xs transition-colors disabled:opacity-40"
-        >
-          just mark it up
-        </button>
+          </form>
+        ) : (
+          <button
+            onClick={() => setTyping(true)}
+            disabled={chosen !== null}
+            className="border-line text-ink-mute hover:text-ink-dim min-h-14 rounded border border-dashed px-4 text-left text-sm transition-colors disabled:opacity-40"
+          >
+            something else
+          </button>
+        )}
       </div>
-    </div>
+
+      <button
+        onClick={() => {
+          if (chosen !== null) return;
+          setChosen("");
+          onSkip();
+        }}
+        disabled={chosen !== null}
+        className="text-ink-mute hover:text-ink-dim active:text-ink min-h-11 w-full text-center text-xs transition-colors disabled:opacity-40"
+      >
+        just mark it up
+      </button>
+    </Sheet>
   );
 }

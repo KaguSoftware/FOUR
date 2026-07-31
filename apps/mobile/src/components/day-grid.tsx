@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { AccessibilityInfo, View } from "react-native";
+import { AccessibilityInfo, Pressable, View } from "react-native";
 import Animated, {
   cancelAnimation,
   Easing,
@@ -15,6 +15,7 @@ import {
   gridFill,
   leversOn,
   monthGrid,
+  monthsBetween,
   WEEKDAY_INITIALS,
   type Entry,
   type LeverSpan,
@@ -47,106 +48,149 @@ import { color, radius, size, space } from "@/theme";
  * colour alone — which is also what keeps the dimmest up-day from reading as a
  * gap in the row.
  *
- * Two modes, because the two screens ask different questions:
+ * Two shapes, because the two screens ask different questions:
  *
- * - **`month`** on Home: the actual calendar month, seven columns, today in the
- *   column its weekday falls on. "Where am I in this month."
- * - **`trailing`** on History: a dense block of the last N days with no
- *   calendar structure at all. "How has the last quarter looked."
+ * - **`DayGrid`** on Home: the trailing 30 days, ten to a row, no calendar
+ *   structure at all. "How has it been lately." Ten and not seven on purpose —
+ *   a seven-wide row invites reading a weekday pattern down the columns, and
+ *   this layout does not encode one.
+ * - **`MonthStack`** on History: every month since the first entry, seven
+ *   columns, so a column IS a weekday. "Which months, and which days do I
+ *   actually lose." The calendar earns its place here and not on Home, where
+ *   it reset to nearly empty on the 1st of every month.
  */
-export function DayGrid({
-  entries,
-  today,
-  spans,
-  days = 30,
-  mode = "trailing",
-}: {
-  entries: Entry[];
-  today: string;
-  /** Every lever's lifespan, archived included. */
-  spans: LeverSpan[];
-  /** `trailing` only. */
-  days?: number;
-  mode?: "trailing" | "month";
-}) {
-  // How many distinct levers fired on each day. Keyed by date because that is
-  // what the ramp is a function of — never by lever identity.
+
+/** Home's trailing block. Ten across, so 30 days is three even rows. */
+const TRAILING_COLS = 10;
+/** History's calendar. Seven across, because a column is a weekday. */
+const MONTH_COLS = 7;
+const GAP = 6;
+
+/** Distinct levers per day, indexed once rather than scanned per cell. */
+function firedByDate(entries: readonly Entry[]) {
   const fired = new Map<string, Set<string>>();
   for (const e of entries) {
     const set = fired.get(e.logged_for) ?? new Set<string>();
     set.add(e.lever);
     fired.set(e.logged_for, set);
   }
+  return fired;
+}
 
-  if (mode === "month") {
-    return <MonthView fired={fired} today={today} spans={spans} />;
-  }
+export function DayGrid({
+  entries,
+  today,
+  spans,
+  days = 30,
+  onPressDay,
+}: {
+  entries: Entry[];
+  today: string;
+  /** Every lever's lifespan, archived included. */
+  spans: LeverSpan[];
+  days?: number;
+  /** Omitted where the grid is a specimen rather than a control. */
+  onPressDay?: (date: string) => void;
+}) {
+  const fired = firedByDate(entries);
+  const [width, setWidth] = useState(0);
+  const cell =
+    width > 0 ? (width - GAP * (TRAILING_COLS - 1)) / TRAILING_COLS : 0;
 
   const start = addDays(today, -(days - 1));
   const cells = Array.from({ length: days }, (_, i) => addDays(start, i));
 
   return (
     <View
-      style={{ flexDirection: "row", flexWrap: "wrap", gap: 4 }}
-      accessible
-      accessibilityRole="image"
+      onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
+      style={{ flexDirection: "row", flexWrap: "wrap", gap: GAP }}
       accessibilityLabel={`Last ${days} days. ${fired.size} logged.`}
     >
-      {cells.map((date) => {
-        const fill = gridFill(
-          fired.get(date)?.size ?? 0,
-          leversOn(spans, date),
-        );
-        const isToday = date === today;
-
-        return (
-          <View
-            key={date}
-            style={{
-              width: 21,
-              height: 21,
-              borderRadius: radius.sm,
-              backgroundColor: fill ?? color.surface,
-              // A down day is an outline; an up day is a fill. Today gets the
-              // brighter ring on top of whichever it is.
-              borderWidth: fill && !isToday ? 0 : 1,
-              borderColor: isToday ? color.lineHi : color.line,
-            }}
-          />
-        );
-      })}
+      {cells.map((date) => (
+        <DayCell
+          key={date}
+          date={date}
+          size={cell}
+          fill={gridFill(fired.get(date)?.size ?? 0, leversOn(spans, date))}
+          isToday={date === today}
+          onPress={onPressDay}
+          // Home's cells land near 31pt — under the 44pt minimum, and the
+          // reason History's calendar is the comfortable place to open a day.
+          // No hitSlop: at a 6pt gap the slop regions would overlap and the
+          // tap would become a guess between two days.
+        />
+      ))}
     </View>
   );
 }
 
-/** Columns, and the gap between them. The cell sizes itself from the width. */
-const COLS = 7;
-const GAP = 6;
+/**
+ * Every month since the first entry, newest first.
+ *
+ * Anchors come from core so the walk cannot skip a month — stepping back from
+ * the 31st with naive date maths lands in March twice and never in February.
+ */
+export function MonthStack({
+  entries,
+  today,
+  spans,
+  onPressDay,
+}: {
+  entries: Entry[];
+  today: string;
+  spans: LeverSpan[];
+  onPressDay?: (date: string) => void;
+}) {
+  const fired = firedByDate(entries);
+  // From the first entry rather than from signup: a stack that opens on empty
+  // months is a wall of nothing in front of the real history.
+  const earliest = entries[0]?.logged_for ?? today;
+  const anchors = monthsBetween(earliest, today);
+
+  return (
+    <View style={{ gap: space[8] }}>
+      {anchors.map((anchor) => (
+        <MonthView
+          key={anchor}
+          anchor={anchor}
+          fired={fired}
+          today={today}
+          spans={spans}
+          onPressDay={onPressDay}
+        />
+      ))}
+    </View>
+  );
+}
 
 function MonthView({
+  anchor,
   fired,
   today,
   spans,
+  onPressDay,
 }: {
+  anchor: string;
   fired: Map<string, Set<string>>;
   today: string;
   spans: LeverSpan[];
+  onPressDay?: (date: string) => void;
 }) {
   const [width, setWidth] = useState(0);
-  const month = monthGrid(today);
+  const month = monthGrid(anchor);
 
+  // Days already past, so the current month does not count its own future as
+  // days that failed to happen.
   const upThisMonth = month.cells.filter(
-    (d) => d !== null && (fired.get(d)?.size ?? 0) > 0,
+    (d) => d !== null && d <= today && (fired.get(d)?.size ?? 0) > 0,
   ).length;
 
-  const cell = width > 0 ? (width - GAP * (COLS - 1)) / COLS : 0;
+  const cell = width > 0 ? (width - GAP * (MONTH_COLS - 1)) / MONTH_COLS : 0;
 
   return (
     <View
       onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
-      accessible
-      accessibilityRole="image"
-      accessibilityLabel={`${month.label}. Day ${month.dayOfMonth} of ${month.daysInMonth}. ${upThisMonth} logged.`}
+      accessibilityLabel={`${month.label} ${month.year}. ${upThisMonth} logged.`}
     >
       <View
         style={{
@@ -156,9 +200,11 @@ function MonthView({
           marginBottom: space[3],
         }}
       >
-        <Label>{month.label}</Label>
+        <Label>
+          {month.label} {month.year}
+        </Label>
         <Mono style={{ fontSize: size.xs, color: color.inkMute }}>
-          {month.dayOfMonth} / {month.daysInMonth}
+          {upThisMonth} up
         </Mono>
       </View>
 
@@ -189,38 +235,81 @@ function MonthView({
             );
           }
 
-          const fill = gridFill(
-            fired.get(date)?.size ?? 0,
-            leversOn(spans, date),
-          );
-          const isToday = date === today;
-          // Days later this month have not happened yet. Also not a down day:
-          // the trailing grid never had this problem because it stopped at
-          // today, and a calendar has to say "not yet" without saying "missed".
-          const future = date > today;
-
-          if (isToday) {
-            return <TodayCell key={date} size={cell} fill={fill} />;
-          }
-
           return (
-            <View
+            <DayCell
               key={date}
-              style={{
-                width: cell,
-                height: cell,
-                borderRadius: radius.sm,
-                backgroundColor: future
-                  ? "transparent"
-                  : (fill ?? color.surface),
-                borderWidth: fill && !future ? 0 : 1,
-                borderColor: future ? color.surface : color.line,
-              }}
+              date={date}
+              size={cell}
+              fill={gridFill(fired.get(date)?.size ?? 0, leversOn(spans, date))}
+              isToday={date === today}
+              // Days later this month have not happened yet. Also not a down
+              // day: a calendar has to say "not yet" without saying "missed".
+              future={date > today}
+              onPress={onPressDay}
             />
           );
         })}
       </View>
     </View>
+  );
+}
+
+/**
+ * One day.
+ *
+ * A `Pressable` rather than a `View` wherever `onPress` is supplied — the grid
+ * is the only record of what a day held, and it was previously unopenable.
+ * Where no handler is given (the manual's specimens) it stays inert rather
+ * than offering a tap that goes nowhere.
+ */
+function DayCell({
+  date,
+  size: cell,
+  fill,
+  isToday,
+  future = false,
+  onPress,
+}: {
+  date: string;
+  size: number;
+  fill: string | null;
+  isToday: boolean;
+  future?: boolean;
+  onPress?: (date: string) => void;
+}) {
+  // Today breathes on BOTH grids. The pulse exists because a static ring did
+  // not read as "you are here" on a real phone, and Home — the screen opened
+  // to decide whether today is done — is where that has to land hardest.
+  if (isToday) {
+    return <TodayCell size={cell} fill={fill} date={date} onPress={onPress} />;
+  }
+
+  const style = {
+    width: cell,
+    height: cell,
+    borderRadius: radius.sm,
+    backgroundColor: future ? "transparent" : (fill ?? color.surface),
+    // A down day is an outline; an up day is a fill. Today keeps the brighter
+    // ring on top of whichever it is.
+    borderWidth: fill && !isToday && !future ? 0 : 1,
+    borderColor: future
+      ? color.surface
+      : isToday
+        ? color.lineHi
+        : color.line,
+  } as const;
+
+  // Future days are not openable: there is nothing to show, and a sheet that
+  // says so is a sheet that had to be dismissed for no reason.
+  if (!onPress || future) return <View style={style} />;
+
+  return (
+    <Pressable
+      onPress={() => onPress(date)}
+      accessibilityRole="button"
+      accessibilityLabel={`${date}: ${fill ? "up" : "down"}`}
+      style={({ pressed }) => [style, pressed && { opacity: 0.6 }]}
+    />
   );
 }
 
@@ -247,9 +336,13 @@ const PULSE_MS = 1800;
 function TodayCell({
   size: cell,
   fill,
+  date,
+  onPress,
 }: {
   size: number;
   fill: string | null;
+  date: string;
+  onPress?: (date: string) => void;
 }) {
   const phase = useSharedValue(0);
   const [reduceMotion, setReduceMotion] = useState(false);
@@ -289,22 +382,30 @@ function TodayCell({
     ),
   }));
 
+  const box = [
+    {
+      width: cell,
+      height: cell,
+      borderRadius: radius.sm,
+      backgroundColor: fill ?? color.surface,
+      // 2px at both ends of the pulse, so the cell does not resize as it
+      // animates — only the colour moves.
+      borderWidth: 2,
+    },
+    // Reduce Motion gets the bright end of the same ramp, statically. The
+    // cue survives; only the movement goes.
+    reduceMotion ? { borderColor: color.ink } : animated,
+  ];
+
+  if (!onPress) return <Animated.View style={box} />;
+
   return (
-    <Animated.View
-      style={[
-        {
-          width: cell,
-          height: cell,
-          borderRadius: radius.sm,
-          backgroundColor: fill ?? color.surface,
-          // 2px at both ends of the pulse, so the cell does not resize as it
-          // animates — only the colour moves.
-          borderWidth: 2,
-        },
-        // Reduce Motion gets the bright end of the same ramp, statically. The
-        // cue survives; only the movement goes.
-        reduceMotion ? { borderColor: color.ink } : animated,
-      ]}
-    />
+    <Pressable
+      onPress={() => onPress(date)}
+      accessibilityRole="button"
+      accessibilityLabel={`${date}, today: ${fill ? "up" : "down"}`}
+    >
+      <Animated.View style={box} />
+    </Pressable>
   );
 }

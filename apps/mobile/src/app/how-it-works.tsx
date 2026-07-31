@@ -342,16 +342,11 @@ function TheGrid() {
 
   return (
     <>
-      <Text style={heading}>The grid is this month, day by day.</Text>
+      <Text style={heading}>The grid is your last 30 days.</Text>
 
-      {/* The real month grid, real ramp, sample history, actual today. */}
+      {/* The real trailing grid, real ramp, sample history, actual today. */}
       <Specimen>
-        <DayGrid
-          entries={entries}
-          today={now}
-          spans={DEMO_SPANS}
-          mode="month"
-        />
+        <DayGrid entries={entries} today={now} spans={DEMO_SPANS} />
       </Specimen>
 
       <Callout swatch={<Cell fired={3} of={3} />} term="Bright — every lever fired">
@@ -366,6 +361,15 @@ function TheGrid() {
       </Callout>
       <Callout swatch={<Cell fired={1} of={3} ring />} term="The slow ring — today">
         Breathing until you log something.
+      </Callout>
+      <Callout term="Tap any day">
+        Opens what you logged that day — the levers, and anything you wrote
+        down with them. Reading only; days are logged as they happen.
+      </Callout>
+      <Callout term="History is a calendar">
+        The History tab shows the same days month by month, seven to a row, so
+        a column is a weekday. That is where you notice you always lose
+        Sundays.
       </Callout>
       <Callout term="History is permanent">
         Renaming or archiving a lever never rewrites a day you already logged.

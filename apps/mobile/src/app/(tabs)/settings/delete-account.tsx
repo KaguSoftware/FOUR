@@ -28,11 +28,21 @@ import { color, space } from "@/theme";
  * caller's own row. Apple requires this flow to exist in-app; the FK layout
  * was set up for it a migration ago.
  *
- * Two gates on purpose: type the address, then the platform's own destructive
- * alert. The typed email is not a password check — the session already proves
+ * Two gates on purpose: type the word, then the platform's own destructive
+ * alert. The typed word is not a password check — the session already proves
  * the account — it is a speed bump that makes "I was just tapping" impossible
  * for the one action that cannot be walked back.
+ *
+ * It used to ask for the account's email address, which locked out the people
+ * most likely to need this screen: sign in with Apple or Google and you may
+ * never have been shown which address the account carries, so the gate demands
+ * a string the user has no way to know. A flow Apple requires to exist cannot
+ * be one a real user can be shut out of. `DELETE` is knowable by everyone,
+ * unambiguous, and impossible to arrive at by accident.
  */
+/** Typed verbatim to arm the button. Uppercase so the match can be exact. */
+const CONFIRM_WORD = "DELETE";
+
 export default function DeleteAccountScreen() {
   const { status } = useStatus();
   // Under a shown native header, `padding` under-avoids by exactly the
@@ -43,10 +53,10 @@ export default function DeleteAccountScreen() {
   const [busy, setBusy] = useState(false);
 
   if (!status) return <Loading />;
-  const email = status.user.email ?? "";
 
-  const armed =
-    email.length > 0 && typed.trim().toLowerCase() === email.toLowerCase();
+  // Case-sensitive on purpose. Matching `delete` too would let the keyboard's
+  // own autocapitalisation decide whether the gate is a gate.
+  const armed = typed.trim() === CONFIRM_WORD;
 
   function confirm() {
     if (!armed || busy) return;
@@ -93,17 +103,18 @@ export default function DeleteAccountScreen() {
         </Body>
 
         <Label style={{ marginTop: space[8], marginBottom: space[3] }}>
-          type {email} to confirm
+          type {CONFIRM_WORD} to confirm
         </Label>
         <TextInput
           value={typed}
           onChangeText={setTyped}
-          placeholder={email}
+          placeholder={CONFIRM_WORD}
           placeholderTextColor={color.inkMute}
-          autoCapitalize="none"
+          // Caps by default so the exact match costs one tap, not a shift
+          // dance — the friction should come from meaning it, not from typing.
+          autoCapitalize="characters"
           autoCorrect={false}
-          keyboardType="email-address"
-          inputMode="email"
+          autoComplete="off"
           style={[field, { backgroundColor: color.surface }]}
         />
 

@@ -5,10 +5,12 @@ import {
   deriveIntervals,
   downDays,
   lastCompletedRun,
+  leverLabels,
   logicalDateLocal,
   uptimeWindow,
   type Entry,
   type LeverSpan,
+  type Signal,
 } from "@uptime/core";
 
 /**
@@ -99,7 +101,7 @@ export async function loadStatus() {
 
   const now = today();
 
-  const [stateRes, entryRes, playbookRes, leverRes, milestoneRes] =
+  const [stateRes, entryRes, playbookRes, leverRes, milestoneRes, signalRes] =
     await Promise.all([
       supabase
         .from("system_state")
@@ -138,6 +140,17 @@ export async function loadStatus() {
         .order("first_hit_on", { ascending: false })
         .limit(1)
         .maybeSingle(),
+      // For the day sheet. Unbounded like `entries`, because any day in
+      // history can be tapped and a row limit would quietly empty old ones.
+      //
+      // No `amount`: that column only exists after the optional-weight
+      // migration, so selecting it unconditionally would break the dashboard
+      // on a database without it. Weight stays on `/proof`, behind its opt-in.
+      supabase
+        .from("signals")
+        .select("observed_on, kind, value, detail")
+        .eq("user_id", user.id)
+        .order("observed_on", { ascending: true }),
     ]);
 
   const row = (stateRes.data ?? {}) as Record<string, unknown>;
@@ -154,6 +167,7 @@ export async function loadStatus() {
   };
 
   const entries = (entryRes.data ?? []) as LoggedEntry[];
+  const signals = (signalRes.data ?? []) as unknown as Signal[];
   const allLevers = (leverRes.data ?? []) as LeverRow[];
   const levers = allLevers.filter((l) => !l.archived);
   const playbook = (playbookRes.data ?? []) as PlaybookItem[];
@@ -171,8 +185,11 @@ export async function loadStatus() {
     entries,
     levers,
     playbook,
+    signals,
     /** For the grid: who existed when, archived included. */
     leverSpans: leverSpans(allLevers),
+    /** For the day sheet: what each lever was CALLED, archived included. */
+    leverLabels: leverLabels(allLevers),
     todayLevers: entries
       .filter((e) => e.logged_for === now)
       .map((e) => e.lever),

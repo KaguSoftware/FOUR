@@ -2,6 +2,7 @@ import * as AppleAuthentication from "expo-apple-authentication";
 import * as Crypto from "expo-crypto";
 import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
+import { Platform } from "react-native";
 
 import { supabase } from "./supabase";
 
@@ -11,10 +12,16 @@ import { supabase } from "./supabase";
  *
  * `canceled: true` marks the user closing the dialog themselves. That is not
  * an error and must not be rendered as one; the screen ignores it.
+ *
+ * `detail` carries the redirect URL and the browser's verdict. It exists
+ * because this flow spent a debugging session unfalsifiable: every non-success
+ * was reported as a cancellation, so a redirect landing somewhere unexpected
+ * showed the user precisely nothing. Anything that is not a plain user
+ * cancellation must be able to say where it actually went.
  */
 export type OAuthResult =
   | { ok: true }
-  | { ok: false; reason: string; canceled?: boolean };
+  | { ok: false; reason: string; canceled?: boolean; detail?: string };
 
 /**
  * Sign in with Apple, via the native sheet.
@@ -76,13 +83,25 @@ export async function signInWithApple(): Promise<OAuthResult> {
  * for a session. `Linking.createURL` makes the redirect scheme-correct in
  * both worlds — `exp://…` inside Expo Go, `uptime://…` in a real build — and
  * whichever one is in play must be on the Supabase redirect allowlist.
+ *
+ * `prompt=select_account` is not optional. The auth session shares Safari's
+ * cookie jar, so without it an existing Google session is chosen silently and
+ * the user never learns WHICH account they signed up with — which then breaks
+ * every screen that names their address back to them, and makes "why is my
+ * data missing" unanswerable. The alternative, `preferEphemeralSession`, gets
+ * the picker by discarding the shared session entirely and costs a full
+ * password login every time; too harsh for the problem.
  */
 export async function signInWithGoogle(): Promise<OAuthResult> {
   const redirectTo = Linking.createURL("auth/callback");
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
-    options: { redirectTo, skipBrowserRedirect: true },
+    options: {
+      redirectTo,
+      skipBrowserRedirect: true,
+      queryParams: { prompt: "select_account" },
+    },
   });
   if (error || !data?.url) {
     return { ok: false, reason: error?.message ?? "No sign-in URL." };
@@ -90,22 +109,44 @@ export async function signInWithGoogle(): Promise<OAuthResult> {
 
   const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
   if (result.type !== "success") {
-    // 'cancel' and 'dismiss' are the user closing the browser.
-    return { ok: false, reason: result.type, canceled: true };
+    // Only `cancel` is unambiguously the user's own decision. Android returns
+    // `dismiss` for the back button too, so it stays silent there — but on iOS
+    // a user cancel is always `cancel`, which makes `dismiss` a real fault and
+    // reporting it as a cancellation is how a broken redirect hides.
+    const userClosed =
+      result.type === "cancel" ||
+      (Platform.OS === "android" && result.type === "dismiss");
+
+    return {
+      ok: false,
+      reason: userClosed ? result.type : `Sign-in did not complete (${result.type}).`,
+      canceled: userClosed,
+      detail: `redirectTo=${redirectTo}`,
+    };
   }
 
   const { queryParams } = Linking.parse(result.url);
   const code = typeof queryParams?.code === "string" ? queryParams.code : null;
   if (!code) {
-    const detail = queryParams?.error_description;
+    const described = queryParams?.error_description;
     return {
       ok: false,
-      reason: typeof detail === "string" ? detail : "No code in the redirect.",
+      reason:
+        typeof described === "string" ? described : "No code in the redirect.",
+      // The landing URL is the single most useful fact when this fails, and
+      // it is the one thing the old code threw away.
+      detail: `redirectTo=${redirectTo} landed=${result.url}`,
     };
   }
 
   const { error: exchangeError } =
     await supabase.auth.exchangeCodeForSession(code);
-  if (exchangeError) return { ok: false, reason: exchangeError.message };
+  if (exchangeError) {
+    return {
+      ok: false,
+      reason: exchangeError.message,
+      detail: `redirectTo=${redirectTo}`,
+    };
+  }
   return { ok: true };
 }

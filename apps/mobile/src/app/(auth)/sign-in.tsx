@@ -94,7 +94,14 @@ export default function SignInScreen() {
     }
   }
 
-  async function withProvider(run: () => Promise<{ ok: boolean; reason?: string; canceled?: boolean }>) {
+  async function withProvider(
+    run: () => Promise<{
+      ok: boolean;
+      reason?: string;
+      canceled?: boolean;
+      detail?: string;
+    }>,
+  ) {
     if (busy) return;
     setBusy(true);
     setError(null);
@@ -102,7 +109,18 @@ export default function SignInScreen() {
     const res = await run();
     setBusy(false);
     // Closing the sheet is a decision, not a failure.
-    if (!res.ok && !res.canceled) setError(res.reason ?? "sign-in failed");
+    if (res.ok || res.canceled) return;
+
+    // The redirect URL is appended in development only: it is the fact that
+    // identifies a misrouted OAuth round trip, and a real user can do nothing
+    // with it. Without this the flow is undebuggable on a device — which is
+    // how it stayed a mystery through two wrong theories.
+    if (res.detail) console.warn("[oauth]", res.reason, res.detail);
+    setError(
+      __DEV__ && res.detail
+        ? `${res.reason ?? "sign-in failed"}\n${res.detail}`
+        : (res.reason ?? "sign-in failed"),
+    );
   }
 
   return (

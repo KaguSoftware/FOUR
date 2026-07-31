@@ -1,7 +1,7 @@
 import { View } from "react-native";
-import { uptimeWindow } from "@uptime/core";
+import { useRouter } from "expo-router";
 import { Body, Label, Mono, Rule } from "@/components/ui";
-import { DayGrid } from "@/components/day-grid";
+import { MonthStack } from "@/components/day-grid";
 import { Loading } from "@/components/states";
 import { Screen } from "@/components/screen";
 import { useStatus } from "@/lib/use-status";
@@ -15,6 +15,7 @@ import { color, size, space } from "@/theme";
  * truncated and never reset.
  */
 export default function HistoryScreen() {
+  const router = useRouter();
   const { status } = useStatus();
   if (!status) return <Loading />;
 
@@ -27,24 +28,31 @@ export default function HistoryScreen() {
     ...outages.map((o) => ({ kind: "outage" as const, ...o })),
   ].sort((a, b) => (a.started_on < b.started_on ? 1 : -1));
 
-  // Named `span`, not `window` — that shadows the global and reads as a typo.
-  const span = uptimeWindow(entries, today, 90);
-
   return (
     <Screen>
-      {/* The grid used to be 90 unlabelled squares. Status says what its own
-          grid covers; this one said nothing at all, so the span was a guess. */}
-      <Label style={{ marginBottom: space[3] }}>
-        last 90 days · {span.up} up
-      </Label>
-
-      <DayGrid entries={entries} today={today} spans={leverSpans} days={90} />
-
       {/* All-time figures are monotonic by construction — they only ever go up,
-          so there is nothing here that a bad month can take away. */}
-      <View style={{ flexDirection: "row", gap: space[8], marginTop: space[8] }}>
+          so there is nothing here that a bad month can take away. They lead the
+          screen because the stack below is as long as the account is old, and
+          the summary that matters most during a bad week cannot be the thing
+          you have to scroll past a year of calendar to reach. */}
+      <View style={{ flexDirection: "row", gap: space[8] }}>
         <Figure label="days up, all time" value={allTime.totalDaysUp} />
         <Figure label="longest run" value={allTime.longestRun} unit="d" />
+      </View>
+
+      {/* Calendar months rather than a dense block of ninety squares. Each
+          month names itself and says how much of it was up, so the span is
+          never a guess — and seven columns mean a column IS a weekday, which
+          is the question this screen exists to answer. */}
+      <View style={{ marginTop: space[8] }}>
+        <MonthStack
+          entries={entries}
+          today={today}
+          spans={leverSpans}
+          onPressDay={(date) =>
+            router.push({ pathname: "/day", params: { date } })
+          }
+        />
       </View>
 
       <Label style={{ marginTop: space[10], marginBottom: space[3] }}>

@@ -128,6 +128,8 @@ function RootNavigator({ fontsLoaded }: { fontsLoaded: boolean }) {
         <Stack.Screen name="log" options={SHEET} />
         <Stack.Screen name="add-lever" options={SHEET} />
         <Stack.Screen name="edit-note" options={SHEET} />
+        {/* Read-only: what a tapped day held. */}
+        <Stack.Screen name="day" options={SHEET} />
         {/* The walkthrough. A full-height native modal, NOT the formSheet
             options above: `fitToContents` measures content once, and a
             three-step screen whose steps differ in height would resize under

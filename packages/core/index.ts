@@ -15,6 +15,7 @@ export * from "./uptime";
 export * from "./monitor";
 export * from "./grid";
 export * from "./month";
+export * from "./day";
 export * from "./levers";
 export * from "./push";
 export * from "./signals";

@@ -7,12 +7,14 @@ import {
   deriveIntervals,
   downDays,
   lastCompletedRun,
+  leverLabels,
   logicalDate,
   uptimeWindow,
   ACTIVE_LEVERS,
   type Entry,
   type Lever,
   type LeverSpan,
+  type Signal,
 } from "@uptime/core";
 
 export type PlaybookItem = {
@@ -135,7 +137,10 @@ const ONBOARDING_COLUMNS = "onboarded_at";
  * actually behind.
  */
 const COLUMN_LADDER = [
-  { columns: `${BASE_COLUMNS}, ${WEIGHT_COLUMNS}, ${ONBOARDING_COLUMNS}`, onboarding: true },
+  {
+    columns: `${BASE_COLUMNS}, ${WEIGHT_COLUMNS}, ${ONBOARDING_COLUMNS}`,
+    onboarding: true,
+  },
   { columns: `${BASE_COLUMNS}, ${WEIGHT_COLUMNS}`, onboarding: false },
   { columns: BASE_COLUMNS, onboarding: false },
 ] as const;
@@ -200,7 +205,10 @@ export async function getSystemState(userId: string): Promise<SystemState> {
   );
 }
 
-export function isSlammed(state: Pick<SystemState, "slammed_until">, today: string) {
+export function isSlammed(
+  state: Pick<SystemState, "slammed_until">,
+  today: string,
+) {
   return state.slammed_until !== null && state.slammed_until >= today;
 }
 
@@ -215,40 +223,61 @@ export async function getStatus() {
   const state = await getSystemState(user.id);
   const today = logicalDate(new Date(), state.timezone);
 
-  const [{ data: entryRows }, { data: playbookRows }, { data: milestoneRow }, levers] =
-    await Promise.all([
-      supabase
-        .from("entries")
-        .select("logged_for, lever, detail")
-        .eq("user_id", user.id)
-        .order("logged_for", { ascending: true }),
-      supabase
-        .from("playbook")
-        .select("id, lever, label, use_count, is_pinned")
-        .eq("user_id", user.id)
-        .eq("archived", false)
-        .order("is_pinned", { ascending: false })
-        .order("use_count", { ascending: false })
-        .order("last_used_at", { ascending: false, nullsFirst: false }),
-      supabase
-        .from("milestones")
-        .select("kind, first_hit_on")
-        .eq("user_id", user.id)
-        .order("first_hit_on", { ascending: false })
-        .limit(1)
-        .maybeSingle(),
-      getLevers(user.id),
-    ]);
+  const [
+    { data: entryRows },
+    { data: playbookRows },
+    { data: milestoneRow },
+    { data: signalRows },
+    levers,
+  ] = await Promise.all([
+    supabase
+      .from("entries")
+      .select("logged_for, lever, detail")
+      .eq("user_id", user.id)
+      .order("logged_for", { ascending: true }),
+    supabase
+      .from("playbook")
+      .select("id, lever, label, use_count, is_pinned")
+      .eq("user_id", user.id)
+      .eq("archived", false)
+      .order("is_pinned", { ascending: false })
+      .order("use_count", { ascending: false })
+      .order("last_used_at", { ascending: false, nullsFirst: false }),
+    supabase
+      .from("milestones")
+      .select("kind, first_hit_on")
+      .eq("user_id", user.id)
+      .order("first_hit_on", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    // Unbounded, like `entries` — the day modal can be opened on any day in
+    // history, so a row limit would make old days silently lose their notes.
+    //
+    // No `amount`: that column only exists once the optional-weight
+    // migration has run, so selecting it here would take the whole dashboard
+    // down on a database that has not. Weight is a measurement rather than
+    // something you did, and it stays where its opt-in guard already lives —
+    // `/proof`, which fetches it separately.
+    supabase
+      .from("signals")
+      .select("observed_on, kind, value, detail")
+      .eq("user_id", user.id)
+      .order("observed_on", { ascending: true }),
+    getLevers(user.id),
+  ]);
 
   const entries = (entryRows ?? []) as Entry[];
   const playbook = (playbookRows ?? []) as PlaybookItem[];
+  const signals = (signalRows ?? []) as unknown as Signal[];
 
   const { runs, outages } = deriveIntervals(entries, today);
   const todayEntries = entries.filter((e) => e.logged_for === today);
 
   // A milestone is only "live" on screen for 24h after it first landed.
   const liveMilestone =
-    milestoneRow && milestoneRow.first_hit_on >= today ? milestoneRow.kind : null;
+    milestoneRow && milestoneRow.first_hit_on >= today
+      ? milestoneRow.kind
+      : null;
 
   return {
     user,
@@ -257,12 +286,16 @@ export async function getStatus() {
     slammed: isSlammed(state, today),
     entries,
     playbook,
+    signals,
     todayLevers: new Set(todayEntries.map((e) => e.lever)),
     // The buttons. Archived levers are read but never offered.
     levers: levers.filter((l) => !l.archived),
     // For the grid: who existed when, archived included, so a past day keeps
     // the shade it had rather than being re-scaled by today's lever count.
     leverSpans: leverSpans(levers),
+    // For the day modal: what each lever was CALLED, archived included, so an
+    // old day names the lever it actually fired.
+    leverLabels: leverLabels(levers),
     uptime: uptimeWindow(entries, today),
     run: currentRun(entries, today),
     down: downDays(entries, today),

@@ -38,6 +38,10 @@ const MONTHS = [
 export type MonthGrid = {
   /** "July" — the month the given date falls in. */
   label: string;
+  /** Four-digit calendar year. A stack of months spanning a new year needs it. */
+  year: number;
+  /** 1-12. */
+  month: number;
   /** 28-31. */
   daysInMonth: number;
   /** 1-31: which day of the month the input was. */
@@ -98,6 +102,8 @@ export function monthGrid(iso: string): MonthGrid {
 
   return {
     label: MONTHS[month1 - 1],
+    year,
+    month: month1,
     daysInMonth: total,
     dayOfMonth,
     cells,
@@ -106,3 +112,66 @@ export function monthGrid(iso: string): MonthGrid {
 
 /** Column headers for a Monday-first grid. */
 export const WEEKDAY_INITIALS = ["M", "T", "W", "T", "F", "S", "S"] as const;
+
+/**
+ * `iso` shifted by `n` calendar months, clamped to the target month's length.
+ *
+ * Clamping is the whole point. `Date.UTC(2026, 2 - 1, 31)` silently rolls into
+ * March, so a naive implementation walking back from the 31st skips February
+ * entirely — the month stack would then be missing a month, and nothing about
+ * the output would look wrong. Landing on the 28th instead is correct here
+ * because callers use the result as an ANCHOR into a month, never as a date in
+ * its own right.
+ */
+export function addMonths(iso: string, n: number): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (!match) throw new Error(`addMonths: expected YYYY-MM-DD, got "${iso}"`);
+
+  const year = Number(match[1]);
+  const month1 = Number(match[2]);
+  const day = Number(match[3]);
+
+  // Months as a single count, so the year rolls over without a branch and
+  // negative `n` works the same as positive.
+  const total = year * 12 + (month1 - 1) + n;
+  const targetYear = Math.floor(total / 12);
+  const targetMonth1 = (total % 12) + 1;
+
+  const clamped = Math.min(day, daysInMonth(targetYear, targetMonth1));
+
+  return [
+    String(targetYear).padStart(4, "0"),
+    String(targetMonth1).padStart(2, "0"),
+    String(clamped).padStart(2, "0"),
+  ].join("-");
+}
+
+/**
+ * One anchor date per calendar month from `fromIso` to `toIso`, newest first.
+ *
+ * Anchors are the FIRST of each month, not the input dates — the caller feeds
+ * these straight to `monthGrid`, which only cares which month it lands in, and
+ * a first-of-month anchor cannot be clamped into the wrong one.
+ *
+ * Returns `[]` when the range is inverted rather than looping forever or
+ * guessing which end was meant.
+ */
+export function monthsBetween(fromIso: string, toIso: string): string[] {
+  const first = firstOfMonth(fromIso);
+  const last = firstOfMonth(toIso);
+  if (first > last) return [];
+
+  const out: string[] = [];
+  for (let cursor = last; cursor >= first; cursor = addMonths(cursor, -1)) {
+    out.push(cursor);
+    // `addMonths` on the earliest month would step below the range; stopping
+    // here also keeps year 0 from underflowing the loop condition.
+    if (cursor === first) break;
+  }
+  return out;
+}
+
+/** The 1st of the month containing `iso`. Validates via `addMonths`. */
+function firstOfMonth(iso: string): string {
+  return `${addMonths(iso, 0).slice(0, 7)}-01`;
+}

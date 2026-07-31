@@ -100,7 +100,13 @@ export default async function StatusPage() {
       </section>
 
       <section className="mb-10">
-        <DayGrid entries={entries} today={today} spans={status.leverSpans} />
+        <DayGrid
+          entries={entries}
+          signals={status.signals}
+          today={today}
+          spans={status.leverSpans}
+          labels={status.leverLabels}
+        />
       </section>
 
       {/* The levers sit in the optical centre of the remaining space: this is

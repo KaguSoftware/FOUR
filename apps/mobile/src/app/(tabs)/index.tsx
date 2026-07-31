@@ -200,7 +200,9 @@ export default function StatusScreen() {
           entries={shownEntries}
           today={today}
           spans={status.leverSpans}
-          mode="month"
+          onPressDay={(date) =>
+            router.push({ pathname: "/day", params: { date } })
+          }
         />
       </View>
 

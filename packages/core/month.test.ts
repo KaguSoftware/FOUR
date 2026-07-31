@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { monthGrid, WEEKDAY_INITIALS } from "./month";
+import { addMonths, monthGrid, monthsBetween, WEEKDAY_INITIALS } from "./month";
 
 /** Every non-null cell, in order. */
 const dates = (iso: string) => monthGrid(iso).cells.filter((c) => c !== null);
@@ -82,5 +82,87 @@ describe("monthGrid", () => {
     expect(() => monthGrid("2026-7-1")).toThrow();
     expect(() => monthGrid("not a date")).toThrow();
     expect(() => monthGrid("")).toThrow();
+  });
+
+  it("reports the year and month as numbers", () => {
+    // The bare label cannot distinguish two Julys, which a stack of months
+    // spanning a new year will contain.
+    expect(monthGrid("2026-07-29")).toMatchObject({ year: 2026, month: 7 });
+    expect(monthGrid("2027-01-01")).toMatchObject({ year: 2027, month: 1 });
+  });
+});
+
+describe("addMonths", () => {
+  it("steps forward and back within a year", () => {
+    expect(addMonths("2026-07-15", 1)).toBe("2026-08-15");
+    expect(addMonths("2026-07-15", -1)).toBe("2026-06-15");
+    expect(addMonths("2026-07-15", 0)).toBe("2026-07-15");
+  });
+
+  it("crosses year boundaries in both directions", () => {
+    expect(addMonths("2026-12-15", 1)).toBe("2027-01-15");
+    expect(addMonths("2026-01-15", -1)).toBe("2025-12-15");
+    expect(addMonths("2026-07-15", -12)).toBe("2025-07-15");
+    expect(addMonths("2026-07-15", 18)).toBe("2028-01-15");
+  });
+
+  it("clamps to the target month rather than rolling into the next one", () => {
+    // The whole reason this is not one-line date maths: naive UTC arithmetic
+    // turns 31 March minus a month into 3 March, which SKIPS February — a
+    // month stack would silently lose a month and look fine doing it.
+    expect(addMonths("2026-03-31", -1)).toBe("2026-02-28");
+    expect(addMonths("2026-01-31", 1)).toBe("2026-02-28");
+    expect(addMonths("2026-08-31", 1)).toBe("2026-09-30");
+  });
+
+  it("clamps to 29 in a leap February", () => {
+    expect(addMonths("2028-03-31", -1)).toBe("2028-02-29");
+  });
+
+  it("throws on a malformed date", () => {
+    expect(() => addMonths("2026-7-1", 1)).toThrow();
+    expect(() => addMonths("", 1)).toThrow();
+  });
+});
+
+describe("monthsBetween", () => {
+  it("returns one first-of-month anchor per month, newest first", () => {
+    expect(monthsBetween("2026-05-14", "2026-08-02")).toEqual([
+      "2026-08-01",
+      "2026-07-01",
+      "2026-06-01",
+      "2026-05-01",
+    ]);
+  });
+
+  it("returns a single month when both ends are in it", () => {
+    expect(monthsBetween("2026-07-01", "2026-07-31")).toEqual(["2026-07-01"]);
+  });
+
+  it("spans a year boundary", () => {
+    expect(monthsBetween("2025-11-20", "2026-02-03")).toEqual([
+      "2026-02-01",
+      "2026-01-01",
+      "2025-12-01",
+      "2025-11-01",
+    ]);
+  });
+
+  it("anchors on the 1st, so no month can be clamped away", () => {
+    // Walking back from the 31st is exactly the case that skips February.
+    const months = monthsBetween("2026-01-31", "2026-03-31");
+    expect(months).toEqual(["2026-03-01", "2026-02-01", "2026-01-01"]);
+  });
+
+  it("returns nothing for an inverted range instead of looping", () => {
+    expect(monthsBetween("2026-08-01", "2026-05-01")).toEqual([]);
+  });
+
+  it("every anchor lands in a distinct month", () => {
+    const months = monthsBetween("2024-01-15", "2026-07-15");
+    expect(months).toHaveLength(31);
+    expect(new Set(months).size).toBe(31);
+    expect(months[0]).toBe("2026-07-01");
+    expect(months.at(-1)).toBe("2024-01-01");
   });
 });

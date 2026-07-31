@@ -22,6 +22,16 @@ of what the screen did, not as failing tests, and several have been regressions
 invisible to `tsc`. See *The cross-screen sync trap* in Gotchas — it caused three
 separate reported bugs in one day.
 
+**⚠ Expo Go stopped working on 2026-07-31** — a native module (Google
+Credential Manager) is now in the tree, by the owner's explicit decision.
+Testing means an **EAS dev build**. See *Gotchas* and *Development builds and
+push*.
+
+**Two rounds are now stacked up unseen on hardware** — the 07-31 grid swap and
+the 07-31 Android-native pass. Both are `tsc`-clean and both touch layout, which
+is exactly the class of change `tsc` cannot judge. Get them onto a device before
+adding a third.
+
 ---
 
 ## Working style
@@ -75,6 +85,8 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 | **Proof trend** | **Daily points.** Plateau detection stays **weekly** |
 | Adaptive scope | One visual system, **two interaction layers** |
 | **Native components** | **Binding.** Use the platform's component wherever one exists — back, sheets, switches, pickers, alerts, list rows, tab bars. Custom only for the day grid, hero readout, lever buttons and takeover |
+| **Android depth** (2026-07-31) | **Full native — a dev build is required.** Native modules are allowed; **Expo Go no longer runs the app.** Owner's call, taken to get Credential Manager sign-in |
+| **Android divergence** (2026-07-31) | **Android may look different where the Material idiom is conventional** — snackbars, summary-style settings rows, an M3 segmented group. The palette, the type ramp and the four custom components stay identical on both |
 
 **Why Expo, in one line:** widgets are native in *every* scenario (WidgetKit is SwiftUI-only; Android widgets are Kotlin/Glance), so the real choice was 1 app codebase + 1 derivation engine versus 2 app codebases + 3 derivation engines.
 
@@ -194,6 +206,15 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
   **162 tests, tsc clean ×3, eslint clean, contrast clean, web build, expo
   export both platforms. Not yet run on a device.**
 
+- **The Android-native pass, 2026-07-31.** Everything below the structural line
+  moved onto Android's own idioms — see *Roadmap* 22 for the list and
+  `apps/mobile/AGENTS.md` for the reusable pieces and the traps. Verified:
+  **162 tests, tsc clean ×3, `expo lint` clean, both bundles export, the web
+  app builds, 30/30 contrast pairs pass.** The Android theme, notification icon
+  and edge-to-edge were verified by reading a throwaway
+  `expo prebuild --platform android` and then deleting it — no JS-only check
+  can see them. **Nothing in this round has been on hardware.**
+
 **Written but NOT verified end-to-end:**
 
 - **Vercel cron has never run.** The route works locally; the schedule is unproven.
@@ -201,6 +222,25 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 - **Drag-to-reorder and drag-to-archive have not been used on a device** as of this writing. The RPC they depend on is applied; the gesture itself is unproven on hardware.
 - **The 2026-07-29 Settings/Auth surface is untested on hardware**: the daily reminder firing at its hour, the test alert, export's share sheet, change email/password round-trips, delete account against the live DB (its migration IS applied now, so it should work), Apple and OTP sign-in. Google sign-in has completed end to end since the account-picker fix.
 - **The whole 2026-07-31 grid round is untested on hardware**: both grid layouts, tapping a day on each screen, how a blank day reads, and the `DELETE` confirm.
+- **The whole 2026-07-31 Android round is untested on hardware.** In rough
+  order of how likely each is to be wrong:
+  1. **The tab-bar allowance.** `TAB_BAR = 80` on Android plus `insets.bottom`
+     assumes the Material navigation bar does **not** already consume the
+     system inset. If it does, every screen has ~48dp of dead space at the
+     bottom. Scroll all four tabs to the end and check the last element is
+     reachable, not merely visible.
+  2. **The keyboard under edge-to-edge.** All eight `KeyboardAvoidingView`s
+     pass `behavior={undefined}` on Android and rely on `adjustResize`, which
+     is set in the manifest. If a field ends up under the IME, the fix is
+     Reanimated's `useAnimatedKeyboard` — already a dependency, no new native
+     module — **not** `react-native-keyboard-controller`.
+  3. **Ripple clipping** on the lever cells, which are absolutely positioned
+     inside an `Animated.View`. `foreground: true` should make them follow the
+     border radius; a square flash at the corners means it did not.
+  4. The three haptics being distinguishable, and **no vibrate permission**
+     under Settings → Apps → four → Permissions.
+  5. The dialog theme, the notification icon, and the two channels — none of
+     which exist outside a real build.
 - Plateau thresholds pass unit tests but have no longitudinal data behind them. `PLATEAU_WEEKS` (4) and `MIN_DAYS_PER_WEEK` (3) are educated guesses.
 
 **Blocked / needs the owner:**
@@ -229,6 +269,54 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
      rests on the rendered preview showing no code plus the known default.
      **The 30-second confirmation is to request a code on a device and look at
      the email.** Do that before changing any code.
+- **Android Google Sign-In needs one Google Cloud client and one env var
+  (2026-07-31).** The code is built and falls back to the browser flow while
+  this is missing, so nothing is broken in the meantime — native Credential
+  Manager just does not engage. Two steps:
+
+  1. **`EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`** in `apps/mobile/.env.local` and on
+     EAS. The value is the **Web** client already confirmed by the 2026-07-31
+     audit: `1017110614147-rj86gh….apps.googleusercontent.com` (get the full
+     string from the console). Not a secret — a client ID is an identifier, and
+     `EXPO_PUBLIC_` is correct.
+  2. **An Android OAuth client**, which the audit did not cover. Hand the owner
+     the prompt below.
+
+  <details><summary>Chrome-agent prompt — Android OAuth client (report only)</summary>
+
+  > Go to **Google Cloud Console → APIs & Services → Credentials**, for the
+  > project that owns the OAuth client
+  > `1017110614147-rj86gh….apps.googleusercontent.com`.
+  >
+  > Report, quoting every value verbatim:
+  >
+  > 1. Under **OAuth 2.0 Client IDs**, list every client: its **Name**, its
+  >    **Type**, and its **Creation date**. I expect at least one of type
+  >    *Web application*. **I am specifically asking whether one of type
+  >    *Android* exists** — say plainly if none does.
+  > 2. If an **Android** client exists, open it and quote its **Package name**
+  >    and its **SHA-1 certificate fingerprint**. Expected package name:
+  >    `com.kagusoftware.uptime`.
+  > 3. Open the **Web application** client and quote its full **Client ID** and
+  >    every **Authorised redirect URI**. Expected sole URI:
+  >    `https://yqphirnsvcqzstwjfshs.supabase.co/auth/v1/callback`.
+  > 4. Go to **APIs & Services → OAuth consent screen** and quote the
+  >    **Publishing status** and **User type**.
+  >
+  > **Do not paste any client SECRET.** For the Web client, say only whether a
+  > secret is present, never its value.
+  >
+  > **Report only, change nothing until I confirm.**
+
+  </details>
+
+  If no Android client exists, the SHA-1 to register comes from
+  `cd apps/mobile && npx eas-cli@latest credentials -p android` — the **build
+  credentials** fingerprint of whichever profile is being installed. A debug
+  build and an EAS build have *different* fingerprints, so both may need
+  registering. Getting the fingerprint wrong presents as `DEVELOPER_ERROR` and
+  nothing else.
+
 - Note for a fresh chat: `apps/web/.env.local` is **not** on this machine, so the web dev server and the dev scripts cannot run here. Tests, typecheck, lint, both builds and `supabase db push` all work without it — `apps/mobile/.env.local` **does** exist.
 
 ## File map (key files)
@@ -271,7 +359,15 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 | `apps/mobile/src/lib/reminder.ts` | The daily reminder: local scheduling, silent app-start reconcile, the test alert. The only file allowed to prompt for notification permission outside onboarding. |
 | `apps/mobile/src/lib/oauth.ts` | Apple (nonce flow → `signInWithIdToken`) and Google (PKCE browser round-trip → `exchangeCodeForSession`). |
 | `apps/mobile/src/lib/export.ts` | The whole account as one JSON file through the share sheet. Raw rows, never derived figures. |
-| `apps/mobile/src/components/button.tsx` | THE button — extracted from five drifting inline copies. Use it instead of a bare Pressable. |
+| `apps/mobile/src/components/button.tsx` | THE button — extracted from five drifting inline copies. Use it instead of a bare Pressable. Also `TextButton`, which replaced eight inline copies of the quiet text link. |
+| `apps/mobile/src/lib/press.ts` | **Touch feedback.** `ripple()` (Android) and `pressFill()` (iOS), never both. Every Pressable in the app goes through it. |
+| `apps/mobile/src/lib/haptics.ts` | **Haptics, named by meaning** — `committed` / `pickedUp` / `nudged`. Android uses real `HapticFeedbackConstants`; `impactAsync` is wrong there and needs a permission the app now blocks. |
+| `apps/mobile/src/lib/back.ts` | `useAndroidBack()` — only for a screen running several steps inside ONE route. `gestureEnabled: false` does **not** stop the Android Back button. |
+| `apps/mobile/src/lib/reduce-motion.ts` | `useReduceMotion()` — "Remove animations" / "Reduce Motion", owed on both platforms. The cue survives; only the movement goes. |
+| `apps/mobile/src/components/snackbar.tsx` | The Android snackbar and `useNotify()`. **Statements only** — the four confirmations stay `Alert.alert` on both platforms. |
+| `apps/mobile/src/components/sheet.tsx` | `<SheetHandle />` — the Android sheet's drag cue. `sheetGrabberVisible` is iOS-only, so Android had none. `null` on iOS. |
+| `apps/mobile/plugins/with-android-dialog-theme.js` | Puts the palette on native dialogs. **AppCompat attributes, not Material 3** — RN builds them with AppCompat's builder. Third copy of the palette hexes; `check:contrast` cannot see it. |
+| `scripts/make-notification-icon.mjs` | `npm run icon:notification`. Crops, scales and whitens the monochrome mark into a 96×96 alpha silhouette. Android reads **only the alpha** of a small icon. |
 | `supabase/migrations/20260729030000_delete_account.sql` | `delete_own_account()` — security definer, no parameters, target comes from the JWT. Apple-required. |
 | `apps/mobile/src/components/screen.tsx` | Every tab screen's frame. Owns the safe-area insets, the tab-bar allowance and the status-bar scrim. |
 | `apps/mobile/src/components/lever-buttons.tsx` | The lever grid, with long-press drag-to-reorder and drag-to-archive. |
@@ -329,9 +425,24 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
     `20260730120000_drop_posture.sql` push. Apple + Google sign-in still need
     verifying on the TestFlight build — Google has worked once since the
     account-picker fix; Apple is unproven.
-22. Then: **custom SMTP** (it unblocks the Magic Link template, which the OTP
-    screen depends on — see *Blocked*) · store listings · Android notification
-    icon · FCM V1 credentials for Android push.
+22. ~~The Android-native pass~~ — done 2026-07-31, **not yet seen on hardware.**
+    The app was built iOS-first; everything below the structural line now uses
+    Android's own idioms. Ripples on all 17 press targets, real
+    `HapticFeedbackConstants` (and the `VIBRATE` permission dropped),
+    `includeFontPadding` on every type primitive, a Material snackbar for the
+    nine informational alerts (the four confirmations stay dialogs), Material
+    summary rows in Settings, an M3 segmented button group, a sheet drag
+    handle, hardware-Back through onboarding and the walkthrough, edge-to-edge
+    declared, a real notification icon, a second notification channel for the
+    reminder, an AppCompat dialog theme, and **native Google Sign-In via
+    Credential Manager**. Verified: **162 tests, tsc clean across all three
+    workspaces, `expo lint` clean, both bundles export, the web app builds, and
+    30/30 contrast pairs pass** — the contrast check caught three of this
+    pass's own defects at 1.35:1. Full notes in `apps/mobile/AGENTS.md`.
+23. Then: **custom SMTP** (it unblocks the Magic Link template, which the OTP
+    screen depends on — see *Blocked*) · store listings · FCM V1 credentials
+    for Android push · **the Google Cloud Android OAuth client** (see the
+    written browser-check prompt in *Blocked*).
 
 ## Deliberately partial — grows later (scope ledger)
 
@@ -364,6 +475,10 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 | Settings "accessibility" section | None. The owner named it as an example of the pattern; there is nothing real to put in it — reduce-motion and text size are OS settings the app already honours | **Ask before inventing one** | Undecided |
 | Day grid | **Both clients: Home is the trailing 30 (10×3), History is a stack of calendar months (7 wide).** Today pulses on both. Every day opens a read-only panel | Done — the swap is the final shape | Both done 2026-07-31 |
 | Day panel | Levers + their detail text + that day's signals, read-only. **No weight** — `signals.amount` only exists after the optional-weight migration, so selecting it unconditionally would break a database without it; weight stays on `/proof` behind its opt-in | Weight here too, once the migration is universal | Done 2026-07-31 |
+| Android nativeness | **Full pass done 2026-07-31, unseen on hardware.** Ripples, Android haptic constants, Material snackbar, summary settings rows, M3 segmented group, sheet drag handle, hardware Back, edge-to-edge, notification icon, two channels, dialog theme, Credential Manager sign-in | Unchanged — this IS the intended shape | Needs a device |
+| Android widgets | None | Glance/Kotlin, same as the iOS WidgetKit one | v1.1 |
+| Android launcher shortcuts | **None.** Long-press → "log a lever" is genuinely native and genuinely wanted | A `shortcuts.xml` config plugin + a deep-link route | Deferred with the widget work — same surface, same build |
+| Material You | **Not doing it.** Dynamic colour contradicts the locked two-hue palette | — | Closed |
 | Timezone | Defaults to Europe/Istanbul in DB | Device-detected at signup, editable | With mobile |
 | Monetization | Free | Undecided. **The usual paywalls are all ruled out by the thesis**, not by preference — lever count is the product's name, longer history attacks re-entry, gamification fails a build test. Any model has to sell something other than a feature | Post-launch |
 
@@ -381,7 +496,53 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
   `signInWithIdToken`, which validates against the Client IDs list; the secret
   only matters for a *web* Apple OAuth flow this product does not have.
   *Still unknown as of that date:* the Magic Link template's raw source (the
-  dashboard locks Source view without custom SMTP).
+  dashboard locks Source view without custom SMTP), **and whether an Android
+  OAuth client exists in Google Cloud** — the audit did not cover it because
+  nothing needed it until 2026-07-31. See the browser-check prompt in
+  *Blocked*.
+
+- **⚠ Expo Go can no longer run this app, as of 2026-07-31.**
+  `@react-native-google-signin/google-signin` is a native module and is not in
+  Expo Go's binary. This was the owner's explicit decision that day ("full
+  native, dev build required"), taken to get Credential Manager sign-in. **The
+  Android testing loop is now an EAS dev build**, which `eas.json` already has
+  a profile for. `npm run android` / `npm run ios` are still
+  `expo start --<platform>` on purpose — `expo prebuild` rewrites them to
+  `expo run:*`, which needs a local Android SDK / Xcode; change them back if
+  you ever run one.
+
+- **Three Android things are invisible to every JS-only check** and only exist
+  in a real build: the notification icon, the dialog theme, and edge-to-edge.
+  `tsc`, `expo lint` and `expo export` all pass with them completely broken.
+  The way to verify them without shipping is
+  `npx expo prebuild --platform android --no-install --clean`, read the
+  generated `android/app/src/main/res/values/{styles,colors}.xml` and
+  `AndroidManifest.xml`, then `rm -rf android`. `/android` is gitignored, so
+  that is free and disposable. It is how the dialog plugin's first version was
+  caught writing Material 3 attributes that React Native never reads.
+
+- **`expo install @react-native-google-signin/google-signin` adds a config
+  plugin entry that breaks BOTH builds.** With no options it takes the
+  plugin's *Firebase* branch and then requires `google-services.json` and
+  `GoogleService-Info.plist`. This project has neither and does not use
+  Firebase. **The entry was removed from `app.json` deliberately** — the native
+  module still autolinks, and Credential Manager needs only `webClientId` at
+  runtime. Do not "fix" its absence.
+
+- **`EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` is the *Web* client ID, never the
+  Android one.** Android's own OAuth client is matched by package name plus
+  SHA-1 and is never named in code; the Web client is the audience the returned
+  `idToken` is minted for. Confusing them fails with `DEVELOPER_ERROR`, which
+  says nothing about which is wrong. **Unset, the app falls back to the browser
+  flow and still works** — that fallback is deliberate, so a missing variable
+  degrades rather than breaks.
+
+- **`npm run check:contrast` caught three defects in the Android pass's own new
+  code**, both at **1.35:1**: the sheet drag handle and the segmented-group
+  divider, each written with `line` where the ground was `surface`. Both are
+  `line-hi` now. The palette did not change — but **a familiar token on a new
+  ground is a new measurement**, and Android's rearranged surfaces create a lot
+  of those. Add a case for every new pair; there are 30 enforced now.
 - **The "Google sign-in redirects to localhost" report is unexplained and NOT
   currently reproducing.** It was reported on both TestFlight and Expo Go. Two
   theories were built and both are dead: the redirect allowlist was already
@@ -525,12 +686,24 @@ npm run test:migrations  # runs every migration against real Postgres (WASM)
 npm run check:contrast   # measures every colour pair against its WCAG floor
 
 # Mobile (needs apps/mobile/.env.local — copy .env.example)
-npm run mobile           # Expo dev server; scan the QR with Expo Go or a dev build
+# ⚠ EXPO GO NO LONGER WORKS as of 2026-07-31 — a native module is in the tree.
+#   Install a dev build first; see "Development builds and push" below.
+npm run mobile           # Expo dev server; open it with the DEV BUILD
 npm run mobile:ios
 npm run mobile:android
-cd apps/mobile && npx expo export --platform ios   # proves the module graph resolves
+npm run icon:notification  # regenerate the Android notification icon
+# The export is the only proof the module graph resolves. Do BOTH platforms.
+cd apps/mobile && npx expo export --platform ios --platform android
 cd apps/mobile && npx expo lint
 npm run build
+
+# Verify the Android native config (theme, notification icon, edge-to-edge).
+# No JS-only check can see any of it. /android is gitignored, so this is free.
+cd apps/mobile && npx expo prebuild --platform android --no-install --clean
+#   read android/app/src/main/res/values/{styles,colors}.xml and AndroidManifest.xml
+rm -rf apps/mobile/android
+#   then put package.json's "android"/"ios" scripts back to `expo start --…`,
+#   which prebuild rewrites to `expo run:…`
 
 # Migrations: FROM THE REPO ROOT, never from apps/mobile. See Gotchas.
 npx supabase migration list   # local vs remote; "remote": "" means not applied

@@ -281,32 +281,28 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
      all three EAS environments (`development`, `preview`, `production`) and
      appended to `apps/mobile/.env.local`. Value is the Web client ID recorded
      in *Gotchas*.
-  2. **An Android OAuth client — still missing.** Confirmed absent by the
-     2026-07-31 browser audit: the project has exactly one client and it is
-     the Web one. Create it at **Google Cloud → APIs & Services → Credentials
-     → + Create Credentials → OAuth client ID → Android**, package
-     `com.kagusoftware.uptime`, SHA-1 from the keystore.
+  2. ~~**An Android OAuth client**~~ — **DONE 2026-07-31.** Created with the
+     keystore's SHA-1; both recorded in *Gotchas*.
+  3. **The OAuth consent screen is still in Testing mode** — see *Gotchas*.
+     Until it is published, Google sign-in works **only for listed test
+     users**. Publishing needs no verification review because every scope is
+     non-sensitive. **This is the last thing between the app and a working
+     Google sign-in for anyone who is not the owner.**
 
-     **The SHA-1 does not exist until a keystore does**, and no Android build
-     has ever run on this project. Generate one WITHOUT building — much faster
-     than waiting on a build just to read a fingerprint:
+  **The Android keystore now exists** (created 2026-07-31, EAS-managed,
+  fingerprints in *Gotchas*). **It is the app's permanent identity on
+  Android** — lose it and a Play listing can never be updated again. EAS holds
+  it; a local backup was downloaded to `apps/mobile/*.jks`, which
+  `.gitignore` covers via `*.jks`. **Move that file out of the repo** to a
+  password manager or backup drive; do not commit it, and note that
+  `eas credentials` prints its passwords to the terminal when downloading.
 
-     ```bash
-     cd apps/mobile
-     npx eas-cli@latest credentials -p android
-     #   → Keystore: Manage everything needed to build your project
-     #   → Set up a new keystore   → then read the SHA-1 Fingerprint
-     ```
-
-     **That keystore becomes the app's permanent identity on Android** — lose
-     it and a Play listing can never be updated. EAS stores it; back it up via
-     the same menu once it exists.
-
-     A locally-built debug APK and an EAS build have **different**
-     fingerprints, so if both are ever used, both SHA-1s need registering.
-     Getting it wrong presents as `DEVELOPER_ERROR` and nothing else — the app
-     falls back to the browser flow, so it looks like the native sheet simply
-     never appears.
+  A locally-built debug APK and an EAS build have **different** fingerprints,
+  and Play App Signing adds a **third**, so each needs its own SHA-1
+  registered against the Android client. Getting it wrong presents as
+  `DEVELOPER_ERROR` and nothing else — the app falls back to the browser flow,
+  so it looks like the native sheet simply never appears rather than like a
+  misconfiguration.
 
 - Note for a fresh chat: `apps/web/.env.local` is **not** on this machine, so the web dev server and the dev scripts cannot run here. Tests, typecheck, lint, both builds and `supabase db push` all work without it — `apps/mobile/.env.local` **does** exist.
 
@@ -500,8 +496,22 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
     A client secret **is** present — that is correct and belongs to the
     server-side web flow Supabase runs. **Credential Manager does not use it;
     do not rotate it.**
-  - **No Android-type OAuth client exists.** That is the one remaining gap for
-    native Google Sign-In on Android — see *Blocked*.
+  - **An Android OAuth client was created later that day** — `four (Android)`,
+    ID `1017110614147-naissv1ogrlht1ba3rpmgekdn3ssbbtp.apps.googleusercontent.com`,
+    package `com.kagusoftware.uptime`, SHA-1
+    `EC:2F:BB:F3:74:79:CE:55:E0:0F:11:85:03:02:68:2A:E4:1A:39:30`. Android
+    clients carry **no secret**. **The app never names this client** — it only
+    ever sends the *Web* ID; the Android one exists so Google recognises the
+    package + signature pair. Nothing to wire up.
+  - **⚠ The OAuth consent screen is in TESTING mode**, surfaced by the
+    creation dialog: *"OAuth access is restricted to the test users listed on
+    your OAuth consent screen."* **Google sign-in therefore works only for
+    accounts explicitly listed as test users** — which will look like a broken
+    native sheet on any device signed into someone else's Google account.
+    The app requests only `email` / `profile` / `openid`, all **non-sensitive**,
+    so publishing the consent screen needs **no Google verification review**
+    and is effectively one click. Do that before testing sign-in on a device
+    that is not the owner's. **Unresolved as of 2026-07-31.**
   - The full Web client ID is **not a secret** (a client ID is an identifier),
     which is why it is written here and shipped as `EXPO_PUBLIC_`.
 

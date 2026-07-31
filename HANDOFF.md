@@ -98,7 +98,10 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 - Supabase (Postgres 17, Auth, RLS) — project `yqphirnsvcqzstwjfshs` ("parsa-system", eu-west-1)
 - Vercel (cron via `apps/web/vercel.ts`) · Vitest · Playwright (dev screenshots only)
 - Node 24.15, npm 11.16, Windows 11 + Git Bash
-- Repo: **`github.com/KaguSoftware/uptime`** — `origin`, and the only remote. This is `ParSaMnSS/personal-system` **transferred** to the Kagu org on 2026-07-28, not a new repo, so full history came with it.
+- Repo: **`github.com/KaguSoftware/FOUR`** — `origin`, and the only remote. This is `ParSaMnSS/personal-system` **transferred** to the Kagu org on 2026-07-28, not a new repo, so full history came with it, and **renamed `uptime` → `FOUR` at some point before 2026-07-31**. The rename surfaced on that date as a `remote: This repository moved.` notice during a push; GitHub still redirects the old URL, so pushes keep working and this is not urgent. To stop the notice:
+  ```bash
+  git remote set-url origin https://github.com/KaguSoftware/FOUR.git
+  ```
 - Timezone: **Europe/Istanbul** (UTC+3, no DST) — becomes device-detected for public users
 
 **No secrets in this file.** Env vars live in `apps/web/.env.local` (gitignored) — see README for the table.

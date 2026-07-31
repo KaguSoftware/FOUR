@@ -3,7 +3,7 @@ import { KeyboardAvoidingView, Platform, TextInput, View } from "react-native";
 import { useHeaderHeight } from "@react-navigation/elements";
 
 import { Button } from "@/components/button";
-import { field } from "@/components/fields";
+import { field, fieldTint } from "@/components/fields";
 import { Loading } from "@/components/states";
 import { Screen } from "@/components/screen";
 import { Note } from "@/components/settings-ui";
@@ -78,6 +78,7 @@ export default function ChangeEmailScreen() {
 
             <Label style={{ marginTop: space[2] }}>new email</Label>
             <TextInput
+              {...fieldTint}
               value={email}
               onChangeText={setEmail}
               placeholder="new address"

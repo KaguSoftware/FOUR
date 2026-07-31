@@ -14,6 +14,7 @@ import {
   JetBrainsMono_500Medium,
 } from "@expo-google-fonts/jetbrains-mono";
 
+import { SnackbarProvider } from "@/components/snackbar";
 import { SessionProvider, useSession } from "@/lib/session";
 import { color } from "@/theme";
 
@@ -63,7 +64,13 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SessionProvider>
         <StatusBar style="light" />
-        <RootNavigator fontsLoaded={fontsLoaded} />
+        {/* Above the navigator, so a snackbar raised from a sheet or a pushed
+            screen is neither clipped by it nor dismissed with it. Android
+            only in effect — on iOS `useNotify` goes straight to `Alert` and
+            this provider never renders anything. */}
+        <SnackbarProvider>
+          <RootNavigator fontsLoaded={fontsLoaded} />
+        </SnackbarProvider>
       </SessionProvider>
     </GestureHandlerRootView>
   );

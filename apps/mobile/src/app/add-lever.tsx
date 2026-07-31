@@ -4,9 +4,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { LEVER_LABEL_MAX, MAX_LEVERS } from "@uptime/core";
 
-import { field } from "@/components/fields";
+import { field, fieldTint } from "@/components/fields";
 import { Body, Label } from "@/components/ui";
+import { SheetHandle } from "@/components/sheet";
 import { createLever } from "@/lib/levers";
+import { pressFill, ripple } from "@/lib/press";
 import { cachedStatus, refreshStatus } from "@/lib/use-status";
 import { color, radius, size, space, TAP } from "@/theme";
 
@@ -71,6 +73,7 @@ export default function AddLeverSheet() {
         gap: space[3],
       }}
     >
+      <SheetHandle />
       <Label>add a lever</Label>
       <Body tone="mute" style={{ fontSize: size.xs }}>
         One more small real thing that keeps a day up. {MAX_LEVERS} is the
@@ -78,6 +81,7 @@ export default function AddLeverSheet() {
       </Body>
 
       <TextInput
+        {...fieldTint}
         autoFocus
         value={label}
         onChangeText={setLabel}
@@ -102,12 +106,13 @@ export default function AddLeverSheet() {
         accessibilityRole="button"
         disabled={!label.trim() || busy}
         onPress={add}
+        android_ripple={!label.trim() || busy ? undefined : ripple("line")}
         style={({ pressed }) => ({
           minHeight: TAP,
           borderRadius: radius.md,
           borderWidth: 1,
           borderColor: color.lineHi,
-          backgroundColor: pressed ? color.line : color.surfaceHi,
+          backgroundColor: pressFill(color.surfaceHi, color.line, pressed),
           alignItems: "center",
           justifyContent: "center",
           opacity: !label.trim() || busy ? 0.4 : 1,

@@ -9,7 +9,7 @@ import {
 import { useHeaderHeight } from "@react-navigation/elements";
 
 import { Button } from "@/components/button";
-import { field } from "@/components/fields";
+import { field, fieldTint } from "@/components/fields";
 import { Loading } from "@/components/states";
 import { Screen } from "@/components/screen";
 import { Body, Label } from "@/components/ui";
@@ -106,6 +106,7 @@ export default function DeleteAccountScreen() {
           type {CONFIRM_WORD} to confirm
         </Label>
         <TextInput
+          {...fieldTint}
           value={typed}
           onChangeText={setTyped}
           placeholder={CONFIRM_WORD}

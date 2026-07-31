@@ -4,7 +4,7 @@ import { useHeaderHeight } from "@react-navigation/elements";
 import { useRouter } from "expo-router";
 
 import { Button } from "@/components/button";
-import { field } from "@/components/fields";
+import { field, fieldTint } from "@/components/fields";
 import { Screen } from "@/components/screen";
 import { Note } from "@/components/settings-ui";
 import { Body, Label } from "@/components/ui";
@@ -58,6 +58,7 @@ export default function ChangePasswordScreen() {
         <View style={{ gap: space[3] }}>
           <Label>new password</Label>
           <TextInput
+            {...fieldTint}
             value={password}
             onChangeText={setPassword}
             placeholder={`at least ${MIN_LENGTH} characters`}
@@ -73,6 +74,7 @@ export default function ChangePasswordScreen() {
 
           <Label style={{ marginTop: space[2] }}>confirm</Label>
           <TextInput
+            {...fieldTint}
             value={confirm}
             onChangeText={setConfirm}
             placeholder="same again"

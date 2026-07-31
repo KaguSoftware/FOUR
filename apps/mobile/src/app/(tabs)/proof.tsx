@@ -10,10 +10,11 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { DAILY_TREND_DAYS, NOTE_MAX } from "@uptime/core";
 
 import { Body, Label, Mono, Rule } from "@/components/ui";
-import { field, noteField } from "@/components/fields";
+import { field, fieldTint, noteField } from "@/components/fields";
 import { Fault, Loading } from "@/components/states";
 import { Screen } from "@/components/screen";
 import { Trend, WeightTrend } from "@/components/trend";
+import { pressFill, pressFillFlat, ripple } from "@/lib/press";
 import { useStatus } from "@/lib/use-status";
 import {
   loadSignals,
@@ -23,6 +24,8 @@ import {
   type WeightRow,
 } from "@/lib/signals";
 import { color, radius, size, space, TAP } from "@/theme";
+
+const android = Platform.OS === "android";
 
 /**
  * Proof — the file of what came back.
@@ -140,12 +143,19 @@ export default function ProofScreen() {
                       params: { date: n.observed_on, text: n.detail ?? "" },
                     })
                   }
+                  // The ripple needs somewhere to be drawn: the iOS version
+                  // grows the row's padding under the finger and pulls the
+                  // margin back to keep the text still, which is a held state
+                  // and cannot be animated per-frame from a ripple. Android
+                  // instead carries the inset permanently — invisible while
+                  // resting, and the ripple then covers the whole row.
+                  android_ripple={ripple("surface")}
                   style={({ pressed }) => ({
                     paddingVertical: space[4],
-                    paddingHorizontal: pressed ? space[2] : 0,
-                    marginHorizontal: pressed ? -space[2] : 0,
+                    paddingHorizontal: android ? space[2] : pressed ? space[2] : 0,
+                    marginHorizontal: android ? -space[2] : pressed ? -space[2] : 0,
                     borderRadius: radius.md,
-                    backgroundColor: pressed ? color.surface : "transparent",
+                    backgroundColor: pressFillFlat(color.surface, pressed),
                   })}
                 >
                   {/* The date sits ABOVE the entry. These are paragraphs, not
@@ -296,6 +306,7 @@ function DailyCheck({
         <View style={{ marginTop: space[4] }}>
           <Label style={{ marginBottom: space[2] }}>weight ({weightUnit})</Label>
           <TextInput
+            {...fieldTint}
             value={weight}
             onChangeText={setWeight}
             placeholder="—"
@@ -313,6 +324,7 @@ function DailyCheck({
         what&apos;s up?
       </Label>
       <TextInput
+        {...fieldTint}
         value={note}
         onChangeText={setNote}
         placeholder="Whatever you want to remember about today."
@@ -335,13 +347,14 @@ function DailyCheck({
           accessibilityRole="button"
           disabled={empty || saving}
           onPress={save}
+          android_ripple={empty || saving ? undefined : ripple("line")}
           style={({ pressed }) => ({
             minHeight: TAP,
             paddingHorizontal: space[5],
             borderRadius: radius.md,
             borderWidth: 1,
             borderColor: color.lineHi,
-            backgroundColor: pressed ? color.line : color.surfaceHi,
+            backgroundColor: pressFill(color.surfaceHi, color.line, pressed),
             alignItems: "center",
             justifyContent: "center",
             opacity: empty || saving ? 0.4 : 1,

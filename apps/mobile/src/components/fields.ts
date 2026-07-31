@@ -1,3 +1,5 @@
+import { Platform } from "react-native";
+
 import { color, radius, space, TAP } from "@/theme";
 
 /**
@@ -30,7 +32,38 @@ export const field = {
   color: color.ink,
   fontFamily: "Inter_400Regular",
   fontSize: 16,
+  includeFontPadding: false,
 } as const;
+
+/**
+ * The caret, the highlight and the drag handles.
+ *
+ * Spread onto the `TextInput` itself, not into `field` — these are props, not
+ * styles, and RN would drop them silently if they went in the style object.
+ *
+ * Android draws all three from the platform accent, which on this palette is
+ * a stock blue caret and two stock blue teardrop handles on a near-black
+ * field. Nothing else in the app is that colour, and the app has exactly one
+ * appearance, so the accent has to come from the palette instead. `ink` for
+ * the caret and handles, `line-hi` for the selection block — the same token
+ * the app already uses wherever a stroke has to read against `bg` (3.33:1),
+ * so highlighted text stays legible rather than being washed out by its own
+ * highlight.
+ *
+ * **Android only, deliberately.** `cursorColor` and `selectionHandleColor` are
+ * Android-only props, but `selectionColor` is NOT — iOS reads it and uses it
+ * for the caret as well as the selection. Applying it there would repaint the
+ * iOS caret grey, which is both a change to a shipped screen and a worse
+ * caret. iOS keeps the system tint it has always had.
+ */
+export const fieldTint = Platform.select({
+  android: {
+    selectionColor: color.lineHi,
+    cursorColor: color.ink,
+    selectionHandleColor: color.ink,
+  },
+  default: {},
+});
 
 /**
  * A multi-line note field.

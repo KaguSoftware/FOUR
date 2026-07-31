@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   ScrollView,
   TextInput,
   View,
@@ -11,18 +10,21 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as AppleAuthentication from "expo-apple-authentication";
 import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
+import { GoogleSigninButton } from "@react-native-google-signin/google-signin";
 import { useRouter } from "expo-router";
 
-import { Button } from "@/components/button";
-import { field } from "@/components/fields";
+import { Button, TextButton } from "@/components/button";
+import { field, fieldTint } from "@/components/fields";
 import { Body, Label, Rule, Wordmark } from "@/components/ui";
 import { signInWithApple, signInWithGoogle } from "@/lib/oauth";
 import { supabase } from "@/lib/supabase";
-import { color, radius, size, space, TAP } from "@/theme";
+import { color, radius, space } from "@/theme";
 
 // Closes the auth popup on platforms where the browser hands control back
 // without resolving the session itself. A no-op everywhere else.
 WebBrowser.maybeCompleteAuthSession();
+
+const android = Platform.OS === "android";
 
 type Mode = "in" | "up";
 
@@ -151,6 +153,7 @@ export default function SignInScreen() {
         ) : (
           <View style={{ gap: space[3] }}>
             <TextInput
+              {...fieldTint}
               value={email}
               onChangeText={setEmail}
               placeholder="email"
@@ -170,6 +173,7 @@ export default function SignInScreen() {
               style={[field, { backgroundColor: color.surface }]}
             />
             <TextInput
+              {...fieldTint}
               value={password}
               onChangeText={setPassword}
               placeholder="password"
@@ -209,33 +213,25 @@ export default function SignInScreen() {
                 alignItems: "center",
               }}
             >
-              <Pressable
-                accessibilityRole="button"
+              <TextButton
+                title={mode === "in" ? "or create an account" : "or sign in"}
+                align="start"
                 onPress={() => {
                   setMode(mode === "in" ? "up" : "in");
                   setError(null);
                 }}
-                style={{ minHeight: TAP, justifyContent: "center" }}
-              >
-                <Body tone="mute" style={{ fontSize: size.xs }}>
-                  {mode === "in" ? "or create an account" : "or sign in"}
-                </Body>
-              </Pressable>
+              />
 
-              <Pressable
-                accessibilityRole="button"
+              <TextButton
+                title="email me a code"
+                align="start"
                 onPress={() =>
                   router.push({
                     pathname: "/email-otp",
                     params: { email: email.trim() },
                   })
                 }
-                style={{ minHeight: TAP, justifyContent: "center" }}
-              >
-                <Body tone="mute" style={{ fontSize: size.xs }}>
-                  email me a code
-                </Body>
-              </Pressable>
+              />
             </View>
 
             <View
@@ -267,10 +263,30 @@ export default function SignInScreen() {
               />
             )}
 
-            <Button
-              title="continue with google"
-              onPress={() => withProvider(signInWithGoogle)}
-            />
+            {/* Google's own button on Android, for the same reason Apple's is
+                Apple's above: the vendor's branding guidelines ask for it,
+                store review checks, and on Android it is also the button
+                users recognise as "the account sheet opens". Elsewhere — iOS,
+                and any Android without Play Services — it is the app's own
+                quiet button opening the browser flow, which is what that
+                path actually does. */}
+            {android ? (
+              <GoogleSigninButton
+                size={GoogleSigninButton.Size.Wide}
+                color={GoogleSigninButton.Color.Dark}
+                onPress={() => withProvider(signInWithGoogle)}
+                disabled={busy}
+                // The button renders at a fixed intrinsic size; stretching the
+                // wrapper and centring keeps it on the column's axis rather
+                // than pinned left against full-width neighbours.
+                style={{ alignSelf: "center", height: 48 }}
+              />
+            ) : (
+              <Button
+                title="continue with google"
+                onPress={() => withProvider(signInWithGoogle)}
+              />
+            )}
           </View>
         )}
       </ScrollView>

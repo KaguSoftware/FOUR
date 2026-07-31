@@ -5,6 +5,7 @@ import * as Localization from "expo-localization";
 import { applyToDay, MILESTONE_COPY } from "@uptime/core";
 
 import { Body, Label, Mono } from "@/components/ui";
+import { useNotify } from "@/components/snackbar";
 import { DayGrid } from "@/components/day-grid";
 import { LeverButtons } from "@/components/lever-buttons";
 import { Screen } from "@/components/screen";
@@ -19,6 +20,7 @@ import { color, size, space } from "@/theme";
 export default function StatusScreen() {
   const router = useRouter();
   const { status, loading, error, refresh } = useStatus();
+  const notify = useNotify();
 
   /**
    * Every lever tap goes through the outbox, online or not.
@@ -133,7 +135,15 @@ export default function StatusScreen() {
         <RefreshControl
           refreshing={loading}
           onRefresh={refresh}
+          // `tintColor` is the iOS spinner and is IGNORED on Android, which
+          // draws a Material circular indicator on its own opaque disc — both
+          // from the platform default, so on this palette it was a blue arc on
+          // a white circle over a near-black screen. `colors` and
+          // `progressBackgroundColor` are the Android half, and iOS ignores
+          // them in turn.
           tintColor={color.inkMute}
+          colors={[color.ink]}
+          progressBackgroundColor={color.surface}
         />
       }
       headerRight={
@@ -222,10 +232,12 @@ export default function StatusScreen() {
         // only make it stick, and say so if it didn't.
         onReorder={async (ids) => {
           const res = await reorderLevers(ids);
-          if (!res.ok) Alert.alert("Didn't save", res.error);
+          if (!res.ok) notify("Didn't save", res.error);
           await refresh();
         }}
-        onArchive={(lever) => confirmArchive(lever, state.user_id, refresh)}
+        onArchive={(lever) =>
+          confirmArchive(lever, state.user_id, refresh, notify)
+        }
       />
 
       {slammed && (
@@ -245,11 +257,18 @@ export default function StatusScreen() {
  * and tapping "archive", so the confirmation matters more here, not less. The
  * copy is the manager's, verbatim: what someone needs to know is that nothing
  * they already logged is going anywhere.
+ *
+ * **The confirmation stays a real dialog on both platforms.** It is a
+ * question, and Android's own convention for a question that removes
+ * something is a dialog too — a snackbar can be missed, and a warning that
+ * can be missed is not a warning. Only the FAILURE that may follow it is
+ * routed through `notify`, because that one is a statement.
  */
 function confirmArchive(
   lever: LeverRow,
   userId: string,
   refresh: () => Promise<void> | void,
+  notify: ReturnType<typeof useNotify>,
 ) {
   Alert.alert(
     `Archive ${lever.label}?`,
@@ -261,7 +280,7 @@ function confirmArchive(
         style: "destructive",
         onPress: async () => {
           const res = await archiveLever(userId, lever.id);
-          if (!res.ok) Alert.alert("Didn't archive", res.error);
+          if (!res.ok) notify("Didn't archive", res.error);
           await refresh();
         },
       },

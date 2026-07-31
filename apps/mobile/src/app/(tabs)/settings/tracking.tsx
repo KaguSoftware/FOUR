@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { Alert } from "react-native";
 
 import { Label } from "@/components/ui";
+import { useNotify } from "@/components/snackbar";
 import { Loading } from "@/components/states";
 import { Screen } from "@/components/screen";
 import { Segmented } from "@/components/segmented";
@@ -34,6 +34,7 @@ type Pending = { enabled?: boolean; unit?: Unit };
 export default function TrackingScreen() {
   const { status, refresh } = useStatus();
   const [pending, setPending] = useState<Pending>({});
+  const notify = useNotify();
 
   if (!status) return <Loading />;
   const { state } = status;
@@ -57,7 +58,7 @@ export default function TrackingScreen() {
 
     if (error) {
       drop();
-      Alert.alert("Didn't save", "That change didn't reach the server.");
+      notify("Didn't save", "That change didn't reach the server.");
       return;
     }
     // Hold the optimistic value until the reload lands, then drop it — the

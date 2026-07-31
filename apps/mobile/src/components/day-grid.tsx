@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import { AccessibilityInfo, Pressable, View } from "react-native";
+import { useCallback } from "react";
+import { Pressable, View } from "react-native";
 import Animated, {
   cancelAnimation,
   Easing,
@@ -21,6 +21,7 @@ import {
   type LeverSpan,
 } from "@uptime/core";
 import { Label, Mono } from "./ui";
+import { useReduceMotion } from "@/lib/reduce-motion";
 import { color, radius, size, space } from "@/theme";
 
 /**
@@ -372,16 +373,9 @@ function TodayCell({
   onPress?: (date: string) => void;
 }) {
   const phase = useSharedValue(0);
-  const [reduceMotion, setReduceMotion] = useState(false);
-
-  useEffect(() => {
-    AccessibilityInfo.isReduceMotionEnabled().then(setReduceMotion);
-    const sub = AccessibilityInfo.addEventListener(
-      "reduceMotionChanged",
-      setReduceMotion,
-    );
-    return () => sub.remove();
-  }, []);
+  // Was an inline subscription here — the only one in the app. It is
+  // `lib/reduce-motion` now, because the snackbar has the same obligation.
+  const reduceMotion = useReduceMotion();
 
   useFocusEffect(
     useCallback(() => {

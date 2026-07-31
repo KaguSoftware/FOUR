@@ -1,6 +1,7 @@
 import * as Notifications from "expo-notifications";
 import { SchedulableTriggerInputTypes } from "expo-notifications";
-import { PUSH_CHANNEL } from "@uptime/core";
+import { PUSH_CHANNEL, REMINDER_CHANNEL } from "@uptime/core";
+import { ensureChannels } from "./push";
 
 /**
  * The daily reminder — a local notification, scheduled on this device.
@@ -31,6 +32,10 @@ export const reminderLabel = (t: string) => t.slice(0, 5);
 
 async function schedule(time: string) {
   const { hour, minute } = parseTime(time);
+  // The channel must exist before anything is posted to it, and this path
+  // never touches `registerForPush` — a reminder needs no token and no EAS
+  // project. A no-op on iOS and on a channel that already exists.
+  await ensureChannels();
   await Notifications.scheduleNotificationAsync({
     identifier: REMINDER_ID,
     content: {
@@ -42,7 +47,9 @@ async function schedule(time: string) {
       type: SchedulableTriggerInputTypes.DAILY,
       hour,
       minute,
-      channelId: PUSH_CHANNEL,
+      // Its OWN channel, not the pager's. The user can silence the nightly
+      // nudge without silencing an outage alert — see `REMINDER_CHANNEL`.
+      channelId: REMINDER_CHANNEL,
     },
   });
 }
@@ -154,14 +161,23 @@ export async function sendTestAlert(): Promise<ReminderSync> {
     return { ok: false, reason: "notifications not permitted" };
   }
 
+  await ensureChannels();
   await Notifications.scheduleNotificationAsync({
     content: {
       title: "four — TEST PAGE",
       body: "This is what a page looks like. The real one fires when the system is down.",
+      // A test page that arrives quietly is not a test of the page. The real
+      // one is sent at `high` priority by the monitor (see `core/push.ts`), so
+      // this has to match or it demonstrates the wrong thing — someone would
+      // check the pager, see it slide silently into the shade, and conclude
+      // the alerts do not work.
+      priority: Notifications.AndroidNotificationPriority.MAX,
     },
     trigger: {
       type: SchedulableTriggerInputTypes.TIME_INTERVAL,
       seconds: 2,
+      // The PAGER's channel, deliberately — the point is to show what a real
+      // page looks like, and a real page comes through `monitor`.
       channelId: PUSH_CHANNEL,
     },
   });

@@ -1,9 +1,10 @@
 import { useCallback, useState } from "react";
-import { Alert, Linking } from "react-native";
+import { Linking, Platform } from "react-native";
 import * as Notifications from "expo-notifications";
 import { useFocusEffect } from "expo-router";
 import { addDays } from "@uptime/core";
 
+import { useNotify } from "@/components/snackbar";
 import { Loading } from "@/components/states";
 import { Screen } from "@/components/screen";
 import {
@@ -28,6 +29,19 @@ type Pending = {
 const DEFAULT_REMINDER = "21:00:00";
 
 /**
+ * What to call the place the user has to go.
+ *
+ * Three strings on this screen said "iOS Settings" outright. On an Android
+ * phone that names an app the user does not have, about a switch that is
+ * genuinely somewhere else — the one moment this copy is read is the moment
+ * it has to be right, because the user is being sent to find something.
+ */
+const SYSTEM_SETTINGS = Platform.OS === "ios" ? "iOS Settings" : "Settings";
+
+/** "Notifications are off" — the same message from three places. */
+const PERMISSION_OFF = `Turn them on for four in ${SYSTEM_SETTINGS}, then try again.`;
+
+/**
  * Two channels share this screen and must not blur: the PAGER is the server's,
  * fires when the system is down, and has no off switch — that channel is the
  * product. The REMINDER is a local nudge at a chosen time, off by default,
@@ -37,9 +51,29 @@ export default function AlertsScreen() {
   const { status, refresh } = useStatus();
   const [pending, setPending] = useState<Pending>({});
   const [permission, setPermission] = useState<string | null>(null);
+  const notify = useNotify();
 
-  // Re-read on every focus: the user may have just changed it in iOS Settings,
-  // and a stale "off" here would look like the app disagreeing with the OS.
+  /**
+   * "Notifications are off", from the three places that can discover it.
+   *
+   * On Android it carries the fix as a snackbar action, which is the Material
+   * shape for a message the user can do something about — one tap straight to
+   * the app's notification settings rather than a dialog telling them to go
+   * find it themselves. On iOS `useNotify` falls through to the Alert this
+   * screen already showed.
+   */
+  const permissionOff = useCallback(
+    () =>
+      notify("Notifications are off", PERMISSION_OFF, {
+        label: "settings",
+        onPress: () => Linking.openSettings(),
+      }),
+    [notify],
+  );
+
+  // Re-read on every focus: the user may have just changed it in system
+  // settings, and a stale "off" here would look like the app disagreeing
+  // with the OS.
   useFocusEffect(
     useCallback(() => {
       let live = true;
@@ -84,7 +118,7 @@ export default function AlertsScreen() {
       // Put it back. A switch that stays on after a failed write is a lie the
       // user only discovers later, when the monitor behaves unexpectedly.
       drop();
-      Alert.alert("Didn't save", "That change didn't reach the server.");
+      notify("Didn't save", "That change didn't reach the server.");
       return false;
     }
 
@@ -103,10 +137,7 @@ export default function AlertsScreen() {
       // fire.
       const sync = await syncReminder(time);
       if (!sync.ok) {
-        Alert.alert(
-          "Notifications are off",
-          "Turn them on for four in iOS Settings, then try again.",
-        );
+        permissionOff();
         setPermission("denied");
         return;
       }
@@ -128,10 +159,7 @@ export default function AlertsScreen() {
   async function onTestAlert() {
     const res = await sendTestAlert();
     if (!res.ok) {
-      Alert.alert(
-        "Notifications are off",
-        "Turn them on for four in iOS Settings, then try again.",
-      );
+      permissionOff();
       setPermission("denied");
     }
   }
@@ -185,7 +213,7 @@ export default function AlertsScreen() {
       <Group title="delivery">
         {permission === "denied" ? (
           <ActionRow
-            title="Notifications off — open iOS Settings"
+            title={`Notifications off — open ${SYSTEM_SETTINGS}`}
             onPress={() => Linking.openSettings()}
           />
         ) : (

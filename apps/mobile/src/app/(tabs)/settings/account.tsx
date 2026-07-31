@@ -2,6 +2,7 @@ import { useSyncExternalStore } from "react";
 import { Alert, View } from "react-native";
 import { oldestAgeDays, pending, type OutboxItem } from "@uptime/core";
 
+import { useNotify } from "@/components/snackbar";
 import { Fault, Loading } from "@/components/states";
 import { Screen } from "@/components/screen";
 import {
@@ -46,6 +47,7 @@ export default function AccountScreen() {
     outboxHealthStore.subscribe,
     outboxHealthStore.get,
   );
+  const notify = useNotify();
 
   if (!status) return <Loading />;
   const { state, user } = status;
@@ -55,7 +57,7 @@ export default function AccountScreen() {
 
   async function onExport() {
     const res = await exportData(state.user_id);
-    if (!res.ok) Alert.alert("Couldn't export", res.reason);
+    if (!res.ok) notify("Couldn't export", res.reason);
   }
 
   return (

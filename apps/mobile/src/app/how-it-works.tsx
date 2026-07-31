@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AccessibilityInfo,
-  Pressable,
   ScrollView,
   Text,
   View,
@@ -10,13 +9,21 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { addDays, gridFill, type Entry } from "@uptime/core";
 
-import { Button } from "@/components/button";
+import { Button, TextButton } from "@/components/button";
 import { DayGrid } from "@/components/day-grid";
 import { LeverButtons } from "@/components/lever-buttons";
-import { Body, Label, Mono, Rule, Wordmark } from "@/components/ui";
+import {
+  androidMetrics,
+  Body,
+  Label,
+  Mono,
+  Rule,
+  Wordmark,
+} from "@/components/ui";
+import { useAndroidBack } from "@/lib/back";
 import { today } from "@/lib/status";
 import type { LeverRow } from "@/lib/status";
-import { color, radius, size, space, TAP } from "@/theme";
+import { color, radius, size, space } from "@/theme";
 
 const STEPS = 7;
 
@@ -55,6 +62,18 @@ export default function HowItWorksScreen() {
   const router = useRouter();
   const [step, setStep] = useState(0);
   const scroll = useRef<ScrollView>(null);
+
+  // Android's Back walks the pages, not the modal. Seven steps live inside one
+  // route, so the navigator's own Back would close all seven from page 6 —
+  // which is not what "back" means to anyone reading page 6. Only page 0 hands
+  // the press on, and there the modal closing IS one step back.
+  useAndroidBack(
+    useCallback(() => {
+      if (step === 0) return false;
+      setStep((s) => s - 1);
+      return true;
+    }, [step]),
+  );
 
   // A page change is a page change, not a re-render of the same one. The
   // scroll position resets — a long page scrolled to reach "next" must not
@@ -118,20 +137,11 @@ export default function HowItWorksScreen() {
           tall
         />
         {step > 0 && (
-          <Pressable
-            accessibilityRole="button"
+          <TextButton
+            title="← back"
             accessibilityLabel="Back to the previous page"
             onPress={() => setStep(step - 1)}
-            style={{
-              minHeight: TAP,
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <Body tone="mute" style={{ fontSize: size.xs }}>
-              ← back
-            </Body>
-          </Pressable>
+          />
         )}
       </View>
     </ScrollView>
@@ -141,6 +151,7 @@ export default function HowItWorksScreen() {
 // --- shared pieces -----------------------------------------------------------
 
 const heading = {
+  ...androidMetrics,
   fontFamily: "Inter_400Regular",
   fontSize: size.lg,
   lineHeight: size.lg * 1.4,
@@ -390,6 +401,7 @@ function TheOutage() {
       <Specimen>
         <Text
           style={{
+            ...androidMetrics,
             fontFamily: "Inter_500Medium",
             fontSize: size["2xl"],
             color: color.down,
@@ -414,6 +426,7 @@ function TheOutage() {
         >
           <Text
             style={{
+              ...androidMetrics,
               fontFamily: "Inter_400Regular",
               fontSize: size.sm,
               color: color.ink,

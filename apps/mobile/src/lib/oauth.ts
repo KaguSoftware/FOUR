@@ -3,6 +3,12 @@ import * as Crypto from "expo-crypto";
 import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
 import { Platform } from "react-native";
+import {
+  GoogleSignin,
+  isErrorWithCode,
+  isSuccessResponse,
+  statusCodes,
+} from "@react-native-google-signin/google-signin";
 
 import { supabase } from "./supabase";
 
@@ -93,6 +99,115 @@ export async function signInWithApple(): Promise<OAuthResult> {
  * password login every time; too harsh for the problem.
  */
 export async function signInWithGoogle(): Promise<OAuthResult> {
+  if (Platform.OS === "android") {
+    const native = await signInWithGoogleNative();
+    // `null` means Play Services is genuinely absent — a de-Googled ROM, or a
+    // device where it needs updating. Fall through to the browser flow rather
+    // than dead-ending; it still works, it is just not the native sheet.
+    if (native !== null) return native;
+  }
+
+  return signInWithGoogleWeb();
+}
+
+/**
+ * Sign in with Google on Android, via Credential Manager.
+ *
+ * This is what Google Sign-In looks like on Android and has since Play
+ * Services 23: a bottom sheet listing the accounts already on the device, with
+ * the app's name on it, resolved without ever leaving the app. The web flow
+ * below — bounce to a Custom Tab, consent screen, redirect back — is what
+ * Android apps did before that existed, and to a fluent user it reads as the
+ * app not having bothered.
+ *
+ * It also removes the failure mode the web flow's `detail` diagnostics exist
+ * for: there is no redirect URL to misroute, so there is nothing to misroute.
+ *
+ * The token path is the same one the Apple button already uses —
+ * `signInWithIdToken` — so the session, the `Stack.Protected` gate and the
+ * routing afterwards are unchanged. Nothing downstream knows which of the
+ * three ways the session was created.
+ *
+ * **Returns `null`, distinctly from a failure, when Play Services is missing.**
+ * That is not the user's fault and not an error worth showing: the caller
+ * falls back to the web round trip, which needs nothing from Google's SDK.
+ *
+ * Needs `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` — the **Web** client ID from Google
+ * Cloud, not the Android one. Android's own client is matched by package name
+ * and SHA-1 certificate fingerprint and is never named in code; the web client
+ * is the audience the returned `idToken` is minted for, and it is the value
+ * Supabase's Google provider must list as an authorised client. Getting these
+ * two confused is the single most common way this flow fails, and it fails
+ * with `DEVELOPER_ERROR`, which says nothing.
+ */
+async function signInWithGoogleNative(): Promise<OAuthResult | null> {
+  const webClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
+  if (!webClientId) {
+    // A build-configuration problem, not a user-facing one. Fall back rather
+    // than show someone an error about an environment variable.
+    if (__DEV__) {
+      console.warn(
+        "[oauth] EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID is unset — " +
+          "falling back to the browser flow. See README.",
+      );
+    }
+    return null;
+  }
+
+  try {
+    // Idempotent, and cheap enough to do per attempt rather than keeping a
+    // module-level "have I configured this yet" flag that a fast refresh
+    // would desynchronise.
+    GoogleSignin.configure({ webClientId });
+    await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+  } catch {
+    return null;
+  }
+
+  try {
+    const response = await GoogleSignin.signIn();
+
+    // Dismissing the sheet is a decision, not a failure — the same rule the
+    // Apple path and the web path already follow.
+    if (!isSuccessResponse(response)) {
+      return { ok: false, reason: "canceled", canceled: true };
+    }
+
+    const idToken = response.data.idToken;
+    if (!idToken) {
+      return {
+        ok: false,
+        reason: "Google returned no identity token.",
+        detail: "native credential manager; check the web client ID",
+      };
+    }
+
+    const { error } = await supabase.auth.signInWithIdToken({
+      provider: "google",
+      token: idToken,
+    });
+    if (error) return { ok: false, reason: error.message };
+    return { ok: true };
+  } catch (e) {
+    if (isErrorWithCode(e) && e.code === statusCodes.SIGN_IN_CANCELLED) {
+      return { ok: false, reason: "canceled", canceled: true };
+    }
+    return {
+      ok: false,
+      reason: String(e),
+      detail: isErrorWithCode(e) ? `code=${e.code}` : undefined,
+    };
+  }
+}
+
+/**
+ * The browser round trip. **iOS always, and Android's fallback.**
+ *
+ * Unchanged from what shipped — see the docblock above `signInWithGoogle` for
+ * the `prompt=select_account` and `detail` reasoning, both of which cost a
+ * debugging session to arrive at.
+ */
+async function signInWithGoogleWeb(): Promise<OAuthResult> {
   const redirectTo = Linking.createURL("auth/callback");
 
   const { data, error } = await supabase.auth.signInWithOAuth({

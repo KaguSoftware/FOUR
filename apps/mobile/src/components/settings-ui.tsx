@@ -9,7 +9,10 @@ import { useRouter } from "expo-router";
 import type { Href } from "expo-router";
 
 import { Body, Label, Rule } from "./ui";
+import { pressFillFlat, ripple } from "@/lib/press";
 import { color, radius, size, space, TAP } from "@/theme";
+
+const android = Platform.OS === "android";
 
 /**
  * The vocabulary Settings is written in.
@@ -39,8 +42,17 @@ import { color, radius, size, space, TAP } from "@/theme";
  * 2026-07-29). A line box close to the glyph height centers cleanly — the same
  * reason `Segmented` sets no lineHeight at all. Prose (`Note`) keeps the
  * reading leading; this is for single-line row text only.
+ *
+ * `textAlignVertical` is the Android half of the same fix, and it is needed
+ * for a different reason: Android does not centre a `TextView`'s text within
+ * its own line box by default — it top-aligns it — so a row whose text has
+ * any leading at all sits high. iOS ignores the property, so it cannot
+ * disturb the fix above.
  */
-const rowText = { lineHeight: size.sm * 1.25 } as const;
+const rowText = {
+  lineHeight: size.sm * 1.25,
+  textAlignVertical: "center",
+} as const;
 
 /** A titled group of rows, hairline-separated. */
 export function Group({
@@ -85,6 +97,27 @@ export function RowRule() {
  * than invoked, and with it every declared style. `ValueRow` (plain View) and
  * `ActionRow` (plain Pressable) were fine on the same screen, which is what
  * narrowed it. The link role in the accessibility tree is kept by hand.
+ *
+ * ## Two layouts, one row
+ *
+ * The two platforms genuinely disagree about how a settings row states its
+ * current value, and this is the clearest case in the app of the locked "one
+ * visual system, two interaction layers" rule paying for itself.
+ *
+ * **iOS** puts the value on the right, at the end of the row, with a
+ * disclosure chevron after it. That is the `UITableViewCell` `.value1` style,
+ * and every settings screen on the platform looks like it.
+ *
+ * **Android** puts it underneath, as a summary line, and shows no chevron at
+ * all — a `Preference` with a `summary`, which is what the system Settings app
+ * and every app that follows it does. The chevron is specifically an iOS tell:
+ * Material dropped it because the whole row being tappable is already the
+ * affordance, and a row that ends in an arrow reads as ported.
+ *
+ * The data is identical, the palette is identical, the type is identical, the
+ * touch target is identical. Only the arrangement differs — and the
+ * `accessibilityLabel` is assembled the same way on both, so the screen reader
+ * hears one row either way.
  */
 export function LinkRow({
   title,
@@ -99,31 +132,60 @@ export function LinkRow({
   destructive?: boolean;
 }) {
   const router = useRouter();
+  const titleColor = destructive ? color.down : color.ink;
+
   return (
     <Pressable
       accessibilityRole="link"
       accessibilityLabel={value ? `${title}, ${value}` : title}
       onPress={() => router.push(href)}
+      android_ripple={ripple(destructive ? "down" : "surface")}
       style={({ pressed }) => ({
         minHeight: TAP + space[2],
         flexDirection: "row",
         alignItems: "center",
         gap: space[3],
         paddingHorizontal: space[4],
-        backgroundColor: pressed ? color.surfaceHi : "transparent",
+        // The summary needs breathing room the single-line iOS row does not.
+        paddingVertical: android && value ? space[3] : 0,
+        backgroundColor: pressFillFlat(color.surfaceHi, pressed),
       })}
     >
-      <Body
-        style={[rowText, { flex: 1, color: destructive ? color.down : color.ink }]}
-      >
-        {title}
-      </Body>
-      {value && (
-        <Body tone="mute" numberOfLines={1} style={[rowText, { maxWidth: "50%" }]}>
-          {value}
-        </Body>
+      {android ? (
+        <View style={{ flex: 1 }}>
+          <Body style={[rowText, { color: titleColor }]}>{title}</Body>
+          {value && (
+            <Body
+              tone="mute"
+              numberOfLines={1}
+              // The summary sits on the xs ramp with an xs line box — the same
+              // pairing `Note` documents. At `sm` it competes with its own
+              // title instead of qualifying it.
+              style={{
+                fontSize: size.xs,
+                lineHeight: size.xs * 1.35,
+                marginTop: 2,
+              }}
+            >
+              {value}
+            </Body>
+          )}
+        </View>
+      ) : (
+        <>
+          <Body style={[rowText, { flex: 1, color: titleColor }]}>{title}</Body>
+          {value && (
+            <Body
+              tone="mute"
+              numberOfLines={1}
+              style={[rowText, { maxWidth: "50%" }]}
+            >
+              {value}
+            </Body>
+          )}
+          <MaterialIcons name="chevron-right" size={20} color={color.inkMute} />
+        </>
       )}
-      <MaterialIcons name="chevron-right" size={20} color={color.inkMute} />
     </Pressable>
   );
 }
@@ -247,12 +309,13 @@ export function TimeRow({
               onChange: pick,
             })
           }
+          android_ripple={ripple("surface")}
           style={({ pressed }) => ({
             minHeight: TAP,
             justifyContent: "center",
             paddingHorizontal: space[3],
             borderRadius: radius.sm,
-            backgroundColor: pressed ? color.surfaceHi : "transparent",
+            backgroundColor: pressFillFlat(color.surfaceHi, pressed),
           })}
         >
           <Body tone="mute" style={rowText}>
@@ -311,11 +374,15 @@ export function ActionRow({
     <Pressable
       accessibilityRole="button"
       onPress={onPress}
+      // Android tints a destructive ripple red — the Material convention, and
+      // free here because the ripple is its own layer. iOS keeps the neutral
+      // held fill it already shipped rather than gaining a red one.
+      android_ripple={ripple(destructive ? "down" : "surface")}
       style={({ pressed }) => ({
         minHeight: TAP + space[2],
         justifyContent: "center",
         paddingHorizontal: space[4],
-        backgroundColor: pressed ? color.surfaceHi : "transparent",
+        backgroundColor: pressFillFlat(color.surfaceHi, pressed),
       })}
     >
       <Body style={[rowText, { color: destructive ? color.down : color.ink }]}>

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Pressable, View, type ViewProps } from "react-native";
 
 import { Body, Label } from "@/components/ui";
+import { pressFill, ripple } from "@/lib/press";
 import { color, radius, space, TAP } from "@/theme";
 
 /**
@@ -133,6 +134,7 @@ export function Fault({
           accessibilityRole="button"
           accessibilityLabel={retryLabel}
           onPress={onRetry}
+          android_ripple={ripple("line")}
           style={({ pressed }) => ({
             minHeight: TAP,
             alignSelf: "flex-start",
@@ -140,7 +142,7 @@ export function Fault({
             borderRadius: radius.md,
             borderWidth: 1,
             borderColor: color.lineHi,
-            backgroundColor: pressed ? color.line : color.surfaceHi,
+            backgroundColor: pressFill(color.surfaceHi, color.line, pressed),
             alignItems: "center",
             justifyContent: "center",
           })}

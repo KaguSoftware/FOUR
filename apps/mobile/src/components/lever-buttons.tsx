@@ -10,8 +10,10 @@ import Animated, {
   withSpring,
   withTiming,
 } from "react-native-reanimated";
-import * as Haptics from "expo-haptics";
 import { MAX_LEVERS } from "@uptime/core";
+import { androidMetrics } from "./ui";
+import { committed, nudged, pickedUp } from "@/lib/haptics";
+import { pressFill, pressFillFlat, ripple } from "@/lib/press";
 import { color, radius, size, LEVER_HEIGHT, TAP } from "@/theme";
 import type { LeverRow } from "@/lib/status";
 
@@ -38,11 +40,17 @@ import type { LeverRow } from "@/lib/status";
 const GAP = 8;
 const SPRING = { damping: 20, stiffness: 220 } as const;
 
-/** Haptics off the UI thread. `runOnJS` needs a plain JS function to call. */
-const tapFeedback = () =>
-  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-const nudgeFeedback = () =>
-  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+/**
+ * Haptics off the UI thread. `runOnJS` needs a plain JS function to call.
+ *
+ * Three distinct meanings, not two — picking a lever up and logging one used
+ * to fire the same impact. `lib/haptics` maps each to the right constant on
+ * each platform; on Android those are real `HapticFeedbackConstants` rather
+ * than a raw vibration.
+ */
+const tapFeedback = () => committed();
+const pickUpFeedback = () => pickedUp();
+const nudgeFeedback = () => nudged();
 
 /**
  * How an archived lever leaves.
@@ -227,19 +235,21 @@ export function LeverButtons({
               accessibilityRole="button"
               accessibilityLabel="Add a lever"
               onPress={onAdd}
+              android_ripple={ripple("surface")}
               style={({ pressed }) => ({
                 flex: 1,
                 borderRadius: radius.md,
                 borderWidth: 1,
                 borderStyle: "dashed",
                 borderColor: color.line,
-                backgroundColor: pressed ? color.surface : "transparent",
+                backgroundColor: pressFillFlat(color.surface, pressed),
                 alignItems: "center",
                 justifyContent: "center",
               })}
             >
               <Text
                 style={{
+                  ...androidMetrics,
                   fontFamily: "Inter_400Regular",
                   fontSize: size.xs,
                   color: color.inkMute,
@@ -332,7 +342,7 @@ function LeverCell({
           held.value = withTiming(1, { duration: 120 });
           lastSlot.value = -1;
           runOnJS(setLifted)(true);
-          runOnJS(tapFeedback)();
+          runOnJS(pickUpFeedback)();
           runOnJS(handlers.current.onPickUp)();
         })
         .onUpdate((e) => {
@@ -427,6 +437,10 @@ function LeverCell({
             tapFeedback();
             onPress();
           }}
+          // `foreground: true` matters most here: this cell is absolutely
+          // positioned inside an `Animated.View` and carries its own fill, so
+          // a background ripple would be painted underneath it and never seen.
+          android_ripple={lifted ? undefined : ripple("line")}
           style={({ pressed }) => ({
             flex: 1,
             borderRadius: radius.md,
@@ -437,14 +451,13 @@ function LeverCell({
             borderColor: done ? color.line : color.lineHi,
             backgroundColor: done
               ? color.surface
-              : pressed
-                ? color.line
-                : color.surfaceHi,
+              : pressFill(color.surfaceHi, color.line, pressed),
           })}
         >
           <Text
             numberOfLines={1}
             style={{
+              ...androidMetrics,
               fontFamily: "Inter_500Medium",
               fontSize: compact ? size.xs : size.sm,
               letterSpacing: 0.6,
@@ -502,6 +515,7 @@ function Trash({ visible }: { visible: boolean }) {
     >
       <Text
         style={{
+          ...androidMetrics,
           fontFamily: "Inter_400Regular",
           fontSize: size.xs,
           color: color.down,

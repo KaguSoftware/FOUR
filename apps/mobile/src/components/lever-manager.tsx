@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Alert, Pressable, TextInput, View } from "react-native";
-import { field } from "./fields";
+import { field, fieldTint } from "./fields";
 import Animated, {
   FadeIn,
   FadeOut,
@@ -14,7 +14,9 @@ import {
   MAX_LEVERS,
 } from "@uptime/core";
 import { Body, Label, Rule } from "./ui";
+import { useNotify } from "./snackbar";
 import { supabase } from "@/lib/supabase";
+import { pressFill, ripple } from "@/lib/press";
 import type { LeverRow } from "@/lib/status";
 import { color, radius, size, space, TAP } from "@/theme";
 
@@ -46,6 +48,10 @@ export function LeverManager({
   const [draft, setDraft] = useState("");
   const [adding, setAdding] = useState("");
   const [busy, setBusy] = useState(false);
+  // Statements go through `notify` — a snackbar on Android, the Alert this
+  // already showed on iOS. The archive CONFIRMATION below stays `Alert.alert`
+  // on both, because it asks a question and must block. See `snackbar.tsx`.
+  const notify = useNotify();
 
   const full = !canAddLever(levers.length);
   const last = levers.length <= 1;
@@ -60,7 +66,7 @@ export function LeverManager({
     const result = await fn();
     setBusy(false);
     if (result && "error" in result && result.error) {
-      Alert.alert("Didn't save", "That change didn't reach the server.");
+      notify("Didn't save", "That change didn't reach the server.");
       return;
     }
     await onChanged();
@@ -68,7 +74,7 @@ export function LeverManager({
 
   async function create() {
     const check = validateLeverLabel(adding);
-    if (!check.ok) return Alert.alert("Can't add that", check.reason);
+    if (!check.ok) return notify("Can't add that", check.reason);
 
     // Unique against EVERY key, archived included — an archived lever still
     // owns its key because its entries still point at it.
@@ -80,7 +86,7 @@ export function LeverManager({
     const rows = all ?? [];
     const active = rows.filter((l) => !l.archived);
     if (!canAddLever(active.length)) {
-      return Alert.alert("Four is the maximum", "Archive one first.");
+      return notify("Four is the maximum", "Archive one first.");
     }
 
     // Lowest free slot, so archiving then adding reuses the gap rather than
@@ -104,7 +110,9 @@ export function LeverManager({
 
   function archive(lever: LeverRow) {
     if (last) {
-      return Alert.alert(
+      // A refusal, not a question — nothing is being decided, so it goes the
+      // same way the other statements do.
+      return notify(
         "Keep at least one lever",
         "A dashboard with no buttons is not a state this app has. Add another first.",
       );
@@ -167,13 +175,14 @@ export function LeverManager({
               }}
             >
               <TextInput
+                {...fieldTint}
                 autoFocus
                 value={draft}
                 onChangeText={setDraft}
                 maxLength={LEVER_LABEL_MAX}
                 onSubmitEditing={() => {
                   const check = validateLeverLabel(draft);
-                  if (!check.ok) return Alert.alert("Can't rename", check.reason);
+                  if (!check.ok) return notify("Can't rename", check.reason);
                   setEditing(null);
                   run(() =>
                     supabase
@@ -197,7 +206,13 @@ export function LeverManager({
               <Pressable
                 onPress={() => setEditing(null)}
                 accessibilityRole="button"
-                style={{ minHeight: TAP, justifyContent: "center", paddingHorizontal: space[2] }}
+                android_ripple={ripple("surface")}
+                style={{
+                  minHeight: TAP,
+                  justifyContent: "center",
+                  paddingHorizontal: space[2],
+                  borderRadius: radius.md,
+                }}
               >
                 <Body tone="mute" style={{ fontSize: size.xs }}>
                   cancel
@@ -269,6 +284,7 @@ export function LeverManager({
           }}
         >
           <TextInput
+            {...fieldTint}
             value={adding}
             onChangeText={setAdding}
             placeholder="Add a lever"
@@ -289,13 +305,14 @@ export function LeverManager({
             accessibilityRole="button"
             disabled={!adding.trim() || busy}
             onPress={create}
+            android_ripple={!adding.trim() || busy ? undefined : ripple("line")}
             style={({ pressed }) => ({
               minHeight: TAP,
               paddingHorizontal: space[4],
               borderRadius: radius.md,
               borderWidth: 1,
               borderColor: color.lineHi,
-              backgroundColor: pressed ? color.line : color.surfaceHi,
+              backgroundColor: pressFill(color.surfaceHi, color.line, pressed),
               alignItems: "center",
               justifyContent: "center",
               opacity: !adding.trim() || busy ? 0.4 : 1,

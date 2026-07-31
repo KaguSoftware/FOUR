@@ -6,6 +6,7 @@ import { dayDetail } from "@uptime/core";
 import { Body, Label, Mono } from "@/components/ui";
 import { cachedStatus } from "@/lib/use-status";
 import { color, radius, size, space } from "@/theme";
+import { SheetHandle } from "@/components/sheet";
 
 /**
  * What a day held.
@@ -53,6 +54,7 @@ export default function DaySheet() {
         gap: space[4],
       }}
     >
+      <SheetHandle />
       <Label>{longDate(date)}</Label>
 
       {detail.future ? (

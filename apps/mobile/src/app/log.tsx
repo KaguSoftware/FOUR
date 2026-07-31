@@ -2,10 +2,12 @@ import { useState } from "react";
 import { Pressable, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import * as Haptics from "expo-haptics";
 import { appendDetail } from "@uptime/core";
-import { field } from "@/components/fields";
+import { field, fieldTint } from "@/components/fields";
 import { Body, Label } from "@/components/ui";
+import { SheetHandle } from "@/components/sheet";
+import { committed } from "@/lib/haptics";
+import { pressFill, pressFillFlat, ripple } from "@/lib/press";
 import { cachedStatus } from "@/lib/use-status";
 import { outboxStore, queueWrite } from "@/lib/outbox";
 import { color, radius, size, space, TAP } from "@/theme";
@@ -74,7 +76,7 @@ export default function LogSheet() {
     // One pick per sheet: the second tap is always an accident.
     if (chosen !== null || !status) return;
     setChosen(next ?? "");
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    committed();
     router.back();
     // Adding to a day that is already logged APPENDS rather than replacing.
     // One entry per lever per day is a schema rule, not a product one — doing
@@ -91,7 +93,7 @@ export default function LogSheet() {
   function remove() {
     if (chosen !== null || !status) return;
     setChosen("");
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    committed();
     router.back();
     queueWrite(status.state.user_id, lever, "undo", null);
   }
@@ -109,6 +111,7 @@ export default function LogSheet() {
         gap: space[2],
       }}
     >
+      <SheetHandle />
       <View
         style={{
           flexDirection: "row",
@@ -141,12 +144,13 @@ export default function LogSheet() {
           accessibilityRole="button"
           disabled={chosen !== null}
           onPress={() => commit(item.label)}
+          android_ripple={chosen !== null ? undefined : ripple("line")}
           style={({ pressed }) => ({
             minHeight: 56,
             borderRadius: radius.md,
             borderWidth: 1,
             borderColor: chosen === item.label ? color.lineHi : color.line,
-            backgroundColor: pressed ? color.line : color.surfaceHi,
+            backgroundColor: pressFill(color.surfaceHi, color.line, pressed),
             justifyContent: "center",
             paddingHorizontal: space[4],
           })}
@@ -158,6 +162,7 @@ export default function LogSheet() {
       {typing ? (
         <View style={{ flexDirection: "row", gap: space[2] }}>
           <TextInput
+            {...fieldTint}
             autoFocus
             value={custom}
             onChangeText={setCustom}
@@ -173,6 +178,7 @@ export default function LogSheet() {
           <Pressable
             accessibilityRole="button"
             onPress={() => commit(custom.trim() || null)}
+            android_ripple={ripple("line")}
             style={{
               minHeight: 56,
               paddingHorizontal: space[4],
@@ -190,6 +196,7 @@ export default function LogSheet() {
         <Pressable
           accessibilityRole="button"
           onPress={() => setTyping(true)}
+          android_ripple={ripple("surface")}
           style={{
             minHeight: 56,
             borderRadius: radius.md,
@@ -212,13 +219,14 @@ export default function LogSheet() {
           accessibilityRole="button"
           disabled={chosen !== null}
           onPress={remove}
+          android_ripple={chosen !== null ? undefined : ripple("down")}
           style={({ pressed }) => ({
             minHeight: TAP,
             alignItems: "center",
             justifyContent: "center",
             marginTop: space[1],
             borderRadius: radius.md,
-            backgroundColor: pressed ? color.downDim : "transparent",
+            backgroundColor: pressFillFlat(color.downDim, pressed),
           })}
         >
           <Body style={{ fontSize: size.xs, color: color.down }}>
@@ -230,11 +238,13 @@ export default function LogSheet() {
           accessibilityRole="button"
           disabled={chosen !== null}
           onPress={() => commit(null)}
+          android_ripple={chosen !== null ? undefined : ripple("surface")}
           style={{
             minHeight: TAP,
             alignItems: "center",
             justifyContent: "center",
             marginTop: space[1],
+            borderRadius: radius.md,
           }}
         >
           <Body tone="mute" style={{ fontSize: size.xs }}>

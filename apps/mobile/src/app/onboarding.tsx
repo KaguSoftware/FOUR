@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   AccessibilityInfo,
   KeyboardAvoidingView,
@@ -18,13 +18,15 @@ import {
   validateLeverLabel,
 } from "@uptime/core";
 
-import { Button } from "@/components/button";
-import { field } from "@/components/fields";
-import { Body, Label, Wordmark } from "@/components/ui";
+import { Button, TextButton } from "@/components/button";
+import { field, fieldTint } from "@/components/fields";
+import { androidMetrics, Body, Label, Wordmark } from "@/components/ui";
 import { Segmented } from "@/components/segmented";
 import { Group, Note, RowRule, SwitchRow, TimeRow } from "@/components/settings-ui";
+import { useAndroidBack } from "@/lib/back";
 import { registerForPush } from "@/lib/push";
 import { syncReminder } from "@/lib/reminder";
+import { ripple } from "@/lib/press";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "@/lib/session";
 import { color, radius, size, space, TAP } from "@/theme";
@@ -64,6 +66,28 @@ export default function OnboardingScreen() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const scroll = useRef<ScrollView>(null);
+
+  /**
+   * Android's Back, walking the four steps.
+   *
+   * The root layout sets `gestureEnabled: false` on this route, which blocks
+   * the iOS edge-swipe and does **nothing at all** to the Android Back button
+   * — different mechanisms entirely. So Back on step 3 of 4 popped the only
+   * screen in the stack and dropped the user out of a setup they had not
+   * finished, having written nothing (nothing is saved until the last tap).
+   *
+   * Step 0 swallows the press rather than passing it on. There is genuinely
+   * nothing behind this screen: the session exists, the account has no levers,
+   * and `Stack.Protected` has removed every other branch from the navigation
+   * state. Letting Back through would close the app on someone mid-signup —
+   * and the deliberate way out, "sign out", is already on the screen.
+   */
+  useAndroidBack(
+    useCallback(() => {
+      if (step > 0) setStep((s) => s - 1);
+      return true;
+    }, [step]),
+  );
 
   // A step change is a page change: reset the scroll — a long step scrolled
   // to reach its CTA must not hand its offset to the next one — and tell a
@@ -146,6 +170,7 @@ export default function OnboardingScreen() {
   }
 
   const heading = {
+    ...androidMetrics,
     fontFamily: "Inter_400Regular",
     fontSize: size.lg,
     lineHeight: size.lg * 1.4,
@@ -218,6 +243,7 @@ export default function OnboardingScreen() {
                   style={{ flexDirection: "row", alignItems: "center", gap: space[2] }}
                 >
                   <TextInput
+                    {...fieldTint}
                     autoFocus={i === 0}
                     value={label}
                     maxLength={LEVER_LABEL_MAX}
@@ -235,10 +261,16 @@ export default function OnboardingScreen() {
                       onPress={() =>
                         setLabels(labels.filter((_, n) => n !== i))
                       }
+                      // Not `TextButton`: this one already carries its own
+                      // horizontal padding inside a flex row, and the shared
+                      // component's negative margin would move it. Same
+                      // ripple, laid out where it already was.
+                      android_ripple={ripple("surface")}
                       style={{
                         minHeight: TAP,
                         paddingHorizontal: space[3],
                         justifyContent: "center",
+                        borderRadius: radius.md,
                       }}
                     >
                       <Body tone="mute" style={{ fontSize: size.xs }}>
@@ -256,6 +288,7 @@ export default function OnboardingScreen() {
               <Pressable
                 accessibilityRole="button"
                 onPress={() => setLabels([...labels, ""])}
+                android_ripple={ripple("surface")}
                 style={{
                   alignSelf: "flex-start",
                   minHeight: TAP,
@@ -386,20 +419,11 @@ export default function OnboardingScreen() {
               onPress={() => finish(true)}
               disabled={busy}
             />
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => finish(false)}
+            <TextButton
+              title="not now — start without alerts"
               disabled={busy}
-              style={{
-                minHeight: TAP,
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Body tone="mute" style={{ fontSize: size.xs }}>
-                not now — start without alerts
-              </Body>
-            </Pressable>
+              onPress={() => finish(false)}
+            />
             <StepBack onPress={() => setStep(2)} label="← back to reminder" />
           </>
         )}
@@ -419,21 +443,13 @@ export default function OnboardingScreen() {
             sign-in. Quiet, and last, because for everyone else it is the wrong
             direction. (Owner, 2026-07-30: deleted their auth row mid-setup and
             had no exit.) */}
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Sign out and start over"
-          onPress={() => supabase.auth.signOut({ scope: "local" })}
-          style={{
-            minHeight: TAP,
-            marginTop: space[6],
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <Body tone="mute" style={{ fontSize: size.xs }}>
-            sign out
-          </Body>
-        </Pressable>
+        <View style={{ marginTop: space[6] }}>
+          <TextButton
+            title="sign out"
+            accessibilityLabel="Sign out and start over"
+            onPress={() => supabase.auth.signOut({ scope: "local" })}
+          />
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -457,19 +473,5 @@ function Cta({
 }
 
 function StepBack({ onPress, label }: { onPress: () => void; label: string }) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onPress}
-      style={{
-        minHeight: TAP,
-        alignItems: "center",
-        justifyContent: "center",
-      }}
-    >
-      <Body tone="mute" style={{ fontSize: size.xs }}>
-        {label}
-      </Body>
-    </Pressable>
-  );
+  return <TextButton title={label} onPress={onPress} />;
 }

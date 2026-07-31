@@ -2,18 +2,17 @@ import { useEffect, useRef, useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   TextInput,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 
-import { Button } from "@/components/button";
-import { field } from "@/components/fields";
+import { Button, TextButton } from "@/components/button";
+import { field, fieldTint } from "@/components/fields";
 import { Body, Wordmark } from "@/components/ui";
 import { supabase } from "@/lib/supabase";
-import { color, size, space, TAP } from "@/theme";
+import { color, size, space } from "@/theme";
 
 const RESEND_COOLDOWN_S = 30;
 
@@ -111,6 +110,7 @@ export default function EmailOtpScreen() {
       {phase === "email" ? (
         <View style={{ gap: space[3] }}>
           <TextInput
+            {...fieldTint}
             value={email}
             onChangeText={setEmail}
             placeholder="email"
@@ -141,6 +141,7 @@ export default function EmailOtpScreen() {
       ) : (
         <View style={{ gap: space[3] }}>
           <TextInput
+            {...fieldTint}
             ref={codeRef}
             value={code}
             onChangeText={(t) => {
@@ -190,50 +191,31 @@ export default function EmailOtpScreen() {
               alignItems: "center",
             }}
           >
-            <Pressable
-              accessibilityRole="button"
+            <TextButton
+              title={
+                cooldown > 0 ? `resend in ${cooldown}s` : "resend the code"
+              }
+              align="start"
               disabled={cooldown > 0 || busy}
+              faded={cooldown > 0}
               onPress={send}
-              style={{ minHeight: TAP, justifyContent: "center" }}
-            >
-              <Body
-                tone="mute"
-                style={{ fontSize: size.xs, opacity: cooldown > 0 ? 0.5 : 1 }}
-              >
-                {cooldown > 0 ? `resend in ${cooldown}s` : "resend the code"}
-              </Body>
-            </Pressable>
+            />
 
-            <Pressable
-              accessibilityRole="button"
+            <TextButton
+              title="wrong address?"
+              align="start"
               onPress={() => {
                 setPhase("email");
                 setError(null);
               }}
-              style={{ minHeight: TAP, justifyContent: "center" }}
-            >
-              <Body tone="mute" style={{ fontSize: size.xs }}>
-                wrong address?
-              </Body>
-            </Pressable>
+            />
           </View>
         </View>
       )}
 
-      <Pressable
-        accessibilityRole="button"
-        onPress={() => router.back()}
-        style={{
-          minHeight: TAP,
-          justifyContent: "center",
-          alignItems: "center",
-          marginTop: space[6],
-        }}
-      >
-        <Body tone="mute" style={{ fontSize: size.xs }}>
-          ← back to sign in
-        </Body>
-      </Pressable>
+      <View style={{ marginTop: space[6] }}>
+        <TextButton title="← back to sign in" onPress={() => router.back()} />
+      </View>
     </KeyboardAvoidingView>
   );
 }

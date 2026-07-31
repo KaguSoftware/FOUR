@@ -93,6 +93,57 @@ const ENFORCED = [
   // Android's Material 3 indicator pill is the primary selection affordance
   // there, so it has to be visible against the bar itself.
   ["tabs · android indicator pill", "line-hi", "bg", NONTEXT],
+
+  // --- The Android surfaces, added 2026-07-31 -----------------------------
+  //
+  // These are the pairs the Android-native pass introduced. Android diverges
+  // from iOS in ARRANGEMENT, never in palette, so none of these is a new
+  // colour — but each is a colour on a ground it had not sat on before, and
+  // "contrast is measured, never assumed" does not care which platform the
+  // pair appears on.
+
+  // The snackbar replaces the modal alert for transient failures. It floats
+  // over screens that already hold `surface` panels, so it sits one tonal step
+  // up on `surface-hi` — which means its text is on a LIGHTER ground than the
+  // `bg` most body copy is measured against, and the old number does not
+  // transfer.
+  ["snackbar · message text", "ink", "surface-hi", TEXT],
+  ["snackbar · action label", "ink", "surface-hi", TEXT],
+  // DESIGN.md forbids shadows, so the border is what separates the snackbar
+  // from whatever is under it. That makes the stroke the whole boundary, and a
+  // boundary that carries the component's edge owes WCAG 1.4.11's 3:1.
+  ["snackbar · edge against a surface panel", "line-hi", "surface", NONTEXT],
+  ["snackbar · edge against the page", "line-hi", "bg", NONTEXT],
+
+  // The Android settings row states its value as a summary line UNDER the
+  // title instead of to the right of it. Same token, same ground, but it is
+  // now the only thing carrying that information — on iOS the chevron and the
+  // right-alignment help identify it as a value, and on Android nothing does.
+  ["settings · android summary line", "ink-mute", "surface", TEXT],
+  ["settings · android row title", "ink", "surface", TEXT],
+
+  // Material's segmented button group is CONNECTED, so its border is doing two
+  // jobs at once: the outline of the whole control against the page, and the
+  // divider between two adjacent segments. It owes 3:1 in both roles.
+  //
+  // This was written with `line` first and measured at 1.35:1 against the
+  // unselected fill — a group that renders as one undivided button. `line-hi`
+  // is the token for a boundary that has to read, and it is now used on both
+  // states rather than only the selected one.
+  ["segmented · android outline vs page", "line-hi", "bg", NONTEXT],
+  ["segmented · android divider vs unselected", "line-hi", "surface", NONTEXT],
+  // The check that marks the selected segment on Android. It is a fourth
+  // signal on top of fill, border and weight, but it is drawn ON the selected
+  // fill and has to survive there on its own.
+  ["segmented · android selected check", "ink", "line", NONTEXT],
+  ["segmented · android selected label", "ink", "line", TEXT],
+  ["segmented · android unselected label", "ink-mute", "surface", TEXT],
+
+  // The Android sheet's drag handle. `sheetGrabberVisible` is iOS-only, so
+  // this is content rather than chrome, and it is the only cue that the sheet
+  // can be dragged away — an affordance, not a divider, which is why it takes
+  // `line-hi`. It measured 1.35:1 as `line`.
+  ["sheet · android drag handle", "line-hi", "surface", NONTEXT],
 ];
 
 const EXEMPT = [
@@ -105,6 +156,11 @@ const EXEMPT = [
     "onboarding · field fill vs page",
     "surface", "bg",
     "Same pre-existing pattern; recorded so the number is on the table when that decision gets made.",
+  ],
+  [
+    "segmented · android selected fill vs unselected",
+    "line", "surface",
+    "The fill difference alone does NOT have to clear 3:1, because selection here never rests on it: the selected segment also carries Inter_500Medium instead of Regular, ink instead of ink-mute text (11.37:1 and 5.08:1 on their own grounds), and a leading check mark at 11.37:1. That check is a change of SHAPE, which is the one signal that survives a colour-blind viewer and a dimmed screen — the same reasoning recorded for the tab bar, where the fix was to add a non-colour cue rather than to brighten a fill. Measured so the number is on the table.",
   ],
 ];
 

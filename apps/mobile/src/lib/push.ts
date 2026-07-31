@@ -2,7 +2,7 @@ import { Platform } from "react-native";
 import * as Notifications from "expo-notifications";
 import * as Device from "expo-device";
 import Constants from "expo-constants";
-import { PUSH_CHANNEL } from "@uptime/core";
+import { PUSH_CHANNEL, REMINDER_CHANNEL } from "@uptime/core";
 import { supabase } from "./supabase";
 import { color } from "@/theme";
 
@@ -31,6 +31,48 @@ Notifications.setNotificationHandler({
     shouldSetBadge: false,
   }),
 });
+
+/**
+ * Declare both Android channels. Safe to call repeatedly; a no-op elsewhere.
+ *
+ * This used to live inside `registerForPush`, which meant the channels only
+ * existed once the user had accepted push — and the daily reminder needs
+ * neither a token nor an EAS project, so on a device that had declined push
+ * the reminder was posted to a channel that had never been declared. Android's
+ * behaviour there is to fall back to a default channel the user cannot find in
+ * settings, or to drop it.
+ *
+ * **A channel's settings are fixed at creation.** Android deliberately ignores
+ * importance, sound and vibration on any later call for the same id, so the
+ * user's own changes cannot be overwritten by an app update. Getting these
+ * wrong the first time means the only fix is a new channel id.
+ */
+export async function ensureChannels() {
+  if (Platform.OS !== "android") return;
+
+  // The pager. HIGH is what earns a heads-up banner while the phone is idle,
+  // which is the entire point — a page you only see by unlocking is not one.
+  await Notifications.setNotificationChannelAsync(PUSH_CHANNEL, {
+    name: "Monitor",
+    description:
+      "Alerts when the system has been down, and the occasional milestone.",
+    importance: Notifications.AndroidImportance.HIGH,
+    lightColor: color.degraded,
+    lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+  });
+
+  // The opt-in nudge. DEFAULT, so it lands in the shade without interrupting
+  // — it is a reminder at a time the user chose, not news. See the docblock on
+  // `REMINDER_CHANNEL` in core for why this is a separate channel at all.
+  await Notifications.setNotificationChannelAsync(REMINDER_CHANNEL, {
+    name: "Daily reminder",
+    description:
+      "The optional nudge at the time you picked. Off unless you turn it on.",
+    importance: Notifications.AndroidImportance.DEFAULT,
+    lightColor: color.degraded,
+    lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+  });
+}
 
 export type PushRegistration =
   | { ok: true; token: string }
@@ -63,19 +105,7 @@ export async function registerForPush(
     return { ok: false, reason: "push needs a physical device" };
   }
 
-  if (Platform.OS === "android") {
-    // Android requires the channel to exist before a notification can use it,
-    // and the channel — not the message — owns importance and the LED colour.
-    await Notifications.setNotificationChannelAsync(PUSH_CHANNEL, {
-      name: "Monitor",
-      description:
-        "Alerts when the system has been down, and the occasional milestone.",
-      importance: Notifications.AndroidImportance.HIGH,
-      lightColor: color.degraded,
-      lockscreenVisibility:
-        Notifications.AndroidNotificationVisibility.PUBLIC,
-    });
-  }
+  await ensureChannels();
 
   const existing = await Notifications.getPermissionsAsync();
   let status = existing.status;

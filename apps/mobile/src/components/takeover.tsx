@@ -1,8 +1,9 @@
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import * as Haptics from "expo-haptics";
 import { type Interval } from "@uptime/core";
-import { Body, Label, Mono } from "./ui";
+import { androidMetrics, Body, Label, Mono } from "./ui";
+import { committed } from "@/lib/haptics";
+import { pressFill, pressFillFlat, ripple } from "@/lib/press";
 import { color, radius, size, space, TAB_BAR, TAP } from "@/theme";
 import type { LeverRow, PlaybookItem } from "@/lib/status";
 
@@ -53,7 +54,7 @@ export function Takeover({
   const byKey = new Map(levers.map((l) => [l.key, l.label]));
 
   function log(lever: string, detail: string | null) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    committed();
     onLog(lever, detail);
   }
 
@@ -76,6 +77,7 @@ export function Takeover({
         {/* Top of the screen, not centred: the first thing your eye lands on. */}
         <Text
           style={{
+            ...androidMetrics,
             fontFamily: "Inter_500Medium",
             fontSize: size["2xl"],
             color: color.down,
@@ -96,12 +98,13 @@ export function Takeover({
               accessibilityRole="button"
               disabled={busy || todayLevers.includes(item.lever)}
               onPress={() => log(item.lever, item.label)}
+              android_ripple={ripple("line")}
               style={({ pressed }) => ({
                 minHeight: 64,
                 borderRadius: radius.md,
                 borderWidth: 1,
                 borderColor: color.lineHi,
-                backgroundColor: pressed ? color.line : color.surfaceHi,
+                backgroundColor: pressFill(color.surfaceHi, color.line, pressed),
                 justifyContent: "center",
                 paddingHorizontal: space[4],
                 opacity: todayLevers.includes(item.lever) ? 0.4 : 1,
@@ -109,6 +112,7 @@ export function Takeover({
             >
               <Text
                 style={{
+                  ...androidMetrics,
                   fontFamily: "Inter_400Regular",
                   fontSize: size.sm,
                   color: color.ink,
@@ -144,6 +148,7 @@ export function Takeover({
                 accessibilityLabel={`Mark ${lever.label} up`}
                 disabled={busy || done}
                 onPress={() => log(lever.key, null)}
+                android_ripple={ripple("surface")}
                 style={({ pressed }) => ({
                   flexBasis: full ? "100%" : "47%",
                   flexGrow: 1,
@@ -155,7 +160,7 @@ export function Takeover({
                   // have no fill, so the stroke is the entire button and owes
                   // WCAG 1.4.11's 3:1. `line` measures 1.45:1; `lineHi` 3.33:1.
                   borderColor: color.lineHi,
-                  backgroundColor: pressed ? color.surfaceHi : "transparent",
+                  backgroundColor: pressFillFlat(color.surfaceHi, pressed),
                   alignItems: "center",
                   justifyContent: "center",
                   opacity: done ? 0.4 : 1,
@@ -164,6 +169,7 @@ export function Takeover({
                 <Text
                   numberOfLines={1}
                   style={{
+                    ...androidMetrics,
                     fontFamily: "Inter_400Regular",
                     fontSize: size.sm,
                     color: color.inkDim,

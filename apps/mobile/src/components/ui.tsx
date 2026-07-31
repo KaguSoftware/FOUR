@@ -9,10 +9,33 @@ import { color, size } from "@/theme";
  * Roboto and instantly stops looking like this product.
  */
 
+/**
+ * The one property that makes Android set type the way iOS does.
+ *
+ * Android's `TextView` reserves extra space above the ascender and below the
+ * descender, taken from the font file's own metrics, and includes it in the
+ * view's height. iOS does not. So identical `fontSize` and `lineHeight` give
+ * a taller box on Android with the glyphs sitting off-centre inside it — the
+ * amount depends on the FONT, which is why it lands differently on Archivo
+ * Black, Inter and JetBrains Mono and cannot be corrected with one padding
+ * value.
+ *
+ * It compounds wherever type is centred or baseline-aligned against something
+ * else: the hero readout beside its `/30`, every uppercase micro-label in a
+ * row with a Switch, the run length on the dashboard. This project has
+ * already fixed the iOS half of that problem twice (see `fields.ts` and the
+ * `rowText` note in `settings-ui.tsx`); this is the Android half.
+ *
+ * **Android-only — iOS ignores it entirely**, so setting it unconditionally
+ * costs nothing and cannot move an iOS pixel.
+ */
+export const androidMetrics = { includeFontPadding: false } as const;
+
 export function Wordmark() {
   return (
     <Text
       style={{
+        ...androidMetrics,
         fontFamily: "ArchivoBlack_400Regular",
         fontSize: size.lg,
         color: color.ink,
@@ -31,6 +54,7 @@ export function Label({ style, ...rest }: TextProps) {
       {...rest}
       style={[
         {
+          ...androidMetrics,
           fontFamily: "Inter_500Medium",
           fontSize: size["2xs"],
           letterSpacing: 0.8,
@@ -61,6 +85,7 @@ export function Body({
       {...rest}
       style={[
         {
+          ...androidMetrics,
           fontFamily: "Inter_400Regular",
           fontSize: size.sm,
           lineHeight: size.sm * 1.55,
@@ -85,6 +110,7 @@ export function Mono({ style, ...rest }: TextProps) {
       {...rest}
       style={[
         {
+          ...androidMetrics,
           fontFamily: "JetBrainsMono_400Regular",
           fontVariant: ["tabular-nums"],
           color: color.ink,

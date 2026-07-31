@@ -35,13 +35,36 @@ export type PushMessage = {
 };
 
 /**
- * The Android notification channel.
+ * The Android notification channel for everything the monitor sends.
  *
- * One channel, named for what it is. Android lets the user mute channels
- * individually, and splitting "you are fading" from "you hit 30 days" would let
- * someone mute exactly the half the product exists to deliver.
+ * One channel for pages AND milestones, named for what it is. Android lets the
+ * user mute channels individually, and splitting "you are fading" from "you hit
+ * 30 days" would let someone mute exactly the half the product exists to
+ * deliver. That split stays refused.
  */
 export const PUSH_CHANNEL = "monitor";
+
+/**
+ * The Android notification channel for the daily reminder.
+ *
+ * **This split is allowed where the pages/milestones one is not**, and the
+ * difference is not a matter of taste:
+ *
+ * - The reminder is **opt-in and off by default**, so a channel for it only
+ *   ever exists for someone who deliberately asked for it. Muting it is
+ *   revoking a request they made; muting the pager is disabling the product.
+ * - It is **local and scheduled by the device**, not sent by the monitor. It
+ *   fires at a time the user picked whether or not anything is wrong.
+ * - It is a **nag; the pager is an alarm.** Sharing one channel forces them to
+ *   share an importance level, so either the nudge shouts at `HIGH` or the
+ *   page whispers at `DEFAULT`. There is no setting that is right for both.
+ *
+ * Without the split, an Android user who found the nightly nudge intrusive had
+ * exactly one control — mute `monitor` — and taking it would silence the
+ * outage alerts too. Giving them the right switch is what stops them reaching
+ * for the wrong one.
+ */
+export const REMINDER_CHANNEL = "reminder";
 
 /**
  * Split a page into a notification title and body.

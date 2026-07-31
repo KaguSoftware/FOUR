@@ -23,7 +23,15 @@
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": true
+      "predictiveBackGestureEnabled": true,
+      "edgeToEdgeEnabled": true,
+      "softwareKeyboardLayoutMode": "resize",
+      "blockedPermissions": [
+        "android.permission.VIBRATE"
+      ]
+    },
+    "androidNavigationBar": {
+      "barStyle": "light-content"
     },
     "plugins": [
       "expo-router",
@@ -32,6 +40,7 @@
       [
         "expo-notifications",
         {
+          "icon": "./assets/images/notification-icon.png",
           "color": "#f2ab35",
           "defaultChannel": "monitor"
         }
@@ -46,7 +55,8 @@
       ],
       "expo-apple-authentication",
       "expo-web-browser",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "./plugins/with-android-dialog-theme"
     ],
     "experiments": {
       "typedRoutes": true,

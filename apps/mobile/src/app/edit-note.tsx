@@ -5,8 +5,10 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { NOTE_MAX } from "@uptime/core";
 
 import { Body, Label, Mono } from "@/components/ui";
-import { noteField } from "@/components/fields";
+import { SheetHandle } from "@/components/sheet";
+import { fieldTint, noteField } from "@/components/fields";
 import { Fault } from "@/components/states";
+import { pressFill, ripple } from "@/lib/press";
 import { rewriteNote } from "@/lib/signals";
 import { cachedStatus } from "@/lib/use-status";
 import { color, radius, size, space, TAP } from "@/theme";
@@ -61,6 +63,7 @@ export default function EditNoteSheet() {
           gap: space[3],
         }}
       >
+        <SheetHandle />
         <View
           style={{
             flexDirection: "row",
@@ -73,6 +76,7 @@ export default function EditNoteSheet() {
         </View>
 
         <TextInput
+          {...fieldTint}
           autoFocus
           value={draft}
           onChangeText={setDraft}
@@ -98,12 +102,13 @@ export default function EditNoteSheet() {
           accessibilityRole="button"
           disabled={busy}
           onPress={save}
+          android_ripple={busy ? undefined : ripple("line")}
           style={({ pressed }) => ({
             minHeight: TAP,
             borderRadius: radius.md,
             borderWidth: 1,
             borderColor: color.lineHi,
-            backgroundColor: pressed ? color.line : color.surfaceHi,
+            backgroundColor: pressFill(color.surfaceHi, color.line, pressed),
             alignItems: "center",
             justifyContent: "center",
             opacity: busy ? 0.5 : 1,

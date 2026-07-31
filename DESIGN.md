@@ -245,10 +245,12 @@ reading as an instrument.
 Vertical rhythm runs on a 4px base: 4 / 8 / 12 / 20 / 32. More space sits above
 a heading than below it, binding each label to the block it introduces.
 
-**The day grid is 15 columns wide**, always. Fifteen reads as a readout rather
-than a tile wall, and it divides evenly into both the 30-day dashboard view (two
-rows) and the 90-day history view (six rows). Cells are square, separated by a
-3px gutter, and size fluidly from the container.
+**The day grid has two column counts, and each one is an argument.** The
+dashboard is **10 across** — 30 days in three even rows, and deliberately *not*
+seven, because a seven-wide row invites reading a weekday pattern down the
+columns that this layout does not encode. History is **7 across**, where a
+column *is* a weekday and that reading is exactly the point. Cells are square,
+separated by a 3px gutter, and size fluidly from the container.
 
 On native, layout is inset by the platform's safe areas and window insets on
 every edge — status bar, notch, home indicator, navigation bar, display cutout,
@@ -341,16 +343,33 @@ never flashes an indicator.
 
 ### The Day Grid (signature component)
 
-The product's most distinctive element. Square cells — a Monday-first calendar
-month on Home, a dense 90-day block on History. **Fill lightness encodes how many
-levers fired**, never which.
+The product's most distinctive element. Square cells — a dense trailing 30-day
+block on Home, Monday-first calendar months on History. **Fill lightness encodes
+how many levers fired**, never which.
+
+The two screens carry the two shapes because they ask different questions. Home
+asks *how has it been lately*, which wants recency and no calendar structure at
+all. History asks *which months, and which days do I actually lose*, which needs
+the weekday alignment a calendar gives. Putting the calendar on Home meant the
+grid emptied itself every 1st, and putting the dense block on History meant
+ninety squares that could not answer the only question that screen exists for.
 
 - **Down:** resting surface with a hairline border — present but unlit.
 - **Up:** a lightness step, solid across the whole cell, no border. The dimmest
   up-day is still unmistakably up.
-- **Today:** a 2px ring that pulses slowly between `line-hi` and `ink`.
+- **Today:** a 2px ring that pulses slowly between `line-hi` and `ink`. On both
+  grids — a static ring did not read as *you are here* on real hardware.
 - **Not yet (later this month):** an empty cell bordered in `surface`. A day
-  that has not happened is not a day that was missed.
+  that has not happened is not a day that was missed. History only.
+- **Padding (a neighbouring month's days):** drawn as nothing at all. A day
+  outside the month has no state, and a bordered cell would read as a miss.
+
+**Every cell opens.** Tapping one shows what that day held — the levers, their
+detail text, the day's signals — and nothing more: the panel is read-only,
+because uptime, runs and outages are derived from entries and a day you can
+quietly edit is not a record. An empty day states the fact and stops. The grid
+already makes the only judgement this product makes about a day; the panel must
+not repeat it in words.
 
 **The ramp is proportional, and generated rather than a fixed scale**, because
 the number of levers is user-defined. `L = 0.51 + (fired / leverCount) × 0.44`,

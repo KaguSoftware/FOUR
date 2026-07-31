@@ -3,7 +3,8 @@
 > **New chat? Read this file top to bottom before doing anything.** It is written
 > to be sufficient on its own. Companions: `PRODUCT.md` (product truth),
 > `DESIGN.md` (visual system), `.impeccable/design.json` (design sidecar), and
-> the approved plan at `~/.claude/plans/some-issues-1-things-memoized-toast.md`.
+> the approved plan at
+> `~/.claude/plans/this-system-needs-some-adaptive-rossum.md`.
 
 ## If the user just said "continue"
 
@@ -28,6 +29,12 @@ separate reported bugs in one day.
 - **Collaborate before locking user-facing decisions.** Propose with a recommendation; don't unilaterally commit to product behaviour.
 - **Plan mode** for non-trivial work; owner approves before build.
 - **Git commits list Parsa as sole author.** Never add `Co-Authored-By` trailers, even though the default harness instructions request one. Verified clean as of 2026-07-28.
+- **External dashboard state (Supabase, Google Cloud, Apple, Vercel) is checked
+  by handing the owner a written prompt for a Claude Chrome agent** — naming the
+  exact page, asking for values quoted verbatim, stating the expected value, and
+  ending with "report only, change nothing". Never guess at it, and never ask
+  the owner to improvise the questions. Treat the report as evidence: if it
+  disproves the working theory, drop the theory rather than patching it.
 - **Make partial scope obvious** — anything shipped deliberately small goes in the scope ledger below and carries a `// SCOPE(...)` tag in code.
 - **State disagreement once, then build what was asked.** The owner has overruled recommendations (the day-grid encoding, for one) and that is their call. Where an override creates a technical problem, *solve the problem* rather than re-arguing the decision.
 - Keep this file honest. If something is written but untested, say so.
@@ -161,6 +168,32 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
   to UTC, because Hermes and native UIKit disagreed about Istanbul's 2000
   offset rules and a picked 13:20 was stored as 14:20.
 
+- **The grid-swap round, 2026-07-31.** The two grids traded screens. **Home** is
+  the trailing 30 days, ten across in three rows; **History** is a scrolling
+  stack of calendar months back to the first entry, seven across, each headed
+  with its name and how much of it was up. Home's calendar month asked "where am
+  I in this month" — a question the hero already answered, and one that reset to
+  nearly empty on the 1st; History's ninety unlabelled squares could not answer
+  "which weekdays do I lose". `monthGrid()` moved rather than being deleted.
+  **Every square now opens a read-only day panel** (levers fired, their detail
+  text, that day's signals) — a native `formSheet` on mobile (`src/app/day.tsx`),
+  a real `Sheet` on web. This was only possible on History *because* of the swap:
+  seven columns give a ~44pt cell, the old block gave 21px. Read-only on purpose
+  — uptime, runs and outages are derived from entries, so an editable past day
+  makes every figure retroactively negotiable. Also: web gained a proper
+  `Sheet` (portal, focus trap, Escape, scroll lock — the inline `PlaybookSheet`
+  had none and now shares it); core gained `addMonths` (day-clamped, so stepping
+  back from the 31st cannot skip February) and `monthsBetween`; **Google now
+  sends `prompt=select_account`** (it was silently reusing Safari's Google
+  session, so users never learned which account they had signed up with);
+  **delete-account asks for `DELETE`, not the account email** (an Apple/Google
+  user may never have seen that address, so the old gate could lock a real user
+  out of a flow Apple requires to exist); and both auth failure paths stopped
+  lying — `oauth.ts` no longer reports every non-success as a user cancellation,
+  and `/auth/callback` no longer labels every failure "link expired". Verified:
+  **162 tests, tsc clean ×3, eslint clean, contrast clean, web build, expo
+  export both platforms. Not yet run on a device.**
+
 **Written but NOT verified end-to-end:**
 
 - **Vercel cron has never run.** The route works locally; the schedule is unproven.
@@ -185,12 +218,23 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
   dropping it while build 4 is anyone's installed version breaks their
   dashboard load. Sequence: build 5 on TestFlight and installed → then
   `db push`. The column with default `'strict'` is harmless in the meantime.
-- **Supabase dashboard config for the new auth methods** (all app-side code is in and fails soft until this lands):
-  1. Auth → Providers → **Apple**: enable; *Client IDs* = `host.exp.Exponent,com.kagusoftware.uptime` (Expo Go's token audience and the real build's, both needed).
-  2. Auth → Providers → **Google**: enable with a Google Cloud OAuth client of type **Web application** whose authorized redirect URI is `https://yqphirnsvcqzstwjfshs.supabase.co/auth/v1/callback`.
-  3. Auth → URL Configuration → Redirect URLs: add `uptime://auth/callback` and the Expo Go form (log `Linking.createURL('auth/callback')` on device — it embeds the LAN IP, e.g. `exp://192.168.x.x:8081/--/auth/callback`).
-  4. Auth → Email Templates → **Magic Link**: add `{{ .Token }}` (keep `{{ .ConfirmationURL }}`), or the OTP screen's emails carry no code to type.
-  5. Custom SMTP before real users — the built-in sender is rate-limited to a handful of emails per hour.
+- **Supabase dashboard config — items 1–3 are DONE, verified 2026-07-31** by a
+  browser audit of the dashboard (see Gotchas for the full result). Apple's
+  Client IDs, Google's provider + Web-application client, and the redirect
+  allowlist (`uptime://auth/callback`, `exp://**`, the Vercel wildcard) are all
+  correct, and Site URL is `https://personal-system-rho.vercel.app` — not
+  localhost. **Google sign-in has since worked end to end.** What remains:
+  1. **Custom SMTP.** The built-in sender is rate-limited to a handful of emails
+     an hour, and — more urgently — the Magic Link template cannot be edited
+     until custom SMTP is on. Which blocks:
+  2. **Auth → Email Templates → Magic Link: add `{{ .Token }}`** (keep
+     `{{ .ConfirmationURL }}`). **The email-OTP screen almost certainly cannot
+     work today**: `src/app/(auth)/email-otp.tsx` asks for a 6-digit code, and
+     Supabase's default template carries only a link. Not 100% confirmed — the
+     dashboard's template Source view is locked without custom SMTP, so this
+     rests on the rendered preview showing no code plus the known default.
+     **The 30-second confirmation is to request a code on a device and look at
+     the email.** Do that before changing any code.
 - Note for a fresh chat: `apps/web/.env.local` is **not** on this machine, so the web dev server and the dev scripts cannot run here. Tests, typecheck, lint, both builds and `supabase db push` all work without it — `apps/mobile/.env.local` **does** exist.
 
 ## File map (key files)
@@ -201,20 +245,25 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 | `packages/core/monitor.ts` | Fade thresholds, milestone selection, plateau detection. Pure functions, fully tested. |
 | `packages/core/index.ts` | Barrel export — the single public surface of the engine. |
 | `packages/core/levers.ts` | Lever key/label rules: slugs, uniqueness, the four-lever ceiling. |
-| `apps/mobile/src/app/how-it-works.tsx` | The in-app manual (native modal, 7 pages) — renders the REAL DayGrid/LeverButtons with sample data so it cannot drift. Auto-opens once per device; reopens from Settings → About. |
+| `apps/mobile/src/app/how-it-works.tsx` | The in-app manual (native modal, 7 pages) — renders the REAL DayGrid/LeverButtons with sample data so it cannot drift. Auto-opens once per device; reopens from Settings → About. **Its grid page describes Home's trailing 30 — update it whenever the grid changes.** |
 | `apps/mobile/src/lib/walkthrough.ts` | The seen-once device flag — AsyncStorage, keyed per user, fails toward "seen". |
 | `apps/web/lib/system.ts` | Loads status in one pass; `requireStatus()` is the auth + onboarding gate every page uses. |
 | `apps/web/app/onboarding/` | First run: the rule, 1–4 levers. The only screen that may not call `requireStatus()`. |
 | `apps/web/app/page.tsx` | Status dashboard; routes to the takeover when down ≥3 days with history. |
 | `apps/web/app/components/takeover.tsx` | Re-entry screen. The most important UI in the product. |
-| `apps/web/app/components/day-grid.tsx` | The signature component — the lightness ramp, driven by `core/grid.ts`. |
+| `apps/web/app/components/day-grid.tsx` | The signature component — the lightness ramp, driven by `core/grid.ts`. Exports `DayGrid` (Home's trailing 30, 10×3) and `MonthStack` (History's calendar months). Server-side: builds the cells and hands the client only the days on screen. |
+| `apps/web/app/components/interactive-grid.tsx` | The client half — tappable cells and the day panel. One component for both the 10-wide and 7-wide shapes, so the tap behaviour cannot drift between them. |
+| `apps/web/app/components/sheet.tsx` | The web overlay shell: portal, focus trap, Escape, scroll lock. **Every web dialog goes through this.** |
+| `apps/mobile/src/components/day-grid.tsx` | Same two shapes on mobile, plus `TodayCell` (the pulsing today ring). |
+| `apps/mobile/src/app/day.tsx` | The day sheet — read-only, native `formSheet`. Reads `cachedStatus`, not `useStatus()`, because iOS measures the sheet to size it. |
+| `packages/core/day.ts` | `dayDetail()` — assembles what a day contained from entries + signals + lever labels. Derives nothing about uptime; a day's detail is a lookup, not a judgement. |
+| `packages/core/month.ts` | `monthGrid()` — a calendar month as a Monday-first 7-column grid, **History's grid now, not Home's**. Plus `addMonths()` (day-clamped, so stepping back from the 31st cannot skip February) and `monthsBetween()`, which drive the stack. |
 | `apps/web/app/proof/page.tsx` | Signal check-in + daily trend, with the optional weight line. |
 | `apps/web/app/api/monitor/check/route.ts` | Daily cron pass. Service-role, `CRON_SECRET`-authed, logs every run to `monitor_runs`. |
 | `apps/web/app/globals.css` | Tailwind v4 `@theme` tokens. Normative in oklch. |
 | `apps/web/proxy.ts` | Session refresh + route protection (Next 16 name for middleware). |
 | `apps/web/vercel.ts` | Cron schedule. Inside the app dir because Vercel's Root Directory points there. |
 | `packages/core/grid.ts` | The day-grid ramp **and `leversOn`** — how many levers existed on a given day, which is the denominator each cell is shaded against. |
-| `packages/core/month.ts` | `monthGrid()` — the calendar month as a Monday-first 7-column grid. Home's grid, not History's. |
 | `apps/mobile/AGENTS.md` | **Read before touching mobile.** SDK **54** facts, and the two run-it-from-the-right-directory traps (`expo`/`eas` from the root, `supabase` from `apps/mobile`). |
 | `apps/mobile/src/lib/store.ts` | A subscribable value. **The fix for cross-screen sync** — read the docblock before touching either hook below. |
 | `apps/mobile/src/lib/use-status.ts` | The shared status store + the focus staleness guard. `refreshStatus()` is callable from anywhere, including the sheets. |
@@ -275,14 +324,20 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
     `scripts/make-mark.ps1`.
 21. **← ACTIVE: build 5, then external testers.** Build 5 carries the
     2026-07-30 owner-feedback round (posture removal, settings text, TimeRow,
-    keyboard, walkthrough). Then: add it to both TestFlight groups, submit the
-    external group for **Beta App Review** (needs Test Information + a demo
+    keyboard, walkthrough) **and the 2026-07-31 grid-swap round** (trailing-30
+    Home, calendar History, the day panel, `prompt=select_account`, the
+    `DELETE` confirm). **None of the 07-31 work has been seen on a device** —
+    check the two grid layouts, tapping a day on each, and a blank day's
+    wording before submitting. Then: add it to both TestFlight groups, submit
+    the external group for **Beta App Review** (needs Test Information + a demo
     account in the review notes; the public link is dead until approval), and
     only after build 5 is installed run the deferred
-    `20260730120000_drop_posture.sql` push. Before review: verify Apple +
-    Google sign-in on the TestFlight build (Supabase dashboard config above).
-22. Then: store listings · Android notification icon · FCM V1 credentials for
-    Android push · custom SMTP.
+    `20260730120000_drop_posture.sql` push. Apple + Google sign-in still need
+    verifying on the TestFlight build — Google has worked once since the
+    account-picker fix; Apple is unproven.
+22. Then: **custom SMTP** (it unblocks the Magic Link template, which the OTP
+    screen depends on — see *Blocked*) · store listings · Android notification
+    icon · FCM V1 credentials for Android push.
 
 ## Deliberately partial — grows later (scope ledger)
 
@@ -313,12 +368,39 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 | Weight unit | **Mobile: kg/lb segmented in Tracking** (display only, never converts). Web: no control | Same on web | Mobile done 2026-07-29 |
 | Archive motion | **Mobile: fade + collapse, with the list carried up.** Web: instant | Same on web | Mobile done 2026-07-29 |
 | Settings "accessibility" section | None. The owner named it as an example of the pattern; there is nothing real to put in it — reduce-motion and text size are OS settings the app already honours | **Ask before inventing one** | Undecided |
-| Home grid | **Mobile: the real calendar month**, today pulsing. History keeps the dense trailing 90 | Same on web | Mobile done 2026-07-29 |
+| Day grid | **Both clients: Home is the trailing 30 (10×3), History is a stack of calendar months (7 wide).** Today pulses on both. Every day opens a read-only panel | Done — the swap is the final shape | Both done 2026-07-31 |
+| Day panel | Levers + their detail text + that day's signals, read-only. **No weight** — `signals.amount` only exists after the optional-weight migration, so selecting it unconditionally would break a database without it; weight stays on `/proof` behind its opt-in | Weight here too, once the migration is universal | Done 2026-07-31 |
 | Timezone | Defaults to Europe/Istanbul in DB | Device-detected at signup, editable | With mobile |
 | Monetization | Free | Undecided. **The usual paywalls are all ruled out by the thesis**, not by preference — lever count is the product's name, longer history attacks re-entry, gamification fails a build test. Any model has to sell something other than a feature | Post-launch |
 
 ## Gotchas / open issues
 
+- **Supabase + Google Cloud auth config was audited in the browser on
+  2026-07-31 and came back CLEAN. Do not re-audit it; do not "fix" it.**
+  Verified that day: Site URL `https://personal-system-rho.vercel.app`; redirect
+  allowlist = `uptime://auth/callback`, `exp://**`, the Vercel wildcard; Google
+  enabled, skip-nonce off, client `1017110614147-rj86gh…apps.googleusercontent.com`,
+  type **Web application**, sole redirect URI
+  `https://yqphirnsvcqzstwjfshs.supabase.co/auth/v1/callback`; Apple enabled with
+  Client IDs `host.exp.Exponent,com.kagusoftware.uptime`. **Apple's OAuth secret
+  key field is empty and that is correct** — the app uses native
+  `signInWithIdToken`, which validates against the Client IDs list; the secret
+  only matters for a *web* Apple OAuth flow this product does not have.
+  *Still unknown as of that date:* the Magic Link template's raw source (the
+  dashboard locks Source view without custom SMTP).
+- **The "Google sign-in redirects to localhost" report is unexplained and NOT
+  currently reproducing.** It was reported on both TestFlight and Expo Go. Two
+  theories were built and both are dead: the redirect allowlist was already
+  correct (above), and `Linking.createURL` returning a Metro dev-server origin
+  cannot explain the TestFlight case. Supabase's auth log shows the app sending
+  `uptime://auth/callback`, Supabase accepting it and handing off to Google —
+  and no return. Nothing in the mobile bundle contains the string `localhost`.
+  Google sign-in has since completed end to end. **`oauth.ts` now carries the
+  computed `redirectTo` and the landing URL on every failure and surfaces them
+  in `__DEV__`, so if it returns, one run identifies it. Instrument, then fix —
+  do not guess a third time.** If it recurs, the cheapest evidence is a
+  screenshot of the browser sheet with the URL bar visible: no port implies a
+  Google-side page, `:8081` implies Metro, `:3000` implies a Site-URL fallback.
 - **A failure state is never red or amber, and this is a product rule, not a
   style preference.** `down` and `degraded` describe the state of the user's
   own system. An app that cannot reach its database is a different axis, and
@@ -328,6 +410,15 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
   well: emphasis by containment, not hue. `components/states.tsx` on mobile and
   the same treatment inline on web. **Owner review welcome — this was decided
   during the 2026-07-29 audit round and is reversible.**
+- **If `tsc` says "Cannot find module '@uptime/core'", run `npm install` at the
+  repo root — the workspace symlinks are stale, and typecheck has been lying.**
+  `node_modules/@uptime/*` are symlinks baked with an absolute path. The repo was
+  moved from `kagu/uptime` to `kagu/four`, which left all three pointing at a
+  directory that no longer exists. `@uptime/core` was then unresolvable, so
+  `npm run typecheck` failed on a **clean checkout** with a wall of module-not-
+  found errors — and every genuine type error in both apps was hidden behind
+  them. Found and repaired 2026-07-31. **Any move or rename of the repo folder
+  breaks this again**, and the symptom points nowhere near the cause.
 - **A read that fails must never render as an empty state.** `loadSignals` used
   to return `[]` on error, so a dropped connection told someone with months of
   journal that they had written nothing — on the one screen whose job is to be

@@ -8,13 +8,21 @@
 
 ## If the user just said "continue"
 
-The **active step** is marked `← ACTIVE` in *Roadmap* below. Do that. Before you
-start:
+**There are TWO active tracks as of 2026-07-31**, both marked `← ACTIVE` in
+*Roadmap* below. They do not depend on each other:
+
+- **iOS track** (step 21) — build 5 to TestFlight, then external testers.
+- **Android track** (step 23) — the first Android build onto a device.
+
+Ask the owner which one they mean if it is not obvious. Before you start:
 
 1. Check *Blocked / needs the owner* — do not re-do work that is waiting on them.
 2. Run `npm test`. **162 tests must be green.** They encode the invariants the
    product rests on; if they are red, stop and fix that first.
 3. Skim *Gotchas*. Several are traps that have already cost time once.
+4. **If this is a different machine**, read *What exists ONLY on the work PC*
+   before running anything — `apps/mobile/.env.local` is gitignored and the
+   app will not build without it. It is recoverable in one command.
 
 **The app is now running on real hardware** (as of 2026-07-29) and the owner is
 testing on a device. That changes how to work on it: bugs arrive as descriptions
@@ -105,6 +113,42 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 - Timezone: **Europe/Istanbul** (UTC+3, no DST) — becomes device-detected for public users
 
 **No secrets in this file.** Env vars live in `apps/web/.env.local` (gitignored) — see README for the table.
+
+## External services — every dashboard, and what it owns
+
+Six services now, and no two use the same identifier. Written down so nobody
+has to reconstruct the list or guess which project is which.
+
+| Service | Dashboard | Identifier | Owns |
+| --- | --- | --- | --- |
+| **Expo / EAS** | [expo.dev/accounts/parsa-mansouri/projects/uptime](https://expo.dev/accounts/parsa-mansouri/projects/uptime) | project `3570cebf-a9dd-458f-a2ce-14093600c025`, slug `uptime` | Builds, submissions, env vars, iOS + Android credentials, **the Android keystore** |
+| **App Store Connect** | [appstoreconnect.apple.com](https://appstoreconnect.apple.com) | app `6796259740`, name **FOUR** | iOS builds, TestFlight, App Store listing |
+| **Google Play Console** | [play.google.com/console](https://play.google.com/console) | account `8319744677397056181` | Android store listing. **Created 2026-07-31, Personal account, unverified** |
+| **Google Cloud** | [console.cloud.google.com](https://console.cloud.google.com) | project `high-office-503913-q9` ("four") | OAuth clients + consent screen for Google sign-in |
+| **Firebase** | [console.firebase.google.com](https://console.firebase.google.com) | — | FCM V1 for Android push. **Not set up as of 2026-07-31** |
+| **Supabase** | [supabase.com/dashboard](https://supabase.com/dashboard) | project `yqphirnsvcqzstwjfshs` ("parsa-system", eu-west-1) | Postgres, Auth, RLS |
+| **Vercel** | [vercel.com](https://vercel.com) | — | The web app, and the monitor cron |
+
+**Checking any of these is done by handing the owner a written Chrome-agent
+prompt** — see *Working style*. Never guess at dashboard state.
+
+## What exists ONLY on the work PC
+
+Everything below is gitignored, so a fresh clone on another machine does **not**
+have it. None of it is lost — each has a recovery path — but a new machine is
+not ready to build until these exist.
+
+| Missing after a fresh clone | Recover with | Notes |
+| --- | --- | --- |
+| `apps/mobile/.env.local` | `cd apps/mobile && npx eas-cli@latest env:list development` — then write the three values into the file | All three are `EXPO_PUBLIC_*`, i.e. public by design and safe to read back this way. See `.env.example` for the file's shape. |
+| `apps/web/.env.local` | **Not on the work PC either** — never has been. Pull from Vercel's project env vars. | Only the web dev server and the dev scripts need it. Tests, typecheck, lint, both builds and `supabase db push` all run without it. |
+| `apps/mobile/*.jks` | `npx eas-cli@latest credentials -p android` → *Download existing keystore* | A **backup only**. EAS holds the canonical copy and uses it server-side, so builds work on any machine without this file. |
+| `node_modules/` | `npm install` at the repo root | |
+
+**The keystore is the one thing that would be unrecoverable**, and it is safe:
+EAS stores it, and a local `.jks` backup was downloaded on 2026-07-31. It is
+gitignored via `*.jks`. **Move that file off the repo directory** to a password
+manager or backup drive — see *Gotchas*.
 
 ## Conventions
 
@@ -246,6 +290,35 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
      which exist outside a real build.
 - Plateau thresholds pass unit tests but have no longitudinal data behind them. `PLATEAU_WEEKS` (4) and `MIN_DAYS_PER_WEEK` (3) are educated guesses.
 
+### The Android release, exactly where it stands (2026-07-31)
+
+Nine things, and the dependency order between them is the part that is easy to
+get wrong. **Only two of these block testing the app**; the rest block the
+*store*, which is weeks away.
+
+| # | Thing | State | Blocks |
+| --- | --- | --- | --- |
+| 1 | **Android keystore** | ✅ Created, EAS-managed. SHA-1 `EC:2F:BB:F3:74:79:CE:55:E0:0F:11:85:03:02:68:2A:E4:1A:39:30`. Local `.jks` backup downloaded | — |
+| 2 | **Android OAuth client** | ✅ Created in Google Cloud, package + SHA-1 verified | — |
+| 3 | **`EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`** | ✅ Set on all three EAS environments **and** `.env.local` | — |
+| 4 | **First Android build** | 🔄 `development` profile, build `6c18ddab-73ac-4ac5-93ad-e7b5a9faa7c8`, versionCode 1. Queued 2026-07-31. Its log confirmed all three env vars loaded and the right keystore used | Testing |
+| 5 | **OAuth consent screen** | ❌ **Still in "Testing" mode.** Only `parsaxavier@gmail.com` can sign in with Google | **Google sign-in on any other account** |
+| 6 | **Firebase / FCM V1** | ❌ Not started | **Remote push (the pager)**. Local notifications and the test alert work without it |
+| 7 | **Play Console account** | ⚠️ Created 2026-07-31. **Personal**, account `8319744677397056181`, developer name corrected to `kagusoftware`. Three verifications outstanding: identity, phone, Android-device | The store only |
+| 8 | **Android submit config** | ❌ `eas.json` `submit.production` has **iOS only**. Needs an `android` block + a Play service-account key | `eas submit --platform android` |
+| 9 | **12 testers × 14 days** | ❌ Not started. Applies because the account is **Personal**; organisation accounts are exempt | Public release only |
+
+**The critical sequencing fact:** items 5, 6 and 7 are independent of each
+other and of the build. Do not let the Play Console verification queue —
+which takes days — hold up device testing, which needs none of it.
+
+**One borrowed-phone session covers three things at once**, and it is worth
+planning as one sitting: install the **Play Console app** and sign in (clears
+verification 7c), install the **dev-build APK** and run the test checklist,
+and check **Google sign-in** — that last one only if item 5 is done first,
+otherwise it fails in a way that looks like a broken app rather than a config
+gate.
+
 **Blocked / needs the owner:**
 
 - **Rotate two credentials** — see Gotchas. Still outstanding from 2026-07-19.
@@ -288,6 +361,34 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
      users**. Publishing needs no verification review because every scope is
      non-sensitive. **This is the last thing between the app and a working
      Google sign-in for anyone who is not the owner.**
+
+     Before publishing, read back the **Branding** page — app name, support
+     email, privacy/terms links — because those become visible to every person
+     who signs in. The privacy and terms pages already exist and are public at
+     `personal-system-rho.vercel.app/privacy` and `/terms`; paste them in while
+     you are there, since Play will ask for them anyway.
+
+- **Google Play Console — three verifications, all outstanding (2026-07-31).**
+  None of them block building or device-testing; they gate *publishing*.
+  1. **Identity** — upload an official document. **The long pole: days.**
+     Start it first.
+  2. **Contact phone number** — quick, but Google gates it behind identity.
+  3. **Android device access** — sign in to the **Play Console mobile app** on
+     a real Android device. **Needs the borrowed phone**, so batch it with the
+     testing session.
+
+  The account is **Personal**, which means the **12-testers-for-14-days closed
+  test** applies before production access. Organisation accounts are exempt,
+  but that route needs a D-U-N-S number for Kagu Software, which takes days to
+  weeks — it was considered and passed over on 2026-07-31 in favour of moving
+  now. Internal testing (up to 100 testers, no review, the real TestFlight
+  equivalent) works as soon as the account is verified.
+
+- **`eas.json` has no Android submit block.** `submit.production` carries only
+  `ios.ascAppId`. Before the first `eas submit --platform android`, add an
+  `android` entry pointing at a **Play service-account key** (Play Console →
+  Setup → API access → create service account → grant release permissions →
+  download JSON). That JSON is a real secret: never commit it.
 
   **The Android keystore now exists** (created 2026-07-31, EAS-managed,
   fingerprints in *Gotchas*). **It is the app's permanent identity on
@@ -399,7 +500,7 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
     stored on EAS so future submits are non-interactive). `/privacy` and
     `/terms` live and public; the FOUR mark on all four icon surfaces via
     `scripts/make-mark.ps1`.
-21. **← ACTIVE: build 5, then external testers.** Build 5 carries the
+21. **← ACTIVE (iOS track): build 5, then external testers.** Build 5 carries the
     2026-07-30 owner-feedback round (posture removal, settings text, TimeRow,
     keyboard, walkthrough) **and the 2026-07-31 grid-swap round** (trailing-30
     Home, calendar History, the day panel, `prompt=select_account`, the
@@ -426,10 +527,20 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
     workspaces, `expo lint` clean, both bundles export, the web app builds, and
     30/30 contrast pairs pass** — the contrast check caught three of this
     pass's own defects at 1.35:1. Full notes in `apps/mobile/AGENTS.md`.
-23. Then: **custom SMTP** (it unblocks the Magic Link template, which the OTP
-    screen depends on — see *Blocked*) · store listings · FCM V1 credentials
-    for Android push · **the Google Cloud Android OAuth client** (see the
-    written browser-check prompt in *Blocked*).
+23. **← ACTIVE (Android track): get the Android build onto a device.** The first Android build
+    ever (`6c18ddab-73ac-4ac5-93ad-e7b5a9faa7c8`, development profile,
+    versionCode 1) was queued on 2026-07-31 — check
+    [the builds page](https://expo.dev/accounts/parsa-mansouri/projects/uptime/builds)
+    for its artifact rather than assuming it succeeded. Then:
+    **(a)** publish the OAuth consent screen, or Google sign-in works only for
+    `parsaxavier@gmail.com`; **(b)** set up Firebase/FCM if the pager needs to
+    fire; **(c)** borrow an Android phone once and do all three
+    phone-dependent things in one sitting — Play Console app sign-in, APK
+    install, and the ranked test checklist under *Written but NOT verified*.
+    Full state table in *Current status → The Android release*.
+24. Then: **custom SMTP** (it unblocks the Magic Link template, which the OTP
+    screen depends on — see *Blocked*) · store listings · Play Console identity
+    verification · the `eas.json` Android submit block.
 
 ## Deliberately partial — grows later (scope ledger)
 
@@ -514,6 +625,25 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
     that is not the owner's. **Unresolved as of 2026-07-31.**
   - The full Web client ID is **not a secret** (a client ID is an identifier),
     which is why it is written here and shipped as `EXPO_PUBLIC_`.
+
+- **⚠ The Android keystore is the app's permanent identity — treat it that
+  way.** Created 2026-07-31, EAS-managed, SHA-1
+  `EC:2F:BB:F3:74:79:CE:55:E0:0F:11:85:03:02:68:2A:E4:1A:39:30` (a certificate
+  fingerprint is public, which is why it is written here). **Lose it after a
+  Play release and that listing can never be updated again** — there is no
+  recovery, no support ticket, nothing. EAS holds the canonical copy and signs
+  server-side, so ordinary work is safe.
+
+  A local `.jks` backup was downloaded to `apps/mobile/` on 2026-07-31 —
+  actually two, because the download ran twice and EAS renamed the first to
+  `*_OLD_1.jks`. Both are covered by the `*.jks` rule in
+  `apps/mobile/.gitignore`, so they cannot be committed by accident.
+  **They should be moved out of the repo directory** to a password manager or
+  backup drive. `eas credentials` prints the keystore and key passwords to the
+  terminal when downloading, so that scrollback is sensitive — the passwords
+  were exposed in chat on 2026-07-31, judged low-risk because the `.jks` file
+  itself never left the machine, and rotation was offered while it was still
+  free. **After a Play release, rotation stops being possible at all.**
 
 - **⚠ Expo Go can no longer run this app, as of 2026-07-31.**
   `@react-native-google-signin/google-signin` is a native module and is not in
@@ -740,7 +870,11 @@ curl -H "Authorization: Bearer $CRON_SECRET" \
 ## Development builds and push
 
 **There is no `eas` command on this machine — it runs through `npx`.**
-Everything below is run from `apps/mobile` and needs a free Expo account.
+Everything below is run from `apps/mobile`.
+
+**The setup below is already DONE** — login, `init`, and all three env vars on
+all three environments. It is kept as the from-scratch reference for a new
+machine or a new project, not as a to-do list.
 
 ```bash
 cd apps/mobile
@@ -749,25 +883,36 @@ npx eas-cli@latest init      # creates the project, writes extra.eas.projectId i
 
 # EAS Build does NOT see .env.local — it is gitignored and never uploaded.
 # The keys live in EAS instead, so nothing lands in a public repo.
-npx eas-cli@latest env:create --name EXPO_PUBLIC_SUPABASE_URL \
-  --value "https://<ref>.supabase.co" --environment development,preview,production \
-  --visibility plaintext
-npx eas-cli@latest env:create --name EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY \
-  --value "sb_publishable_..." --environment development,preview,production \
-  --visibility plaintext
+# NOTE: `env:create` is deprecated in favour of `env:set`; both work today.
+npx eas-cli@latest env:set --name EXPO_PUBLIC_SUPABASE_URL \
+  --value "https://<ref>.supabase.co" --visibility plaintext --scope project \
+  --environment development --environment preview --environment production
+#  ...same for EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+#  ...and EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID (added 2026-07-31)
+
+# Read them back — this is how you rebuild a lost .env.local:
+npx eas-cli@latest env:list development
 
 npx eas-cli@latest build --profile development --platform android  # APK, no Apple account
 npx eas-cli@latest build --profile development --platform ios      # needs an Apple Developer account
 ```
 
-**Why this is needed at all:** `expo-notifications` cannot issue a push token
-without an EAS `projectId`, and **remote push does not work in Expo Go** — so
-the escalation ladder is untestable until a development build exists.
-`registerForPush` already fails soft and says why (`"no EAS projectId; run
-eas init"`), so nothing crashes in the meantime.
+**Watch the first lines of any build's output.** It prints which *environment*
+it resolved and names every variable it loaded. If a variable is missing there,
+it is missing from the bundle — `EXPO_PUBLIC_*` values are inlined at build
+time, not read at runtime, so **adding one always requires a rebuild.**
 
-**Android is the cheap path**: EAS builds an APK you install directly, no Apple
-account and no Mac. iOS device builds need an Apple Developer account ($99/yr)
+**Why a dev build is needed at all:** as of 2026-07-31 it is the only way to
+run the app on Android at all, because a native module is in the tree. Beyond
+that, `expo-notifications` cannot issue a push token without an EAS
+`projectId`, and remote push has never worked in Expo Go — so the escalation
+ladder is untestable without one either way. `registerForPush` fails soft and
+says why, so nothing crashes in the meantime.
+
+**Android is still the cheap path**: EAS builds an APK you install directly, no
+Apple account and no Mac, and **no Play Console account either** — sideloading
+needs nothing. Play Console ($25 once) is only for distributing to other people
+through the store. iOS device builds need an Apple Developer account ($99/yr)
 or Xcode on the team's Mac.
 
 If the Expo account is an **organisation** rather than a personal one, add

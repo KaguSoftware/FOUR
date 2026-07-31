@@ -105,7 +105,7 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 
 **Done and verified:**
 
-- Schema pushed — 9 tables, RLS on all. Verified: anon reads return zero rows, cross-user insert rejected (42501). **All seven migrations applied to the live database as of 2026-07-29.**
+- Schema pushed — 9 tables, RLS on all. Verified: anon reads return zero rows, cross-user insert rejected (42501). **Nine of the ten migrations are applied to the live database, confirmed by `npx supabase migration list` on 2026-07-31** — including `delete_account` and `integrity_hardening`, which this file previously listed as outstanding. The only local-only migration is `20260730120000_drop_posture.sql`, and it is deliberately held (see *Blocked*).
 - Auth: password sign-in + magic link fallback; deep link survives sign-in via `?next=`.
 - Status dashboard, re-entry takeover, day grid, two-tap logging with playbook chips, history, playbook, proof, settings.
 - Monitor route with fade tiers, milestone ledger, plateau detection. **Verified end-to-end** against seeded data: silent at 1 day, pages at 2, escalates at 3, same-day dedupe works.
@@ -199,20 +199,14 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 - **Vercel cron has never run.** The route works locally; the schedule is unproven.
 - **Push has never been delivered to a device.** Needs a development build; `expo-notifications` cannot issue a token without an EAS `projectId` and remote push does not work in Expo Go.
 - **Drag-to-reorder and drag-to-archive have not been used on a device** as of this writing. The RPC they depend on is applied; the gesture itself is unproven on hardware.
-- **The 2026-07-29 Settings/Auth surface is untested on hardware**: the daily reminder firing at its hour, the test alert, export's share sheet, change email/password round-trips, delete account against the live DB (migration not yet pushed), Apple / Google / OTP sign-in (all three also need the dashboard config below).
+- **The 2026-07-29 Settings/Auth surface is untested on hardware**: the daily reminder firing at its hour, the test alert, export's share sheet, change email/password round-trips, delete account against the live DB (its migration IS applied now, so it should work), Apple and OTP sign-in. Google sign-in has completed end to end since the account-picker fix.
+- **The whole 2026-07-31 grid round is untested on hardware**: both grid layouts, tapping a day on each screen, how a blank day reads, and the `DELETE` confirm.
 - Plateau thresholds pass unit tests but have no longitudinal data behind them. `PLATEAU_WEEKS` (4) and `MIN_DAYS_PER_WEEK` (3) are educated guesses.
 
 **Blocked / needs the owner:**
 
-- **`npx supabase db push` from the repo root** to apply
-  `20260729040000_integrity_hardening.sql` (26 harness checks green). Until it
-  lands, the RLS split, the length and weight bounds, the composite playbook
-  FK, the `monitor_runs` day-unique and the timezone trigger are all local
-  only. **Nothing breaks without it** — every fix has an app-side layer too —
-  but the second layer is missing.
 - **Rotate two credentials** — see Gotchas. Still outstanding from 2026-07-19.
 - **A development build** — see *Roadmap* step 15. This is the gate on push.
-- **`npx supabase db push` from the repo root** to apply `20260729030000_delete_account.sql` (19 harness checks green). Delete account fails politely until then.
 - **`20260730120000_drop_posture.sql` is written but MUST WAIT for build 5.**
   TestFlight build 4 still selects the `posture` column in its status query;
   dropping it while build 4 is anyone's installed version breaks their

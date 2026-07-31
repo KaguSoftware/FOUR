@@ -404,6 +404,16 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
   well: emphasis by containment, not hue. `components/states.tsx` on mobile and
   the same treatment inline on web. **Owner review welcome — this was decided
   during the 2026-07-29 audit round and is reversible.**
+- **`eas submit` failing with `getaddrinfo ENOTFOUND idmsa.apple.com` is DNS,
+  not credentials.** It looks like an auth failure — it appears straight after
+  the Apple ID password prompt — but the request never left the machine. This
+  network's resolver is a corporate domain controller
+  (`SUPERPAYDC.superpay.tech`, 192.168.168.7) and intermittently fails external
+  lookups. Confirm with `nslookup idmsa.apple.com`; if it resolves, just retry.
+  Happened 2026-07-31. **`ascAppId` is now set in `eas.json`
+  (`submit.production.ios`), which skips the Apple Developer Portal login that
+  step needed** — the upload itself uses the App Store Connect API key already
+  stored on EAS, so submits should no longer touch `idmsa.apple.com` at all.
 - **If `tsc` says "Cannot find module '@uptime/core'", run `npm install` at the
   repo root — the workspace symlinks are stale, and typecheck has been lying.**
   `node_modules/@uptime/*` are symlinks baked with an absolute path. The repo was

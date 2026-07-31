@@ -83,13 +83,46 @@ export default function TabsLayout() {
       // and returns the moment you scroll back up.
       minimizeBehavior="onScrollDown"
       tintColor={color.ink}
-      iconColor={color.inkMute}
+      // Both of these MUST be the {default, selected} form. A flat value
+      // applies to the selected state too and silently overrides `tintColor` —
+      // the type docs say so outright — which left selected and unselected
+      // identical in colour. On iOS 26 the glass pill still showed which tab
+      // was active, so it looked correct; on anything without Liquid Glass
+      // there was no indicator at all. Reported from the device.
+      iconColor={{ default: color.inkMute, selected: color.ink }}
       labelStyle={{
-        fontFamily: "Inter_400Regular",
-        fontSize: size["2xs"],
-        color: color.inkMute,
+        default: {
+          fontFamily: "Inter_400Regular",
+          fontSize: size["2xs"],
+          color: color.inkMute,
+        },
+        selected: {
+          // Medium as well as brighter: weight survives a colour-blind viewer
+          // and a dimmed screen, both of which flatten a hue difference.
+          fontFamily: "Inter_500Medium",
+          fontSize: size["2xs"],
+          color: color.ink,
+        },
       }}
+      // Android draws a Material 3 pill behind the selected icon, and there it
+      // is the PRIMARY selection affordance — so it has to be visible against
+      // the bar. `line` measures 1.45:1 on this background, which is a pill you
+      // cannot see; `line-hi` is 3.33:1 and is the token this palette already
+      // uses where a boundary has to read (the today ring in the day grid).
+      indicatorColor={color.lineHi}
     >
+      {/* `Icon` also takes `sf={{ default, selected }}` for a filled-when-active
+          symbol, which would make selection a change of SHAPE rather than only
+          colour — the strongest fallback of all, and the iOS convention.
+
+          Not used, because only `house` and `gearshape` have filled twins in
+          SF Symbols: `clock.arrow.circlepath` and `chart.xyaxis.line` do not.
+          Two tabs changing shape while two stayed flat would read as the other
+          two being broken. Getting all four would mean swapping History and
+          Proof to different metaphors (a plain clock, a bar chart), which is a
+          design decision rather than part of this fix. The weight change on the
+          selected label is the non-colour cue instead, and it applies to all
+          four equally. */}
       <NativeTabs.Trigger name="index">
         <Label>Home</Label>
         <Icon

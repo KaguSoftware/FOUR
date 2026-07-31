@@ -48,6 +48,22 @@ To change a dependency: `cd apps/mobile && npx expo install --fix`.
   and therefore does **not** work in Expo Go — so we use `VectorIcon` with
   `MaterialIcons` from `@expo/vector-icons`. There is no Material-Symbol-by-name
   prop in 54; that (`md`) arrived in 57.
+- **`NativeTabs` `iconColor` and `labelStyle` MUST use the
+  `{ default, selected }` form.** Given a flat value, they apply to the selected
+  state too and **silently override `tintColor`** — the type docs say so
+  outright — so the selected tab renders identically to the others. On iOS 26
+  the glass selection pill hides the bug entirely; on any device without Liquid
+  Glass there is then no selection indicator at all. Shipped that way in build 7
+  and was reported from a device. Android additionally needs `indicatorColor`:
+  its Material 3 pill defaults to a colour chosen for a light surface and is
+  invisible on this palette. The four tab-bar pairs are now in
+  `scripts/check-contrast.mjs` so it cannot regress quietly.
+- **`Icon` takes `sf={{ default, selected }}`** for a filled-when-active symbol.
+  Not used, because only `house` and `gearshape` have filled twins —
+  `clock.arrow.circlepath` and `chart.xyaxis.line` do not, and two tabs changing
+  shape while two stay flat reads as the other two being broken. `SFSymbol` is a
+  typed union, so a wrong symbol name fails `tsc` rather than shipping a blank
+  tab.
 - **`@expo/ui` on SDK 54 is `0.2.0-beta.9`** and has no universal components.
   We do not use it. React Native's own `Switch` **is** the platform control —
   a real `UISwitch` / Material switch — so nothing is lost.

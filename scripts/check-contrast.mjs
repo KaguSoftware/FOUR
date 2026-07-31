@@ -79,6 +79,20 @@ const ENFORCED = [
   // The button has NO fill, so this stroke is the entire button. It owes 3:1.
   ["takeover · mark-it-up lever border", "line-hi", "bg", NONTEXT],
   ["login · create-account button", "ink", "surface-hi", TEXT],
+  // The tab bar. These exist because the selected tab was invisible on any
+  // device without Liquid Glass: `iconColor` and `labelStyle.color` were set as
+  // flat values, which apply to the selected state too and silently override
+  // `tintColor`, so selected and unselected rendered identically. iOS 26 hid it
+  // behind the glass selection pill. Nothing here may rest on that pill.
+  ["tabs · selected label/icon", "ink", "bg", TEXT],
+  ["tabs · unselected label/icon", "ink-mute", "bg", TEXT],
+  // The one that actually encodes "which tab am I on" without the glass. It is
+  // state carried by colour, so it owes the 3:1 non-text floor against the
+  // OTHER state rather than against the background.
+  ["tabs · selected vs unselected", "ink", "ink-mute", NONTEXT],
+  // Android's Material 3 indicator pill is the primary selection affordance
+  // there, so it has to be visible against the bar itself.
+  ["tabs · android indicator pill", "line-hi", "bg", NONTEXT],
 ];
 
 const EXEMPT = [

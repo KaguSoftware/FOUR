@@ -277,48 +277,36 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
   this is missing, so nothing is broken in the meantime — native Credential
   Manager just does not engage. Two steps:
 
-  1. **`EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`** in `apps/mobile/.env.local` and on
-     EAS. The value is the **Web** client already confirmed by the 2026-07-31
-     audit: `1017110614147-rj86gh….apps.googleusercontent.com` (get the full
-     string from the console). Not a secret — a client ID is an identifier, and
-     `EXPO_PUBLIC_` is correct.
-  2. **An Android OAuth client**, which the audit did not cover. Hand the owner
-     the prompt below.
+  1. ~~**`EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`**~~ — **DONE 2026-07-31.** Set on
+     all three EAS environments (`development`, `preview`, `production`) and
+     appended to `apps/mobile/.env.local`. Value is the Web client ID recorded
+     in *Gotchas*.
+  2. **An Android OAuth client — still missing.** Confirmed absent by the
+     2026-07-31 browser audit: the project has exactly one client and it is
+     the Web one. Create it at **Google Cloud → APIs & Services → Credentials
+     → + Create Credentials → OAuth client ID → Android**, package
+     `com.kagusoftware.uptime`, SHA-1 from the keystore.
 
-  <details><summary>Chrome-agent prompt — Android OAuth client (report only)</summary>
+     **The SHA-1 does not exist until a keystore does**, and no Android build
+     has ever run on this project. Generate one WITHOUT building — much faster
+     than waiting on a build just to read a fingerprint:
 
-  > Go to **Google Cloud Console → APIs & Services → Credentials**, for the
-  > project that owns the OAuth client
-  > `1017110614147-rj86gh….apps.googleusercontent.com`.
-  >
-  > Report, quoting every value verbatim:
-  >
-  > 1. Under **OAuth 2.0 Client IDs**, list every client: its **Name**, its
-  >    **Type**, and its **Creation date**. I expect at least one of type
-  >    *Web application*. **I am specifically asking whether one of type
-  >    *Android* exists** — say plainly if none does.
-  > 2. If an **Android** client exists, open it and quote its **Package name**
-  >    and its **SHA-1 certificate fingerprint**. Expected package name:
-  >    `com.kagusoftware.uptime`.
-  > 3. Open the **Web application** client and quote its full **Client ID** and
-  >    every **Authorised redirect URI**. Expected sole URI:
-  >    `https://yqphirnsvcqzstwjfshs.supabase.co/auth/v1/callback`.
-  > 4. Go to **APIs & Services → OAuth consent screen** and quote the
-  >    **Publishing status** and **User type**.
-  >
-  > **Do not paste any client SECRET.** For the Web client, say only whether a
-  > secret is present, never its value.
-  >
-  > **Report only, change nothing until I confirm.**
+     ```bash
+     cd apps/mobile
+     npx eas-cli@latest credentials -p android
+     #   → Keystore: Manage everything needed to build your project
+     #   → Set up a new keystore   → then read the SHA-1 Fingerprint
+     ```
 
-  </details>
+     **That keystore becomes the app's permanent identity on Android** — lose
+     it and a Play listing can never be updated. EAS stores it; back it up via
+     the same menu once it exists.
 
-  If no Android client exists, the SHA-1 to register comes from
-  `cd apps/mobile && npx eas-cli@latest credentials -p android` — the **build
-  credentials** fingerprint of whichever profile is being installed. A debug
-  build and an EAS build have *different* fingerprints, so both may need
-  registering. Getting the fingerprint wrong presents as `DEVELOPER_ERROR` and
-  nothing else.
+     A locally-built debug APK and an EAS build have **different**
+     fingerprints, so if both are ever used, both SHA-1s need registering.
+     Getting it wrong presents as `DEVELOPER_ERROR` and nothing else — the app
+     falls back to the browser flow, so it looks like the native sheet simply
+     never appears.
 
 - Note for a fresh chat: `apps/web/.env.local` is **not** on this machine, so the web dev server and the dev scripts cannot run here. Tests, typecheck, lint, both builds and `supabase db push` all work without it — `apps/mobile/.env.local` **does** exist.
 
@@ -499,10 +487,23 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
   `signInWithIdToken`, which validates against the Client IDs list; the secret
   only matters for a *web* Apple OAuth flow this product does not have.
   *Still unknown as of that date:* the Magic Link template's raw source (the
-  dashboard locks Source view without custom SMTP), **and whether an Android
-  OAuth client exists in Google Cloud** — the audit did not cover it because
-  nothing needed it until 2026-07-31. See the browser-check prompt in
-  *Blocked*.
+  dashboard locks Source view without custom SMTP).
+
+- **Google Cloud was re-audited in the browser on 2026-07-31 for the Android
+  work, and came back consistent with the earlier audit.** Recorded so nobody
+  re-runs it:
+  - Project **`high-office-503913-q9`**, named "four".
+  - **Exactly one** OAuth client: *Web application*, created 2026-07-29, full
+    ID `1017110614147-rj86ghgjdvgass9stp01bi2jvv04h0rn.apps.googleusercontent.com`.
+    Sole authorised redirect URI
+    `https://yqphirnsvcqzstwjfshs.supabase.co/auth/v1/callback`, no JS origins.
+    A client secret **is** present — that is correct and belongs to the
+    server-side web flow Supabase runs. **Credential Manager does not use it;
+    do not rotate it.**
+  - **No Android-type OAuth client exists.** That is the one remaining gap for
+    native Google Sign-In on Android — see *Blocked*.
+  - The full Web client ID is **not a secret** (a client ID is an identifier),
+    which is why it is written here and shipped as `EXPO_PUBLIC_`.
 
 - **⚠ Expo Go can no longer run this app, as of 2026-07-31.**
   `@react-native-google-signin/google-signin` is a native module and is not in

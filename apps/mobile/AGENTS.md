@@ -53,6 +53,15 @@ Reusable pieces, so nothing re-invents them:
   ripple, iOS keeps its held-press fill, and **never both** (they stack into a
   smear). `foreground: true` is load-bearing: a background ripple is drawn
   behind the view's own fill and is invisible on every button in this app.
+  A foreground ripple clips to the **Pressable's own** `borderRadius`, not its
+  child's — a wrapper styled `{ flex: 1 }` around a rounded box paints a
+  square ripple over it, which is why `TodayCell` carries an otherwise
+  invisible radius. `pressDim()` is the third form, for a control whose fill
+  is DATA and so has no resting colour to step to. **The day grid was the one
+  surface this pass missed** — both its cells shipped a bare
+  `pressed && { opacity: 0.6 }`, the iOS idiom, on Android too; fixed
+  2026-08-01. Its ripple is `line-hi`, the fourth tone, because a cell's fill
+  runs the whole ramp and `line` disappears against the dim end of it.
 - **`src/lib/haptics.ts`** — `committed()` / `pickedUp()` / `nudged()`. Named by
   meaning, because the two platforms' vocabularies do not map 1:1.
   **`Haptics.impactAsync` is wrong on Android** and expo-haptics' own types say

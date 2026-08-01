@@ -144,6 +144,13 @@ const ENFORCED = [
   // can be dragged away — an affordance, not a divider, which is why it takes
   // `line-hi`. It measured 1.35:1 as `line`.
   ["sheet · android drag handle", "line-hi", "surface", NONTEXT],
+
+  // The day cell's Android ripple. Measured against the DIMMEST ground the
+  // cell can have — an unfilled day, which is `surface` — because that is the
+  // worst case; every up day is brighter and the ripple only reads harder.
+  // `line` measured 1.35:1 here, the third time that token has been the wrong
+  // pick for an affordance on this palette.
+  ["day grid · android press ripple", "line-hi", "surface", NONTEXT],
 ];
 
 const EXEMPT = [

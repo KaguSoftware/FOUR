@@ -35,13 +35,23 @@ import { color } from "@/theme";
  * The tones are the same three surfaces the iOS pressed states use, so the
  * two platforms are answering with the same palette even though they are
  * answering differently.
+ *
+ * **`line-hi` is the fourth tone, and it is not interchangeable with `line`.**
+ * The first three all assume a control with one known resting fill, so a tone
+ * one step off that fill is a visible answer. The day grid has no such fill —
+ * a cell's brightness runs the whole ramp from `surface` to nearly `ink`, and
+ * that is the data. `line` over the dim end measures 1.35:1, the same reading
+ * that already condemned it on the sheet handle and the segmented divider.
+ * `line-hi` is 3.09:1 there and still reads as a darkening at the bright end,
+ * so it is the one tone that survives both ends of a ramp.
  */
 export function ripple(
-  tone: "line" | "surface" | "down" = "line",
+  tone: "line" | "line-hi" | "surface" | "down" = "line",
 ): PressableProps["android_ripple"] {
   if (Platform.OS !== "android") return undefined;
   const tones = {
     line: color.line,
+    "line-hi": color.lineHi,
     surface: color.surfaceHi,
     down: color.downDim,
   } as const;
@@ -82,4 +92,21 @@ export function pressFillFlat(
 ): string {
   if (Platform.OS === "android") return "transparent";
   return isPressed ? pressed : "transparent";
+}
+
+/**
+ * The third iOS held-press form: dimming, for a control whose fill IS content.
+ *
+ * A day cell has no resting colour to step to — its fill is the day's value,
+ * computed by `@uptime/core`, and swapping it for a pressed surface would say
+ * the day changed. So iOS answers by fading the whole cell instead.
+ *
+ * Android returns `1`: the ripple is already the answer, and the same rule
+ * that keeps `pressFill` still under one applies here. A cell that both dims
+ * and ripples reads as a flicker, and on the grid it reads as the *data*
+ * flickering.
+ */
+export function pressDim(isPressed: boolean, dim = 0.6): number {
+  if (Platform.OS === "android") return 1;
+  return isPressed ? dim : 1;
 }

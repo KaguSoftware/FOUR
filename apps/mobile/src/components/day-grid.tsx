@@ -21,6 +21,7 @@ import {
   type LeverSpan,
 } from "@uptime/core";
 import { Label, Mono } from "./ui";
+import { pressDim, ripple } from "@/lib/press";
 import { useReduceMotion } from "@/lib/reduce-motion";
 import { color, radius, size, space } from "@/theme";
 
@@ -291,6 +292,14 @@ function MonthView({
  * is the only record of what a day held, and it was previously unopenable.
  * Where no handler is given (the manual's specimens) it stays inert rather
  * than offering a tap that goes nowhere.
+ *
+ * **Press feedback is per-platform, like every other control in this app.**
+ * Both cells shipped `pressed && { opacity: 0.6 }` on both platforms — the
+ * iOS held-press idiom, rendered on Android too. The grid was written before
+ * `lib/press` existed and was the one thing the Android pass missed, so the
+ * signature component of the product was also the only surface on Home and
+ * History that answered an Android tap the iOS way. Android ripples; iOS
+ * keeps the exact fade it already had. Never both — see `lib/press`.
  */
 function DayCell({
   date,
@@ -338,7 +347,10 @@ function DayCell({
       onPress={() => onPress(date)}
       accessibilityRole="button"
       accessibilityLabel={`${date}: ${fill ? "up" : "down"}`}
-      style={({ pressed }) => [style, pressed && { opacity: 0.6 }]}
+      // `line-hi`, not `line`: this cell's fill is the DATA and runs the whole
+      // ramp, so the ripple has to read against both ends of it. See `ripple`.
+      android_ripple={ripple("line-hi")}
+      style={({ pressed }) => [style, { opacity: pressDim(pressed) }]}
     />
   );
 }
@@ -434,7 +446,17 @@ function TodayCell({
       onPress={() => onPress(date)}
       accessibilityRole="button"
       accessibilityLabel={`${date}, today: ${fill ? "up" : "down"}`}
-      style={({ pressed }) => [{ flex: 1 }, pressed && { opacity: 0.6 }]}
+      android_ripple={ripple("line-hi")}
+      style={({ pressed }) => [
+        {
+          flex: 1,
+          // Invisible — this element has no fill and no border; the animated
+          // box inside carries both. It exists so the foreground ripple has
+          // an outline to clip to, or it paints a square over a rounded cell.
+          borderRadius: radius.sm,
+        },
+        { opacity: pressDim(pressed) },
+      ]}
     >
       <Animated.View style={box} />
     </Pressable>

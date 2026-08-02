@@ -61,7 +61,11 @@ Reusable pieces, so nothing re-invents them:
   surface this pass missed** — both its cells shipped a bare
   `pressed && { opacity: 0.6 }`, the iOS idiom, on Android too; fixed
   2026-08-01. Its ripple is `line-hi`, the fourth tone, because a cell's fill
-  runs the whole ramp and `line` disappears against the dim end of it.
+  runs the whole ramp and `line` disappears against the dim end of it. The
+  **`Scale` on Proof** was the second miss (fixed 2026-08-02): `Segmented` was
+  derived from it, gained a ripple, and the original was left silent — so the
+  copy answered an Android tap and the thing it was copied from did not. When
+  a control is lifted from another, check the source got the same pass.
 - **`src/lib/haptics.ts`** — `committed()` / `pickedUp()` / `nudged()`. Named by
   meaning, because the two platforms' vocabularies do not map 1:1.
   **`Haptics.impactAsync` is wrong on Android** and expo-haptics' own types say

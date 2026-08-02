@@ -388,6 +388,20 @@ function DailyCheck({
   );
 }
 
+/**
+ * The 1–5 signal control, tapped every time this screen is used.
+ *
+ * `Segmented` was lifted from this control — "the treatment is lifted from the
+ * `Scale` control on the Proof screen, which is already measured" — and when
+ * the Android pass reached Segmented it noted that the shape had **no press
+ * feedback on either platform** and gave it a ripple. The original was left
+ * where it was, so the derived control answered an Android tap and the one it
+ * was derived from did not.
+ *
+ * Android-only, for the same reason recorded there: on iOS the selection
+ * moving is immediate enough to be the acknowledgement, and iOS ignores
+ * `android_ripple` outright, so nothing here can move an iOS pixel.
+ */
 function Scale({
   label,
   value,
@@ -410,6 +424,13 @@ function Scale({
               accessibilityState={{ selected: on }}
               accessibilityLabel={`${label} ${n} of 5`}
               onPress={() => onChange(n)}
+              // `line-hi`, not `line`. Four of these five cells rest on
+              // `surface`, and they are the ones actually tapped — a ripple
+              // in `line` measures 1.35:1 there, which is the same reading
+              // that already condemned that token on the sheet handle, the
+              // segmented divider and the day cell. `line-hi` is 3.09:1 on
+              // `surface` and still reads on the selected cell's `line`.
+              android_ripple={ripple("line-hi")}
               style={{
                 flex: 1,
                 minHeight: TAP,

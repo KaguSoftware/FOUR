@@ -151,6 +151,12 @@ const ENFORCED = [
   // `line` measured 1.35:1 here, the third time that token has been the wrong
   // pick for an affordance on this palette.
   ["day grid · android press ripple", "line-hi", "surface", NONTEXT],
+
+  // The proof scale's Android ripple. Four of the five cells rest on
+  // `surface` and are the ones actually tapped, so that is the enforced
+  // ground. The selected cell's `line` is measured below rather than
+  // enforced — see the exemption.
+  ["proof scale · android press ripple", "line-hi", "surface", NONTEXT],
 ];
 
 const EXEMPT = [
@@ -168,6 +174,11 @@ const EXEMPT = [
     "segmented · android selected fill vs unselected",
     "line", "surface",
     "The fill difference alone does NOT have to clear 3:1, because selection here never rests on it: the selected segment also carries Inter_500Medium instead of Regular, ink instead of ink-mute text (11.37:1 and 5.08:1 on their own grounds), and a leading check mark at 11.37:1. That check is a change of SHAPE, which is the one signal that survives a colour-blind viewer and a dimmed screen — the same reasoning recorded for the tab bar, where the fix was to add a non-colour cue rather than to brighten a fill. Measured so the number is on the table.",
+  ],
+  [
+    "proof scale · android ripple on the SELECTED cell",
+    "line-hi", "line",
+    "2.29:1, and deliberately not enforced. A ripple only has to be seen where it is actually raised, and tapping the already-selected cell is a no-op the control does not need to acknowledge — the four unselected cells rest on `surface` at 3.09:1 and are enforced above. Brightening the token past line-hi to win this pair would repaint the today ring, every button border and the sheet handle, which is a palette decision rather than a Proof one. Measured so the number is on the table.",
   ],
 ];
 

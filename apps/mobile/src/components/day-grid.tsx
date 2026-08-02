@@ -347,9 +347,11 @@ function DayCell({
       onPress={() => onPress(date)}
       accessibilityRole="button"
       accessibilityLabel={`${date}: ${fill ? "up" : "down"}`}
-      // `line-hi`, not `line`: this cell's fill is the DATA and runs the whole
-      // ramp, so the ripple has to read against both ends of it. See `ripple`.
-      android_ripple={ripple("line-hi")}
+      // This cell is the hardest ground in the app for a ripple: its fill is
+      // the DATA and runs the whole ramp from `surface` to nearly `ink`, so
+      // the one neutral has to read against both ends. `ink-mute` is 5.08:1
+      // on the dim end and 3.02:1 on the bright one. See `ripple`.
+      android_ripple={ripple()}
       style={({ pressed }) => [style, { opacity: pressDim(pressed) }]}
     />
   );
@@ -446,7 +448,7 @@ function TodayCell({
       onPress={() => onPress(date)}
       accessibilityRole="button"
       accessibilityLabel={`${date}, today: ${fill ? "up" : "down"}`}
-      android_ripple={ripple("line-hi")}
+      android_ripple={ripple()}
       style={({ pressed }) => [
         {
           flex: 1,

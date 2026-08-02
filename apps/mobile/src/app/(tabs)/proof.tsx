@@ -149,7 +149,7 @@ export default function ProofScreen() {
                   // and cannot be animated per-frame from a ripple. Android
                   // instead carries the inset permanently — invisible while
                   // resting, and the ripple then covers the whole row.
-                  android_ripple={ripple("surface")}
+                  android_ripple={ripple()}
                   style={({ pressed }) => ({
                     paddingVertical: space[4],
                     paddingHorizontal: android ? space[2] : pressed ? space[2] : 0,
@@ -347,7 +347,7 @@ function DailyCheck({
           accessibilityRole="button"
           disabled={empty || saving}
           onPress={save}
-          android_ripple={empty || saving ? undefined : ripple("line")}
+          android_ripple={empty || saving ? undefined : ripple()}
           style={({ pressed }) => ({
             minHeight: TAP,
             paddingHorizontal: space[5],
@@ -424,13 +424,7 @@ function Scale({
               accessibilityState={{ selected: on }}
               accessibilityLabel={`${label} ${n} of 5`}
               onPress={() => onChange(n)}
-              // `line-hi`, not `line`. Four of these five cells rest on
-              // `surface`, and they are the ones actually tapped — a ripple
-              // in `line` measures 1.35:1 there, which is the same reading
-              // that already condemned that token on the sheet handle, the
-              // segmented divider and the day cell. `line-hi` is 3.09:1 on
-              // `surface` and still reads on the selected cell's `line`.
-              android_ripple={ripple("line-hi")}
+              android_ripple={ripple()}
               style={{
                 flex: 1,
                 minHeight: TAP,

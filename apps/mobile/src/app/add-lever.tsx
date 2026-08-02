@@ -106,7 +106,7 @@ export default function AddLeverSheet() {
         accessibilityRole="button"
         disabled={!label.trim() || busy}
         onPress={add}
-        android_ripple={!label.trim() || busy ? undefined : ripple("line")}
+        android_ripple={!label.trim() || busy ? undefined : ripple()}
         style={({ pressed }) => ({
           minHeight: TAP,
           borderRadius: radius.md,

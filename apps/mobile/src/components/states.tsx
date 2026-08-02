@@ -134,7 +134,7 @@ export function Fault({
           accessibilityRole="button"
           accessibilityLabel={retryLabel}
           onPress={onRetry}
-          android_ripple={ripple("line")}
+          android_ripple={ripple()}
           style={({ pressed }) => ({
             minHeight: TAP,
             alignSelf: "flex-start",

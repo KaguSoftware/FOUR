@@ -98,7 +98,7 @@ export function Takeover({
               accessibilityRole="button"
               disabled={busy || todayLevers.includes(item.lever)}
               onPress={() => log(item.lever, item.label)}
-              android_ripple={ripple("line")}
+              android_ripple={ripple()}
               style={({ pressed }) => ({
                 minHeight: 64,
                 borderRadius: radius.md,
@@ -148,7 +148,7 @@ export function Takeover({
                 accessibilityLabel={`Mark ${lever.label} up`}
                 disabled={busy || done}
                 onPress={() => log(lever.key, null)}
-                android_ripple={ripple("surface")}
+                android_ripple={ripple()}
                 style={({ pressed }) => ({
                   flexBasis: full ? "100%" : "47%",
                   flexGrow: 1,

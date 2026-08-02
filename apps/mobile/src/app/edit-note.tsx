@@ -102,7 +102,7 @@ export default function EditNoteSheet() {
           accessibilityRole="button"
           disabled={busy}
           onPress={save}
-          android_ripple={busy ? undefined : ripple("line")}
+          android_ripple={busy ? undefined : ripple()}
           style={({ pressed }) => ({
             minHeight: TAP,
             borderRadius: radius.md,

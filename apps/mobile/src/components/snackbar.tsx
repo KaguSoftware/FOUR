@@ -193,7 +193,7 @@ function Snackbar({
             onDismiss();
             message.action?.onPress();
           }}
-          android_ripple={ripple("line")}
+          android_ripple={ripple()}
           style={{
             minHeight: TAP,
             paddingHorizontal: space[3],

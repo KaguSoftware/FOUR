@@ -265,7 +265,7 @@ export default function OnboardingScreen() {
                       // horizontal padding inside a flex row, and the shared
                       // component's negative margin would move it. Same
                       // ripple, laid out where it already was.
-                      android_ripple={ripple("surface")}
+                      android_ripple={ripple()}
                       style={{
                         minHeight: TAP,
                         paddingHorizontal: space[3],
@@ -288,7 +288,7 @@ export default function OnboardingScreen() {
               <Pressable
                 accessibilityRole="button"
                 onPress={() => setLabels([...labels, ""])}
-                android_ripple={ripple("surface")}
+                android_ripple={ripple()}
                 style={{
                   alignSelf: "flex-start",
                   minHeight: TAP,

@@ -44,7 +44,7 @@ export function Button({
       accessibilityState={{ disabled: off, busy }}
       disabled={off}
       onPress={onPress}
-      android_ripple={off ? undefined : ripple("line")}
+      android_ripple={off ? undefined : ripple()}
       style={({ pressed }) => ({
         minHeight: tall ? 56 : TAP,
         borderRadius: radius.md,
@@ -106,7 +106,7 @@ export function TextButton({
       accessibilityState={{ disabled }}
       disabled={disabled}
       onPress={onPress}
-      android_ripple={disabled ? undefined : ripple("surface")}
+      android_ripple={disabled ? undefined : ripple()}
       style={{
         minHeight: TAP,
         justifyContent: "center",

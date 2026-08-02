@@ -145,18 +145,28 @@ const ENFORCED = [
   // `line-hi`. It measured 1.35:1 as `line`.
   ["sheet · android drag handle", "line-hi", "surface", NONTEXT],
 
-  // The day cell's Android ripple. Measured against the DIMMEST ground the
-  // cell can have — an unfilled day, which is `surface` — because that is the
-  // worst case; every up day is brighter and the ripple only reads harder.
-  // `line` measured 1.35:1 here, the third time that token has been the wrong
-  // pick for an affordance on this palette.
-  ["day grid · android press ripple", "line-hi", "surface", NONTEXT],
+  // The Android ripple, against EVERY ground it is drawn on.
+  //
+  // There is one neutral — `ink-mute` — because a ripple is a translucent
+  // radial wash rather than a held fill, and the per-surface tones this used
+  // to take (`line`, `surface`, `down-dim`) measured 1.00–1.81:1 against
+  // their own grounds. Twenty-eight controls rippled and none of them drew.
+  // Material carries one `colorControlHighlight` per theme for exactly this
+  // reason, so the pairs below are the whole set: if a new surface appears,
+  // it has to clear this token, not pick its own.
+  //
+  // `line` is the tightest and is real — the selected cell of the proof scale
+  // and of `Segmented`. `ink` is the brightest a day cell can reach.
+  ["ripple · on the page", "ink-mute", "bg", NONTEXT],
+  ["ripple · on a panel", "ink-mute", "surface", NONTEXT],
+  ["ripple · on a control", "ink-mute", "surface-hi", NONTEXT],
+  ["ripple · on a selected segment", "ink-mute", "line", NONTEXT],
+  ["ripple · on a full day cell", "ink-mute", "ink", NONTEXT],
 
-  // The proof scale's Android ripple. Four of the five cells rest on
-  // `surface` and are the ones actually tapped, so that is the enforced
-  // ground. The selected cell's `line` is measured below rather than
-  // enforced — see the exemption.
-  ["proof scale · android press ripple", "line-hi", "surface", NONTEXT],
+  // The destructive ripple: sign out, delete account, and "didn't happen" in
+  // the log sheet. A statement rather than a surface match, and the one place
+  // the ripple takes a hue. It was `down-dim` at 1.52:1, which is nothing.
+  ["ripple · destructive on a panel", "down", "surface", NONTEXT],
 ];
 
 const EXEMPT = [
@@ -176,9 +186,9 @@ const EXEMPT = [
     "The fill difference alone does NOT have to clear 3:1, because selection here never rests on it: the selected segment also carries Inter_500Medium instead of Regular, ink instead of ink-mute text (11.37:1 and 5.08:1 on their own grounds), and a leading check mark at 11.37:1. That check is a change of SHAPE, which is the one signal that survives a colour-blind viewer and a dimmed screen — the same reasoning recorded for the tab bar, where the fix was to add a non-colour cue rather than to brighten a fill. Measured so the number is on the table.",
   ],
   [
-    "proof scale · android ripple on the SELECTED cell",
-    "line-hi", "line",
-    "2.29:1, and deliberately not enforced. A ripple only has to be seen where it is actually raised, and tapping the already-selected cell is a no-op the control does not need to acknowledge — the four unselected cells rest on `surface` at 3.09:1 and are enforced above. Brightening the token past line-hi to win this pair would repaint the today ring, every button border and the sheet handle, which is a palette decision rather than a Proof one. Measured so the number is on the table.",
+    "ripple · the old per-surface tone, on a control",
+    "line", "surface-hi",
+    "1.22:1. Kept as a standing record of what the ripple looked like from the Android pass until 2026-08-02: a real RippleDrawable, correctly bounded, drawn in a colour one tonal step off its own ground. An iOS held-press CAN live at that step, because it fills the whole control and the eye catches its edge; a ripple has no edge and decays in ~300ms. This row is why the tone is no longer a per-call decision.",
   ],
 ];
 

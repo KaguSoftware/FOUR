@@ -144,7 +144,7 @@ export default function LogSheet() {
           accessibilityRole="button"
           disabled={chosen !== null}
           onPress={() => commit(item.label)}
-          android_ripple={chosen !== null ? undefined : ripple("line")}
+          android_ripple={chosen !== null ? undefined : ripple()}
           style={({ pressed }) => ({
             minHeight: 56,
             borderRadius: radius.md,
@@ -178,7 +178,7 @@ export default function LogSheet() {
           <Pressable
             accessibilityRole="button"
             onPress={() => commit(custom.trim() || null)}
-            android_ripple={ripple("line")}
+            android_ripple={ripple()}
             style={{
               minHeight: 56,
               paddingHorizontal: space[4],
@@ -196,7 +196,7 @@ export default function LogSheet() {
         <Pressable
           accessibilityRole="button"
           onPress={() => setTyping(true)}
-          android_ripple={ripple("surface")}
+          android_ripple={ripple()}
           style={{
             minHeight: 56,
             borderRadius: radius.md,
@@ -219,7 +219,7 @@ export default function LogSheet() {
           accessibilityRole="button"
           disabled={chosen !== null}
           onPress={remove}
-          android_ripple={chosen !== null ? undefined : ripple("down")}
+          android_ripple={chosen !== null ? undefined : ripple("destructive")}
           style={({ pressed }) => ({
             minHeight: TAP,
             alignItems: "center",
@@ -238,7 +238,7 @@ export default function LogSheet() {
           accessibilityRole="button"
           disabled={chosen !== null}
           onPress={() => commit(null)}
-          android_ripple={chosen !== null ? undefined : ripple("surface")}
+          android_ripple={chosen !== null ? undefined : ripple()}
           style={{
             minHeight: TAP,
             alignItems: "center",

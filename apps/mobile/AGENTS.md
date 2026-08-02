@@ -57,15 +57,28 @@ Reusable pieces, so nothing re-invents them:
   child's — a wrapper styled `{ flex: 1 }` around a rounded box paints a
   square ripple over it, which is why `TodayCell` carries an otherwise
   invisible radius. `pressDim()` is the third form, for a control whose fill
-  is DATA and so has no resting colour to step to. **The day grid was the one
-  surface this pass missed** — both its cells shipped a bare
-  `pressed && { opacity: 0.6 }`, the iOS idiom, on Android too; fixed
-  2026-08-01. Its ripple is `line-hi`, the fourth tone, because a cell's fill
-  runs the whole ramp and `line` disappears against the dim end of it. The
-  **`Scale` on Proof** was the second miss (fixed 2026-08-02): `Segmented` was
-  derived from it, gained a ripple, and the original was left silent — so the
-  copy answered an Android tap and the thing it was copied from did not. When
-  a control is lifted from another, check the source got the same pass.
+  is DATA and so has no resting colour to step to.
+
+  **`ripple()` takes `neutral` (default) or `destructive`, and nothing else.**
+  It used to take a tone per surface — `line`, `surface`, `down-dim` — picked
+  to echo the iOS pressed state. Measured against the grounds they were drawn
+  on, those are 1.00–1.81:1: **every one of the twenty-eight ripples the
+  Android pass added was invisible**, for eight months, on a real
+  `RippleDrawable` that was otherwise correct. A held fill survives one tonal
+  step because it covers the control and the eye catches its edge; a
+  translucent wash with no edge, decaying in ~300ms, does not. `ink-mute` is
+  the only token clearing 3:1 on every ground here (5.48 on `bg` → 3.02 on
+  `ink`), which is also why Material carries one `colorControlHighlight` per
+  theme rather than one per surface. Fixed 2026-08-02; the six pairs are in
+  `check:contrast` and a new surface must clear the token rather than pick
+  its own.
+
+  Two controls were missed by the Android pass entirely and shipped the iOS
+  idiom bare: the **day grid** (`pressed && { opacity: 0.6 }` on both
+  platforms, fixed 2026-08-01) and the **`Scale` on Proof** (no feedback at
+  all — `Segmented` was derived from it, gained a ripple, and the original was
+  left silent; fixed 2026-08-02). When a control is lifted from another,
+  check the source got the same pass.
 - **`src/lib/haptics.ts`** — `committed()` / `pickedUp()` / `nudged()`. Named by
   meaning, because the two platforms' vocabularies do not map 1:1.
   **`Haptics.impactAsync` is wrong on Android** and expo-haptics' own types say

@@ -58,7 +58,7 @@ export function Segmented<T extends string>({
             // answer to a tap was the selection moving. Android gets its
             // ripple; iOS keeps the unchanged behaviour, where the selection
             // change is immediate enough to serve as the acknowledgement.
-            android_ripple={ripple("line")}
+            android_ripple={ripple()}
             style={{
               flex: 1,
               minHeight: TAP,

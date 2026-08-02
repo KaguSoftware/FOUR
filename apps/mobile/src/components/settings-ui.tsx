@@ -139,7 +139,7 @@ export function LinkRow({
       accessibilityRole="link"
       accessibilityLabel={value ? `${title}, ${value}` : title}
       onPress={() => router.push(href)}
-      android_ripple={ripple(destructive ? "down" : "surface")}
+      android_ripple={ripple(destructive ? "destructive" : "neutral")}
       style={({ pressed }) => ({
         minHeight: TAP + space[2],
         flexDirection: "row",
@@ -309,7 +309,7 @@ export function TimeRow({
               onChange: pick,
             })
           }
-          android_ripple={ripple("surface")}
+          android_ripple={ripple()}
           style={({ pressed }) => ({
             minHeight: TAP,
             justifyContent: "center",
@@ -377,7 +377,7 @@ export function ActionRow({
       // Android tints a destructive ripple red — the Material convention, and
       // free here because the ripple is its own layer. iOS keeps the neutral
       // held fill it already shipped rather than gaining a red one.
-      android_ripple={ripple(destructive ? "down" : "surface")}
+      android_ripple={ripple(destructive ? "destructive" : "neutral")}
       style={({ pressed }) => ({
         minHeight: TAP + space[2],
         justifyContent: "center",

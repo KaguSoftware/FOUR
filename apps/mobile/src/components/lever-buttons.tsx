@@ -235,7 +235,7 @@ export function LeverButtons({
               accessibilityRole="button"
               accessibilityLabel="Add a lever"
               onPress={onAdd}
-              android_ripple={ripple("surface")}
+              android_ripple={ripple()}
               style={({ pressed }) => ({
                 flex: 1,
                 borderRadius: radius.md,
@@ -440,7 +440,7 @@ function LeverCell({
           // `foreground: true` matters most here: this cell is absolutely
           // positioned inside an `Animated.View` and carries its own fill, so
           // a background ripple would be painted underneath it and never seen.
-          android_ripple={lifted ? undefined : ripple("line")}
+          android_ripple={lifted ? undefined : ripple()}
           style={({ pressed }) => ({
             flex: 1,
             borderRadius: radius.md,

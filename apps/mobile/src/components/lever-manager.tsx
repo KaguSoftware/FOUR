@@ -206,7 +206,7 @@ export function LeverManager({
               <Pressable
                 onPress={() => setEditing(null)}
                 accessibilityRole="button"
-                android_ripple={ripple("surface")}
+                android_ripple={ripple()}
                 style={{
                   minHeight: TAP,
                   justifyContent: "center",
@@ -305,7 +305,7 @@ export function LeverManager({
             accessibilityRole="button"
             disabled={!adding.trim() || busy}
             onPress={create}
-            android_ripple={!adding.trim() || busy ? undefined : ripple("line")}
+            android_ripple={!adding.trim() || busy ? undefined : ripple()}
             style={({ pressed }) => ({
               minHeight: TAP,
               paddingHorizontal: space[4],

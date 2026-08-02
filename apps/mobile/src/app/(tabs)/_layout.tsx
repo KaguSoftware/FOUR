@@ -110,6 +110,23 @@ export default function TabsLayout() {
       // cannot see; `line-hi` is 3.33:1 and is the token this palette already
       // uses where a boundary has to read (the today ring in the day grid).
       indicatorColor={color.lineHi}
+      // **Android-only, and it must be stated rather than left to default.**
+      //
+      // Unset, react-native-screens leaves the bar on
+      // `NavigationBarView.LABEL_VISIBILITY_AUTO`
+      // (`TabsHostAppearanceApplicator.kt`), and AUTO is a rule about item
+      // COUNT: labelled at three items or fewer, selected-only at four or
+      // more. This app has exactly four, so it sits on the wrong side of that
+      // line — three of the four tabs render icon-only on Android while all
+      // four are labelled on iOS, and the `labelStyle.default` configured
+      // above describes a label that is never drawn.
+      //
+      // `labeled` is also the more native answer, not a concession to iOS:
+      // AUTO's threshold is Material 2 `BottomNavigationView` behaviour, and
+      // the M3 navigation bar labels every destination — which is what Gmail,
+      // Photos and Play all show. Stating it explicitly also means adding a
+      // fifth tab cannot silently restyle the bar.
+      labelVisibilityMode="labeled"
     >
       {/* `Icon` also takes `sf={{ default, selected }}` for a filled-when-active
           symbol, which would make selection a change of SHAPE rather than only

@@ -231,6 +231,18 @@ export function LeverManager({
               <Body tone="dim" style={{ flex: 1 }} numberOfLines={1}>
                 {lever.label}
               </Body>
+              {/* These two are the last inline text buttons in the app with no
+                  press feedback of any kind. `TextButton` exists because there
+                  were eight of them and "every one offered no press feedback
+                  at all"; these were missed because they are laid out in a row
+                  rather than stacked, so they never matched the shape that was
+                  factored out. The `cancel` button eight lines above — same
+                  component, same file — already carries both.
+
+                  The radius is invisible on both platforms (no fill, no
+                  border): it is only there so the foreground ripple has an
+                  outline to clip to instead of spilling into a hard-edged
+                  rectangle, which is exactly the note on `TextButton`. */}
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={`Rename ${lever.label}`}
@@ -238,7 +250,13 @@ export function LeverManager({
                   setDraft(lever.label);
                   setEditing(lever.id);
                 }}
-                style={{ minHeight: TAP, justifyContent: "center", paddingHorizontal: space[2] }}
+                android_ripple={ripple()}
+                style={{
+                  minHeight: TAP,
+                  justifyContent: "center",
+                  paddingHorizontal: space[2],
+                  borderRadius: radius.md,
+                }}
               >
                 <Body tone="mute" style={{ fontSize: size.xs }}>
                   rename
@@ -248,7 +266,17 @@ export function LeverManager({
                 accessibilityRole="button"
                 accessibilityLabel={`Archive ${lever.label}`}
                 onPress={() => archive(lever)}
-                style={{ minHeight: TAP, justifyContent: "center", paddingHorizontal: space[2] }}
+                // Neutral, not destructive: this row is not red, and archiving
+                // still has to get past a confirmation dialog. The destructive
+                // ripple belongs to the two rows that sign you out and delete
+                // the account, where the text is `down` too.
+                android_ripple={ripple()}
+                style={{
+                  minHeight: TAP,
+                  justifyContent: "center",
+                  paddingHorizontal: space[2],
+                  borderRadius: radius.md,
+                }}
               >
                 <Body
                   tone="mute"

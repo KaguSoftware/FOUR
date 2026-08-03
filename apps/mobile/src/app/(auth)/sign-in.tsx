@@ -10,12 +10,12 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as AppleAuthentication from "expo-apple-authentication";
 import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
-import { GoogleSigninButton } from "@react-native-google-signin/google-signin";
 import { useRouter } from "expo-router";
 
 import { Button, TextButton } from "@/components/button";
 import { field, fieldTint } from "@/components/fields";
 import { Body, Label, Logo, Rule } from "@/components/ui";
+import { googleSignin } from "@/lib/google-native";
 import { signInWithApple, signInWithGoogle } from "@/lib/oauth";
 import { supabase } from "@/lib/supabase";
 import { color, radius, space } from "@/theme";
@@ -25,6 +25,11 @@ import { color, radius, space } from "@/theme";
 WebBrowser.maybeCompleteAuthSession();
 
 const android = Platform.OS === "android";
+
+// Google's branded button, or null where the native module is absent (Expo
+// Go) — the screen then falls back to its own quiet button, matching what
+// the sign-in flow actually does there (the browser round trip).
+const GoogleSigninButton = googleSignin()?.GoogleSigninButton ?? null;
 
 type Mode = "in" | "up";
 
@@ -270,7 +275,7 @@ export default function SignInScreen() {
                 and any Android without Play Services — it is the app's own
                 quiet button opening the browser flow, which is what that
                 path actually does. */}
-            {android ? (
+            {android && GoogleSigninButton ? (
               <GoogleSigninButton
                 size={GoogleSigninButton.Size.Wide}
                 color={GoogleSigninButton.Color.Dark}

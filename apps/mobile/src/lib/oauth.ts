@@ -3,13 +3,8 @@ import * as Crypto from "expo-crypto";
 import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
 import { Platform } from "react-native";
-import {
-  GoogleSignin,
-  isErrorWithCode,
-  isSuccessResponse,
-  statusCodes,
-} from "@react-native-google-signin/google-signin";
 
+import { googleSignin } from "./google-native";
 import { supabase } from "./supabase";
 
 /**
@@ -141,6 +136,12 @@ export async function signInWithGoogle(): Promise<OAuthResult> {
  * with `DEVELOPER_ERROR`, which says nothing.
  */
 async function signInWithGoogleNative(): Promise<OAuthResult | null> {
+  // `null` in Expo Go, where the native module is not in the binary — the
+  // same "not the user's fault" fallback as missing Play Services.
+  const gsi = googleSignin();
+  if (!gsi) return null;
+  const { GoogleSignin, isErrorWithCode, isSuccessResponse, statusCodes } = gsi;
+
   const webClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
   if (!webClientId) {
     // A build-configuration problem, not a user-facing one. Fall back rather

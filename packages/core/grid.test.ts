@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { MAX_LEVERS, gridFill, gridRamp, leversOn } from "./grid";
+import { MAX_LEVERS, gridFill, gridRamp, leversOn, windowStart } from "./grid";
+import { addDays } from "./uptime";
 
 const INK = "#eceff1";
 
@@ -177,5 +178,53 @@ describe("gridFill", () => {
     // are untouched; only the shade moves.
     expect(gridFill(1, 2)! > gridFill(1, 3)!).toBe(true);
     expect(gridFill(1, 3)! > gridFill(1, 4)!).toBe(true);
+  });
+});
+
+describe("windowStart", () => {
+  const TODAY = "2026-08-03";
+
+  it("starts today when nothing has been logged", () => {
+    // One live cell and twenty-nine that have not happened. Not twenty-nine
+    // blanks and then today at the end.
+    expect(windowStart(null, TODAY)).toBe(TODAY);
+  });
+
+  it("pins to day one while the account is younger than the window", () => {
+    expect(windowStart("2026-08-01", TODAY)).toBe("2026-08-01");
+    expect(windowStart("2026-07-20", TODAY)).toBe("2026-07-20");
+  });
+
+  it("puts day one in the first cell", () => {
+    // The whole point: the first logged day IS the start, so it sits in cell
+    // one and does not move the next morning.
+    const first = "2026-08-01";
+    expect(windowStart(first, "2026-08-01")).toBe(first);
+    expect(windowStart(first, "2026-08-02")).toBe(first);
+    expect(windowStart(first, "2026-08-09")).toBe(first);
+  });
+
+  it("hands over to the rolling window on the 30th day, with no seam", () => {
+    // Both branches agree on the changeover day, which is why there is no mode
+    // to switch between.
+    const first = addDays(TODAY, -29);
+    expect(windowStart(first, TODAY)).toBe(first);
+    expect(windowStart(first, TODAY)).toBe(addDays(TODAY, -29));
+  });
+
+  it("rolls once there is more history than the window", () => {
+    expect(windowStart("2024-01-01", TODAY)).toBe(addDays(TODAY, -29));
+    expect(windowStart(addDays(TODAY, -30), TODAY)).toBe(addDays(TODAY, -29));
+  });
+
+  it("never starts later than today", () => {
+    // A future `firstDay` means a skewed clock or seeded data. A block that
+    // starts after today has no present cell at all.
+    expect(windowStart("2027-01-01", TODAY)).toBe(TODAY);
+  });
+
+  it("honours a window other than 30", () => {
+    expect(windowStart("2024-01-01", TODAY, 7)).toBe(addDays(TODAY, -6));
+    expect(windowStart("2026-08-02", TODAY, 7)).toBe("2026-08-02");
   });
 });

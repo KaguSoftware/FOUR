@@ -45,15 +45,19 @@ export default function SettingsIndex() {
           href="/(tabs)/settings/levers"
         />
         <RowRule />
-        <LinkRow title="Alerts" value={alerts} href="/(tabs)/settings/alerts" />
-        <RowRule />
         <LinkRow
-          title="Tracking"
+          title="Activities"
+          // How many are remembered, not which — the labels are per-lever and
+          // would not fit on one row.
           value={
-            state.weight_enabled ? `Weight · ${state.weight_unit}` : "Weight off"
+            status.playbook.length === 0
+              ? "None yet"
+              : `${status.playbook.length} remembered`
           }
-          href="/(tabs)/settings/tracking"
+          href="/(tabs)/settings/activities"
         />
+        <RowRule />
+        <LinkRow title="Alerts" value={alerts} href="/(tabs)/settings/alerts" />
       </Group>
 
       <Group>

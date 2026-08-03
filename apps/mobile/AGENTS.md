@@ -77,7 +77,8 @@ Reusable pieces, so nothing re-invents them:
   idiom bare: the **day grid** (`pressed && { opacity: 0.6 }` on both
   platforms, fixed 2026-08-01) and the **`Scale` on Proof** (no feedback at
   all — `Segmented` was derived from it, gained a ripple, and the original was
-  left silent; fixed 2026-08-02). When a control is lifted from another,
+  left silent; fixed 2026-08-02, and the control itself was deleted with the
+  old Proof screen on 2026-08-03). When a control is lifted from another,
   check the source got the same pass.
 - **`src/lib/haptics.ts`** — `committed()` / `pickedUp()` / `nudged()`. Named by
   meaning, because the two platforms' vocabularies do not map 1:1.
@@ -238,3 +239,34 @@ To change a dependency: `cd apps/mobile && npx expo install --fix`.
 - Verify with `npm run typecheck` and then, from `apps/mobile`,
   `npx expo export --platform ios --platform android`. That export is the only
   proof the module graph actually resolves.
+
+## The proof/mood/activities round (2026-08-03)
+
+Five changes; the traps worth knowing before touching any of them.
+
+- **`Frame` in `src/components/screen.tsx`** is `Screen` without the
+  ScrollView, for the pixel wall — which is sized to the space it is given and
+  must fit it exactly. It carries the identical insets, **including
+  `TAB_BAR`**. `insets.bottom` alone clears the home indicator and leaves the
+  content under translucent glass; that has been a real bug here four times.
+- **The wall is two `<Path>` elements, not 2,500 views.** `pixelPaths` in core
+  returns the geometry as SVG path data — same doctrine as the old
+  `trendPath`, and the reason a wall of that size mounts instantly on an older
+  phone. `react-native-svg` was already a dependency.
+- **`@react-native-community/slider` is a new native module.** Fine here —
+  Expo Go already could not run this app — but it means an existing dev build
+  does not have it and has to be rebuilt. Version is SDK 54's own pin, from
+  `bundledNativeModules.json`; never hand-pick it.
+- **The slider commits on `onSlidingComplete`, never `onValueChange`**, and
+  carries `step={1}`. Left continuous, the platform hands back `63.42711` and
+  the `int` column rejects the write with no visible cause.
+- **`src/app/activities.tsx` is a `modal`, not a `SHEET`** — its height changes
+  as rows are added and deleted, and `fitToContents` measures once. Same
+  reasoning already recorded for `how-it-works`. The log sheet reaches it with
+  `router.replace`, not `push`; see the HANDOFF gotcha.
+- **`src/lib/playbook.ts` is online-only and does NOT go through the outbox.**
+  The outbox exists because a missed log is a lost day; a rename that needs a
+  connection costs nothing comparable. Its queue is keyed `(logged_for, lever)`
+  with last-write-wins collapsing, which an activity op does not fit, and a
+  queued delete flushed after a queued log would delete the row the log just
+  upserted. `src/lib/levers.ts` is online-only for the same reason.

@@ -134,9 +134,19 @@ function RootNavigator({ fontsLoaded }: { fontsLoaded: boolean }) {
             someone with one item and clip someone with three. */}
         <Stack.Screen name="log" options={SHEET} />
         <Stack.Screen name="add-lever" options={SHEET} />
-        <Stack.Screen name="edit-note" options={SHEET} />
         {/* Read-only: what a tapped day held. */}
         <Stack.Screen name="day" options={SHEET} />
+        {/* The activity editor, opened from the log sheet. A modal for the
+            same reason the walkthrough is one: its height changes as rows are
+            added and deleted, and `fitToContents` measures once. */}
+        <Stack.Screen
+          name="activities"
+          options={{
+            presentation: "modal",
+            headerShown: false,
+            contentStyle: { backgroundColor: color.bg },
+          }}
+        />
         {/* The walkthrough. A full-height native modal, NOT the formSheet
             options above: `fitToContents` measures content once, and a
             three-step screen whose steps differ in height would resize under

@@ -13,6 +13,7 @@
 
 import type { Entry } from "./uptime";
 import { currentRun, uptimeWindow } from "./uptime";
+import { MOOD_KIND, MOOD_MAX, MOOD_MIN } from "./mood";
 
 export type FadeAction =
   | { kind: "none"; reason: string }
@@ -162,6 +163,18 @@ const MIN_DAYS_PER_WEEK = 3;
 const PLATEAU_WEEKS = 4;
 
 /**
+ * How much of the scale's own range counts as "went nowhere", 0..1.
+ *
+ * **Normalised, and that is the point.** This was `0.25` compared against raw
+ * values, which was 6.25% of the old 1–5 energy scale. When the reading moved
+ * to a 1–100 mood slider the same literal became 0.25% of the range — a
+ * threshold nothing could ever clear, so every month would have read as a
+ * plateau and the pager would have fired constantly. Comparing fractions of
+ * the range keeps the meaning fixed no matter what the control is.
+ */
+const PLATEAU_FLAT_FRACTION = 0.0625;
+
+/**
  * The plateau check.
  *
  * Detects "UP, but flat": high uptime while felt-state signals stop moving.
@@ -190,8 +203,12 @@ export function evaluatePlateau(opts: {
     return { flat: false, reason: "within 6-week cooldown" };
   }
 
+  // `mood` only. The old `energy` and `sleep` kinds are still in the table and
+  // still readable in the day sheet, but nothing writes them any more — mixing
+  // a historical 1–5 rating into a 1–100 average would produce a number that
+  // is not on either scale.
   const scalar = signals
-    .filter((s) => s.value !== null && (s.kind === "energy" || s.kind === "sleep"))
+    .filter((s) => s.value !== null && s.kind === MOOD_KIND)
     .sort((a, b) => a.observed_on.localeCompare(b.observed_on));
 
   // Group by the ISO week the day falls in, not by the day itself.
@@ -205,7 +222,7 @@ export function evaluatePlateau(opts: {
 
   const weekAvgs = [...byWeek.entries()]
     .sort((a, b) => a[0].localeCompare(b[0]))
-    // energy + sleep both land on a sampled day, so require days, not rows.
+    // One row per sampled day, so this is a day count.
     .filter(([, vals]) => vals.length >= MIN_DAYS_PER_WEEK)
     .map(([, vals]) => vals.reduce((x, y) => x + y, 0) / vals.length);
 
@@ -217,13 +234,16 @@ export function evaluatePlateau(opts: {
   const first = recent[0];
   const last = recent[recent.length - 1];
 
-  // Flat or declining across the window.
-  const flat = last - first <= 0.25;
+  // Flat or declining across the window, measured as a fraction of the scale
+  // rather than in raw points — see PLATEAU_FLAT_FRACTION.
+  const range = MOOD_MAX - MOOD_MIN;
+  const moved = (last - first) / range;
+  const flat = moved <= PLATEAU_FLAT_FRACTION;
   return {
     flat,
     reason: flat
-      ? `signals flat ${weeks} weeks (${first.toFixed(1)} → ${last.toFixed(1)})`
-      : `signals rising (${first.toFixed(1)} → ${last.toFixed(1)})`,
+      ? `signals flat ${weeks} weeks (${first.toFixed(0)} → ${last.toFixed(0)})`
+      : `signals rising (${first.toFixed(0)} → ${last.toFixed(0)})`,
   };
 }
 

@@ -108,6 +108,62 @@ export function Screen({
 }
 
 /**
+ * The same frame, for a screen that must NOT scroll.
+ *
+ * `Screen` is a `ScrollView`, which is right for every surface that is a list
+ * of things. The pixel wall is the opposite: it is sized to the space it is
+ * given and has to fit it exactly, because a wall you can scroll is a wall
+ * whose message is cropped, and one that is 20pt taller than the viewport
+ * bounces on every touch for no reason.
+ *
+ * It carries the identical insets — including `TAB_BAR`, which is the trap.
+ * `insets.bottom` alone clears the home indicator and leaves the content under
+ * translucent glass: visible and unreachable. That has been a real bug on this
+ * project four times.
+ *
+ * Children get a `flex: 1` box, so measuring with `onLayout` gives the real
+ * space available rather than the screen's full height.
+ */
+export function Frame({
+  children,
+  headerRight,
+  wordmark = true,
+}: {
+  children: ReactNode;
+  headerRight?: ReactNode;
+  wordmark?: boolean;
+}) {
+  const insets = useSafeAreaInsets();
+
+  return (
+    <View
+      style={{
+        flex: 1,
+        backgroundColor: color.bg,
+        paddingTop: insets.top + space[4],
+        paddingHorizontal: space[5],
+        paddingBottom: insets.bottom + TAB_BAR + space[4],
+      }}
+    >
+      {wordmark && (
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "baseline",
+            justifyContent: "space-between",
+            marginBottom: space[5],
+          }}
+        >
+          <Wordmark />
+          {headerRight}
+        </View>
+      )}
+      <View style={{ flex: 1 }}>{children}</View>
+    </View>
+  );
+}
+
+/**
  * The same bottom allowance, for a surface that owns its own ScrollView.
  *
  * The takeover needs its own layout — no wordmark, its own top padding — but it

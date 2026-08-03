@@ -158,9 +158,12 @@ export default function TabsLayout() {
 
       <NativeTabs.Trigger name="proof">
         <Label>Proof</Label>
+        {/* A grid, not a line chart. This was `chart.xyaxis.line` /
+            `show-chart` when the screen WAS a chart; leaving it there would
+            promise a trend and open a wall of pixels. */}
         <Icon
-          sf="chart.xyaxis.line"
-          androidSrc={<VectorIcon family={MaterialIcons} name="show-chart" />}
+          sf="square.grid.3x3.fill"
+          androidSrc={<VectorIcon family={MaterialIcons} name="grid-on" />}
         />
       </NativeTabs.Trigger>
 

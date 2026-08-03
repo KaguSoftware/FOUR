@@ -21,8 +21,7 @@ import {
 import { Button, TextButton } from "@/components/button";
 import { field, fieldTint } from "@/components/fields";
 import { androidMetrics, Body, Label, Wordmark } from "@/components/ui";
-import { Segmented } from "@/components/segmented";
-import { Group, Note, RowRule, SwitchRow, TimeRow } from "@/components/settings-ui";
+import { Group, RowRule, SwitchRow, TimeRow } from "@/components/settings-ui";
 import { useAndroidBack } from "@/lib/back";
 import { registerForPush } from "@/lib/push";
 import { syncReminder } from "@/lib/reminder";
@@ -31,26 +30,21 @@ import { supabase } from "@/lib/supabase";
 import { useSession } from "@/lib/session";
 import { color, radius, size, space, TAP } from "@/theme";
 
-const STEPS = 4;
+const STEPS = 3;
 const DEFAULT_REMINDER = "21:00:00";
 
-const UNIT_CHOICES = [
-  { value: "kg", title: "kg" },
-  { value: "lb", title: "lb" },
-] as const;
-
 /**
- * First run, in four screens.
+ * First run, in three screens.
  *
  * The first states the rule before it asks for anything, because "one of these,
  * not all" is the single idea someone has to accept for the rest of the product
  * to make sense. It also explains, without a tour, why there is no streak
  * counter anywhere in the app.
  *
- * Then the two opt-ins (weight, the daily reminder), both defaulting off
- * because off IS the product's default, and finally the pager. That last screen
- * exists so the iOS notification prompt lands with its reason on screen: by
- * then the user has chosen levers and knows what a page would be about.
+ * Then the daily reminder, defaulting off because off IS the product's
+ * default, and finally the pager. That last screen exists so the iOS
+ * notification prompt lands with its reason on screen: by then the user has
+ * chosen levers and knows what a page would be about.
  *
  * Nothing is written until the last tap. A half-finished account cannot open
  * the app at all, so there is no intermediate state worth saving.
@@ -60,19 +54,17 @@ export default function OnboardingScreen() {
   const { session, markOnboarded } = useSession();
   const [step, setStep] = useState(0);
   const [labels, setLabels] = useState<string[]>([""]);
-  const [weightOn, setWeightOn] = useState(false);
-  const [weightUnit, setWeightUnit] = useState<"kg" | "lb">("kg");
   const [reminderAt, setReminderAt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const scroll = useRef<ScrollView>(null);
 
   /**
-   * Android's Back, walking the four steps.
+   * Android's Back, walking the three steps.
    *
    * The root layout sets `gestureEnabled: false` on this route, which blocks
    * the iOS edge-swipe and does **nothing at all** to the Android Back button
-   * — different mechanisms entirely. So Back on step 3 of 4 popped the only
+   * — different mechanisms entirely. So Back on step 2 of 3 popped the only
    * screen in the stack and dropped the user out of a setup they had not
    * finished, having written nothing (nothing is saved until the last tap).
    *
@@ -130,8 +122,6 @@ export default function OnboardingScreen() {
       {
         user_id: userId,
         timezone: Localization.getCalendars()[0]?.timeZone ?? "UTC",
-        weight_enabled: weightOn,
-        weight_unit: weightUnit,
         daily_reminder_at: reminderAt,
       },
       { onConflict: "user_id" },
@@ -326,45 +316,6 @@ export default function OnboardingScreen() {
 
         {step === 1 && (
           <>
-            <Text style={heading}>Keep a number alongside the system?</Text>
-            <Body tone="mute" style={{ marginTop: space[3] }}>
-              Optional, and structurally separate: weight is recorded next to
-              uptime, never inside it. It cannot make a day up or down.
-            </Body>
-
-            <Group title="tracking" first={false}>
-              <SwitchRow
-                title="Track weight"
-                value={weightOn}
-                onValueChange={setWeightOn}
-              />
-            </Group>
-            {weightOn && (
-              <>
-                <Label style={{ marginTop: space[6], marginBottom: space[3] }}>
-                  unit
-                </Label>
-                <Segmented
-                  label="Weight unit"
-                  options={UNIT_CHOICES}
-                  value={weightUnit}
-                  onChange={setWeightUnit}
-                />
-              </>
-            )}
-            <Note>
-              No goal, no target, no judgement of the trend — a number you
-              chose to keep, not a score kept on you. Off by default, and
-              changeable in Settings at any time.
-            </Note>
-
-            <Cta label="continue" onPress={() => setStep(2)} />
-            <StepBack onPress={() => setStep(0)} label="← back to levers" />
-          </>
-        )}
-
-        {step === 2 && (
-          <>
             <Text style={heading}>Want a daily nudge?</Text>
             <Body tone="mute" style={{ marginTop: space[3] }}>
               A quiet reminder from this device at a time you pick. Off by
@@ -391,12 +342,12 @@ export default function OnboardingScreen() {
               )}
             </Group>
 
-            <Cta label="continue" onPress={() => setStep(3)} />
-            <StepBack onPress={() => setStep(1)} label="← back to tracking" />
+            <Cta label="continue" onPress={() => setStep(2)} />
+            <StepBack onPress={() => setStep(0)} label="← back to levers" />
           </>
         )}
 
-        {step === 3 && (
+        {step === 2 && (
           <>
             <Text style={heading}>
               When the system goes down, it pages you.
@@ -424,7 +375,7 @@ export default function OnboardingScreen() {
               disabled={busy}
               onPress={() => finish(false)}
             />
-            <StepBack onPress={() => setStep(2)} label="← back to reminder" />
+            <StepBack onPress={() => setStep(1)} label="← back to reminder" />
           </>
         )}
 

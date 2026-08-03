@@ -126,13 +126,25 @@ Stated on its own terms, not against any competitor. Confirmed 2026-07-28.
   cut two days later by owner decision: the app is strict-only, one voice. The
   removal was cheap precisely because posture was built to be copy-only; the
   constraint that mattered survives as the milestone rule below.
-- **Proof ships in v1** (confirmed 2026-07-28, reversing the earlier cut). The
-  daily felt-state check-in and its trend are core, not optional.
-- **The proof trend plots daily points**, matching the daily sampling rate.
-  **Plateau detection still reads weekly** — these are two different readers of
-  the same data and they must not be conflated. A plateau judged on raw days
-  fires after four quiet days, which is a mood, not a trend.
-- **Optional weight**, per the constraint below.
+- **Proof ships in v1** (confirmed 2026-07-28, reversing the earlier cut), and
+  was **rebuilt on 2026-08-03**: the felt-state check-in moved to the
+  dashboard as one slider, and the screen itself became the pixel wall below.
+- **One felt-state reading, on the dashboard.** Two 1–5 scales and a written
+  journal, on a screen you had to navigate to, were answered by whoever was
+  already curious enough to go there. A single continuous slider under the
+  levers is the same reading at a fraction of the cost. **Plateau detection
+  still reads weekly** — a plateau judged on raw days fires after four quiet
+  days, which is a mood, not a trend — and its flat threshold is a fraction of
+  the scale's range, never a number of points, so the reading's scale can
+  change without silencing the pager.
+- **`/proof` is the pixel wall.** A screen of cells, as many lit as the
+  fraction of the calendar month the system has been up, with a fixed set left
+  permanently dark in the shape of a message. At nothing there is nothing to
+  read; the message emerges, a word at a time, as the month fills. The app
+  never tells the user to keep going — it gradually stops hiding that it
+  would.
+- **Optional weight was removed on 2026-08-03.** Owner decision, taken with the
+  journal. Existing rows are kept and still shown on the days they belong to.
 
 **Constraints that future work must preserve:**
 
@@ -145,12 +157,19 @@ Stated on its own terms, not against any competitor. Confirmed 2026-07-28.
 - Empty history reads as **0 days down**, never a large number.
 - No calories, no quality scoring, no badges, no confetti, no coins, no
   leaderboards.
-- **Weight is opt-in and off by default** (confirmed 2026-07-28, amending the
-  earlier "no weight" rule). When switched on it is recorded and plotted, and
-  that is the whole feature: it **never affects uptime**, there is no goal
-  weight, no target, no "X above/below", no BMI, and no interpretation of the
-  trend. It is a number the user chose to keep, never a score the product keeps
-  on them. Switching it off hides it without deleting history.
+- **Nothing the user says about a day may affect uptime.** The mood reading
+  lives in `signals`, a different table from `entries`, and only `entries` is
+  derived from — a structural guarantee rather than a convention. Skipping it
+  costs nothing and the copy has to say so.
+- **The pixel wall's unlit cells and its message cells are the same colour.**
+  If they ever separate by even one step the message is legible at zero
+  percent, and the screen stops being something the month reveals.
+- **The activity cap may never block a log.** Ten remembered activities per
+  lever; at the ceiling an explicit add is refused, but logging a lever with a
+  new note retires something unpinned and barely-used instead — or records
+  nothing at all. Both the client rule and the database trigger archive rather
+  than raise, because a constraint violation dead-letters a queued tap and a
+  missed log is a lost day.
 
 **Owner-stated, 2026-07-28 — a technically polished result that breaks either
 of these is wrong:**

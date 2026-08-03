@@ -4,7 +4,7 @@ import { useOptimistic, useState, useTransition } from "react";
 import { logEntry, undoEntry } from "@/app/actions";
 import { Sheet } from "./sheet";
 import type { LeverRow, PlaybookItem } from "@/lib/system";
-import type { Lever } from "@uptime/core";
+import { rankActivities, type Lever } from "@uptime/core";
 
 /**
  * The whole logging path: tap a lever, tap a chip. Two taps, no typing.
@@ -196,7 +196,10 @@ function PlaybookSheet({
       <p className="label mb-3">{lever}</p>
 
       <div className="flex flex-col gap-2">
-        {items.slice(0, 3).map((item) => (
+        {/* Ranked in core, so this and the takeover and the phone cannot
+            disagree about which three are the top three. Also drops archived
+            rows, which the loader now returns for the editor's retired list. */}
+        {rankActivities(items).slice(0, 3).map((item) => (
           <button
             key={item.id}
             onClick={() => pick(item.label)}

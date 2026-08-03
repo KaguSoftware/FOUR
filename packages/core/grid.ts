@@ -33,7 +33,50 @@
  * rests on fill alone.
  */
 
+import { addDays } from "./uptime";
+
 export const MAX_LEVERS = 4;
+
+/**
+ * The first day of Home's trailing block.
+ *
+ * `max(firstDay, today - (days - 1))`, and that single expression is the whole
+ * behaviour — there is deliberately no mode to be in.
+ *
+ * **Why it is not simply `today - 29`.** That is a rolling window, and on a new
+ * account a rolling window is read backwards. Three days in, twenty-seven cells
+ * are blank and the three real ones sit at the BOTTOM-RIGHT, so the block reads
+ * as filling upward from the end; worse, every cell moves one place left
+ * overnight, so the day you logged yesterday is not where you left it. Someone
+ * with three days of history is exactly the person who most needs the grid to
+ * say *you have started*, and it was saying *you are nearly all gap*.
+ *
+ * Pinning to day one puts the first day in the first cell. Days after `today`
+ * are the caller's `future` treatment — drawn as nothing, the same as a
+ * calendar's trailing pad, because a day that has not happened is not a day
+ * that was missed.
+ *
+ * Once there are `days` of history the pin is behind the rolling edge and this
+ * returns `today - (days - 1)` forever after. The transition needs no handling:
+ * on the 30th day both branches give the same date.
+ *
+ * **The hero does not do this.** `uptimeWindow` stays a true rolling window —
+ * see its docblock. The grid answers "what have I done so far"; the number
+ * answers "is the system up".
+ */
+export function windowStart(
+  firstDay: string | null,
+  today: string,
+  days = 30,
+): string {
+  const rolling = addDays(today, -(days - 1));
+  // Nothing logged, or a `firstDay` in the future — a clock skew, or seeded
+  // data. Either way the block starts today: one live cell and twenty-nine
+  // that have not happened. It must never start LATER than today, or the grid
+  // has no present.
+  const pin = firstDay === null || firstDay > today ? today : firstDay;
+  return pin > rolling ? pin : rolling;
+}
 
 /**
  * A lever's lifespan, as dates.

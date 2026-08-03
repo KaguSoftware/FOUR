@@ -163,6 +163,67 @@
     color: var(--color-ink-mute);
     font-weight: 500;
   }
+
+  /*
+   * The mood slider's track and thumb.
+   *
+   * A real `<input type="range">`, because it is the platform's control and
+   * comes with keyboard operation, the screen-reader role and the value
+   * announcement already correct — none of which a hand-built div gets for
+   * free. Only its skin is replaced: the browser default is a light-theme
+   * accent that is invisible on this palette.
+   *
+   * `-webkit-` and `-moz-` thumbs cannot share a rule — a selector either
+   * engine does not recognise invalidates the whole block — so they are
+   * written out twice on purpose. Do not merge them.
+   */
+  .mood-range {
+    appearance: none;
+    -webkit-appearance: none;
+    height: 44px; /* the tap target, not the track */
+    background: transparent;
+    cursor: pointer;
+  }
+
+  .mood-range::-webkit-slider-runnable-track {
+    height: 4px;
+    border-radius: 2px;
+    background: var(--color-line);
+  }
+  .mood-range::-moz-range-track {
+    height: 4px;
+    border-radius: 2px;
+    background: var(--color-line);
+  }
+
+  /* 20px on a 4px track, so the thumb has to be pulled up by (20-4)/2. */
+  .mood-range::-webkit-slider-thumb {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 20px;
+    height: 20px;
+    margin-top: -8px;
+    border-radius: 50%;
+    background: var(--color-ink);
+    border: none;
+  }
+  .mood-range::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--color-ink);
+    border: none;
+  }
+
+  /* Focus must be visible: this control is operable by arrow key. */
+  .mood-range:focus-visible::-webkit-slider-thumb {
+    outline: 2px solid var(--color-line-hi);
+    outline-offset: 2px;
+  }
+  .mood-range:focus-visible::-moz-range-thumb {
+    outline: 2px solid var(--color-line-hi);
+    outline-offset: 2px;
+  }
 }
 
 /* Motion conveys state; it never decorates. */

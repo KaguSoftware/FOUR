@@ -1,8 +1,8 @@
 import { requireStatus } from "@/lib/system";
 import { signOut } from "@/app/actions";
+import { ActivityManager } from "./activity-manager";
 import { LeverManager } from "./lever-manager";
 import { SlammedToggle } from "./slammed-toggle";
-import { WeightToggle } from "./weight-toggle";
 import { TelegramSetup } from "./telegram-setup";
 import { BackLink } from "@/app/components/nav-link";
 import { Wordmark } from "@/app/components/wordmark";
@@ -25,12 +25,13 @@ export default async function SettingsPage() {
         <LeverManager levers={status.levers} />
       </section>
 
+      {/* Directly under the levers, because an activity belongs to one. */}
       <section className="border-line border-b py-6">
-        <SlammedToggle on={slammed} until={state.slammed_until} />
+        <ActivityManager levers={status.levers} activities={status.playbook} />
       </section>
 
       <section className="border-line border-b py-6">
-        <WeightToggle on={state.weight_enabled} />
+        <SlammedToggle on={slammed} until={state.slammed_until} />
       </section>
 
       <Row label="timezone" value={state.timezone} />

@@ -6,11 +6,13 @@ import {
   monthGrid,
   monthsBetween,
   WEEKDAY_INITIALS,
+  windowStart,
   type Entry,
   type LeverSpan,
   type Signal,
 } from "@uptime/core";
 import { InteractiveGrid, type GridCell } from "./interactive-grid";
+import { MonthPager } from "./month-pager";
 
 /**
  * The day grid, in the two shapes the product uses.
@@ -46,13 +48,17 @@ type Source = {
 };
 
 /**
- * The trailing block: the last `days` days, ten to a row, no calendar
- * structure at all.
+ * The trailing block: `days` days, ten to a row, no calendar structure at all.
  *
  * Ten columns is a deliberate non-week. This grid answers "how has it been
  * lately", and a row that happened to be a week would invite reading down the
  * columns for a weekday pattern that the layout does not actually encode.
  * History's calendar is where that question belongs.
+ *
+ * **It begins at day one until the account is `days` old**, then rolls. See
+ * `windowStart` — a plain rolling window reads backwards on a new account: the
+ * three days someone had actually logged sat at the bottom-right behind
+ * twenty-seven blanks, and every square moved one place left overnight.
  */
 export function DayGrid({
   entries,
@@ -63,72 +69,92 @@ export function DayGrid({
   days = 30,
 }: Source & { days?: number }) {
   const fired = firedByDate(entries);
-  const cells: GridCell[] = Array.from({ length: days }, (_, i) => {
-    const date = addDays(today, -(days - 1 - i));
-    return dayCell(date, { entries, signals, today, spans, labels }, fired);
-  });
+  const start = windowStart(firstLogged(entries), today, days);
+
+  const cells: GridCell[] = Array.from({ length: days }, (_, i) =>
+    dayCell(addDays(start, i), { entries, signals, today, spans, labels }, fired),
+  );
+
+  // `dayCell` already renders anything past today as `future`, drawn as
+  // nothing — the same treatment the calendar's trailing pad gets.
+  const elapsed = cells.filter((c) => c.kind !== "future").length;
 
   return (
-    <InteractiveGrid cells={cells} cols={10} label={`Last ${days} days`} />
+    <InteractiveGrid
+      cells={cells}
+      cols={10}
+      // "Last 30 days" is a lie while the block is pinned to day one; most of
+      // it has not happened yet.
+      label={elapsed < days ? `Day ${elapsed} of ${days}` : `Last ${days} days`}
+    />
   );
 }
 
 /**
- * History: every month since the first entry, newest first.
+ * History: every month since the first entry, newest first, **one per page**.
  *
  * A calendar earns its place here and not on the dashboard. Seven columns mean
  * a column IS a weekday, so "I always lose Sundays" becomes visible — and the
  * cells come out large enough to be a legitimate tap target, which the old
  * ninety-square block never was.
+ *
+ * It was a vertical stack, and an account a year old made this a page you
+ * scrolled thirteen calendars of to reach the incident list under them. Months
+ * are peers you compare, not one long document.
  */
 export function MonthStack({ entries, signals, today, spans, labels }: Source) {
-  // From the first entry, not from signup: a stack that opens with empty
-  // months is a wall of nothing before any of the real history.
-  const earliest = entries[0]?.logged_for ?? today;
+  // From the first entry, not from signup: a pager that opens on empty months
+  // is a stack of nothing before any of the real history.
+  const earliest = firstLogged(entries) ?? today;
   const anchors = monthsBetween(earliest, today);
   const fired = firedByDate(entries);
 
+  const pages = anchors.map((anchor) => {
+    /**
+     * Six rows, always.
+     *
+     * A real month occupies four, five or six depending on how its 1st falls,
+     * which was fine in a stack where each was as tall as it was. In a pager
+     * the container takes the height of the page on screen, so moving between
+     * a four-row February and a six-row August would resize the whole section
+     * and shunt the incident list under it up and down.
+     */
+    const month = monthGrid(anchor, { minWeeks: 6 });
+    const cells: GridCell[] = month.cells.map((date) =>
+      date === null
+        ? { kind: "pad" }
+        : dayCell(date, { entries, signals, today, spans, labels }, fired),
+    );
+
+    const up = month.cells.filter(
+      (d) => d !== null && d <= today && (fired.get(d)?.size ?? 0) > 0,
+    ).length;
+
+    return { anchor, month, cells, up };
+  });
+
   return (
-    <div className="flex flex-col gap-8">
-      {anchors.map((anchor) => {
-        const month = monthGrid(anchor);
-        const cells: GridCell[] = month.cells.map((date) =>
-          date === null
-            ? { kind: "pad" }
-            : dayCell(date, { entries, signals, today, spans, labels }, fired),
-        );
+    <MonthPager
+      labels={pages.map((p) => `${p.month.label} ${p.month.year} · ${p.up} up`)}
+      months={pages.map(({ anchor, month, cells }) => (
+        <section key={anchor} className="px-px">
+          <ul
+            className="text-ink-mute mb-2 grid grid-cols-7 gap-[3px] text-center text-[11px]"
+            aria-hidden="true"
+          >
+            {WEEKDAY_INITIALS.map((d, i) => (
+              <li key={i}>{d}</li>
+            ))}
+          </ul>
 
-        const up = month.cells.filter(
-          (d) => d !== null && d <= today && (fired.get(d)?.size ?? 0) > 0,
-        ).length;
-
-        return (
-          <section key={anchor}>
-            <div className="mb-3 flex items-baseline justify-between">
-              <p className="label">
-                {month.label} {month.year}
-              </p>
-              <p className="tabular text-ink-mute text-xs">{up} up</p>
-            </div>
-
-            <ul
-              className="text-ink-mute mb-2 grid grid-cols-7 gap-[3px] text-center text-[11px]"
-              aria-hidden="true"
-            >
-              {WEEKDAY_INITIALS.map((d, i) => (
-                <li key={i}>{d}</li>
-              ))}
-            </ul>
-
-            <InteractiveGrid
-              cells={cells}
-              cols={7}
-              label={`${month.label} ${month.year}`}
-            />
-          </section>
-        );
-      })}
-    </div>
+          <InteractiveGrid
+            cells={cells}
+            cols={7}
+            label={`${month.label} ${month.year}`}
+          />
+        </section>
+      ))}
+    />
   );
 }
 
@@ -147,6 +173,22 @@ function firedByDate(entries: Entry[]) {
     byDate.set(e.logged_for, set);
   }
   return byDate;
+}
+
+/**
+ * The earliest logged day, or null.
+ *
+ * Scanned rather than read off `entries[0]`. The query does order ascending,
+ * but "the first element is the oldest" is a property no caller assembling an
+ * entry list would think to preserve, and getting it wrong here moves the
+ * whole grid.
+ */
+function firstLogged(entries: Entry[]): string | null {
+  let first: string | null = null;
+  for (const e of entries) {
+    if (first === null || e.logged_for < first) first = e.logged_for;
+  }
+  return first;
 }
 
 /** One real day, shaded and loaded with its detail. */

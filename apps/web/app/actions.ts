@@ -5,13 +5,22 @@ import { getSupabase, getSystemState } from "@/lib/system";
 import {
   addDays,
   appendDetail,
+  canAddActivity,
   canAddLever,
+  findActivity,
+  retireCandidate,
   logicalDate,
+  normalizeActivityLabel,
+  validateActivityLabel,
   uniqueLeverKey,
   validateLeverLabel,
+  ACTIVITY_FULL_COPY,
   DETAIL_MAX,
   MAX_LEVERS,
-  NOTE_MAX,
+  MOOD_KIND,
+  MOOD_MAX,
+  MOOD_MIN,
+  type ActivityRow,
   type Lever,
 } from "@uptime/core";
 
@@ -54,27 +63,61 @@ export async function logEntry(
 
   let playbookId: string | null = null;
 
+  /**
+   * Remember what worked — the IMPLICIT half of the activity cap.
+   *
+   * **Every failure here is swallowed on purpose.** The entry write below is
+   * the thing that matters; this is a convenience index on top of it, and
+   * `entries.detail` keeps the text regardless.
+   *
+   * At the cap this retires something first rather than being refused, unlike
+   * `createActivity`, which refuses. The choice is `retireCandidate`'s: never
+   * a pinned row, never one used more than once. If nothing qualifies it
+   * creates nothing at all — the day still logs, and the playbook simply stops
+   * learning until the list is pruned.
+   */
   if (detail && detail.trim()) {
-    const label = detail.trim().slice(0, 80);
-    // Upsert into the playbook so what worked is always one tap next time.
-    const { data: item } = await supabase
+    const label = normalizeActivityLabel(detail);
+    const { data: existing } = await supabase
       .from("playbook")
-      .upsert(
-        { user_id: user.id, lever, label },
-        { onConflict: "user_id,lever,label" },
-      )
-      .select("id, use_count")
-      .single();
+      .select("id, lever, label, use_count, last_used_at, is_pinned, archived")
+      .eq("user_id", user.id)
+      .eq("lever", lever)
+      .eq("archived", false);
 
-    if (item) {
-      playbookId = item.id;
+    const rows = (existing ?? []) as ActivityRow[];
+    const known = findActivity(rows, label);
+    const retire = retireCandidate(rows, label);
+    const blocked = !known && !retire && !canAddActivity(rows.length);
+
+    if (retire) {
       await supabase
         .from("playbook")
-        .update({
-          use_count: (item.use_count ?? 0) + 1,
-          last_used_at: new Date().toISOString(),
-        })
-        .eq("id", item.id);
+        .update({ archived: true })
+        .eq("id", retire.id)
+        .eq("user_id", user.id);
+    }
+
+    if (!blocked) {
+      const { data: item } = await supabase
+        .from("playbook")
+        .upsert(
+          { user_id: user.id, lever, label },
+          { onConflict: "user_id,lever,label" },
+        )
+        .select("id, use_count")
+        .single();
+
+      if (item) {
+        playbookId = item.id;
+        await supabase
+          .from("playbook")
+          .update({
+            use_count: (item.use_count ?? 0) + 1,
+            last_used_at: new Date().toISOString(),
+          })
+          .eq("id", item.id);
+      }
     }
   }
 
@@ -173,67 +216,41 @@ export async function annotateOutage(startedOn: string, note: string) {
   revalidatePath("/history");
 }
 
-/** Daily felt-state sample. Skippable, and it never touches uptime. */
-export async function logSignals(input: {
-  energy?: number | null;
-  sleep?: number | null;
-  detail?: string | null;
-  /** Optional, opt-in. Stored in `signals`, never in `entries`, so it is
-      structurally incapable of affecting uptime. */
-  weight?: number | null;
-}): Promise<ActionResult> {
+/**
+ * Today's mood reading.
+ *
+ * Replaces `logSignals`, which wrote up to four rows across four kinds. This
+ * writes one, and the upsert on `(user_id, observed_on, kind)` means setting
+ * it twice in a day REPLACES rather than appends — correct for a state
+ * reading, and the reason the journal that used to share this path had to
+ * append instead.
+ *
+ * Nothing here can affect uptime: `signals` is a different table from
+ * `entries`, and only `entries` is derived from. That is a structural
+ * guarantee rather than a convention.
+ */
+export async function saveMood(value: number): Promise<ActionResult> {
   const { supabase, user } = await requireUser();
   const state = await getSystemState(user.id);
   const today = logicalDate(new Date(), state.timezone);
 
-  const rows = [];
-  if (input.energy)
-    rows.push({
-      user_id: user.id,
-      observed_on: today,
-      kind: "energy",
-      value: input.energy,
-    });
-  if (input.sleep)
-    rows.push({
-      user_id: user.id,
-      observed_on: today,
-      kind: "sleep",
-      value: input.sleep,
-    });
-  if (input.detail?.trim())
-    rows.push({
-      user_id: user.id,
-      observed_on: today,
-      kind: "note",
-      value: null,
-      // Was 160, which silently truncated anything longer than a sentence.
-      // People write these as a journal, so the cap is now a runaway-paste
-      // guard rather than a limit on what a day can be worth saying.
-      detail: input.detail.trim().slice(0, NOTE_MAX),
-    });
+  if (!Number.isFinite(value)) return { ok: false, error: "not a number" };
+  // Clamped here as well as in core: the column's CHECK rejects anything
+  // outside 1..100, and a rejected write surfaces as a constraint name rather
+  // than as anything the user could act on.
+  const clamped = Math.min(Math.max(Math.round(value), MOOD_MIN), MOOD_MAX);
 
-  // Only recorded when the feature is on, so a stale client cannot write
-  // weight into an account that never enabled it.
-  if (state.weight_enabled && input.weight != null && Number.isFinite(input.weight)) {
-    const amount = Math.round(Math.min(Math.max(input.weight, 1), 999) * 100) / 100;
-    rows.push({
+  const { error } = await supabase.from("signals").upsert(
+    {
       user_id: user.id,
       observed_on: today,
-      kind: "weight",
-      value: null,
-      amount,
-    });
-  }
+      kind: MOOD_KIND,
+      value: clamped,
+    },
+    { onConflict: "user_id,observed_on,kind" },
+  );
+  if (error) return { ok: false, error: error.message };
 
-  if (rows.length) {
-    const { error } = await supabase
-      .from("signals")
-      .upsert(rows, { onConflict: "user_id,observed_on,kind" });
-    if (error) return { ok: false, error: error.message };
-  }
-
-  revalidatePath("/proof");
   revalidatePath("/");
   return { ok: true };
 }
@@ -281,26 +298,6 @@ export async function signOut() {
   const supabase = await getSupabase();
   await supabase.auth.signOut();
   revalidatePath("/", "layout");
-}
-
-/**
- * The weight opt-in.
- *
- * Switching it off hides the field and the chart but deletes nothing, so
- * switching back on restores the history rather than starting from zero.
- */
-export async function setWeightEnabled(on: boolean): Promise<ActionResult> {
-  const { supabase, user } = await requireUser();
-  const { error } = await supabase
-    .from("system_state")
-    .update({ weight_enabled: on })
-    .eq("user_id", user.id);
-
-  if (error) return { ok: false, error: error.message };
-
-  revalidatePath("/settings");
-  revalidatePath("/proof");
-  return { ok: true };
 }
 
 // ---------------------------------------------------------------------------
@@ -493,6 +490,125 @@ export async function restoreLever(id: string): Promise<LeverResult> {
     .eq("id", id)
     .eq("user_id", user.id);
   if (error) return { ok: false, error: "Could not restore that lever." };
+
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// Activities — the per-lever playbook
+//
+// Until 2026-08-03 these could only be CREATED, as a side effect of logging a
+// lever with a detail. A typo lived forever, the list grew without bound
+// behind a picker that showed three, and there was no way to see the rest.
+//
+// The cap has two halves and they are deliberately not symmetric:
+//
+//   - Adding HERE refuses at ten. The user is looking at the list; being told
+//     it is full is an answer they can act on.
+//   - `logEntry`'s implicit create never refuses, because refusing there would
+//     block a log, and a missed log is a lost day. At the cap it retires
+//     something provably harmless, or creates nothing at all. See
+//     `retireCandidate` in core.
+//
+// Rules live in `packages/core/playbook.ts` so both clients enforce the same
+// ones.
+// ---------------------------------------------------------------------------
+
+export async function createActivity(
+  lever: Lever,
+  label: string,
+): Promise<ActionResult> {
+  const { supabase, user } = await requireUser();
+
+  const check = validateActivityLabel(label);
+  if (!check.ok) return { ok: false, error: check.reason };
+
+  const { data: existing, error: readError } = await supabase
+    .from("playbook")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("lever", lever)
+    .eq("archived", false);
+
+  if (readError) return { ok: false, error: readError.message };
+  if (!canAddActivity((existing ?? []).length)) {
+    return { ok: false, error: ACTIVITY_FULL_COPY };
+  }
+
+  const { error } = await supabase.from("playbook").insert({
+    user_id: user.id,
+    lever,
+    label: normalizeActivityLabel(label),
+  });
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
+export async function renameActivity(
+  id: string,
+  label: string,
+): Promise<ActionResult> {
+  const { supabase, user } = await requireUser();
+
+  const check = validateActivityLabel(label);
+  if (!check.ok) return { ok: false, error: check.reason };
+
+  const { error } = await supabase
+    .from("playbook")
+    .update({ label: normalizeActivityLabel(label) })
+    .eq("id", id)
+    // RLS is the boundary, but the filter is this file's habit and costs
+    // nothing.
+    .eq("user_id", user.id);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
+/**
+ * A hard delete, and the asymmetry with levers is deliberate.
+ *
+ * "Archive never deletes" exists because archiving a LEVER must not change
+ * uptime. An activity is a label on a shortcut chip and cannot affect it, so
+ * the rule's reason does not reach here. Two things make the delete safe:
+ *
+ * - `entries.playbook_id` is `on delete set null (playbook_id)` and nothing in
+ *   either client ever READS that column — `entries.detail` keeps the text.
+ * - `unique (user_id, lever, label)` includes archived rows, so archive-only
+ *   would leave a name you can neither see nor re-add, and the second attempt
+ *   fails with a unique violation about an invisible row.
+ *
+ * The cap's own eviction still ARCHIVES: that one is the system removing
+ * something the user did not ask about, and has to be recoverable.
+ */
+export async function deleteActivity(id: string): Promise<ActionResult> {
+  const { supabase, user } = await requireUser();
+
+  const { error } = await supabase
+    .from("playbook")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", user.id);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
+/** Bring back something the cap retired. */
+export async function restoreActivity(id: string): Promise<ActionResult> {
+  const { supabase, user } = await requireUser();
+
+  const { error } = await supabase
+    .from("playbook")
+    .update({ archived: false })
+    .eq("id", id)
+    .eq("user_id", user.id);
+  if (error) return { ok: false, error: error.message };
 
   revalidatePath("/", "layout");
   return { ok: true };

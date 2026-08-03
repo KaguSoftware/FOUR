@@ -65,10 +65,10 @@ export default function PrivacyPage() {
           The date, which lever you logged, and any note you attach to it. Notes
           are optional and always have been.
         </Item>
-        <Item term="What you write in the journal">
-          Energy and sleep ratings, your weight if you turned that on, and
-          whatever free text you write. People use this as a diary; it is
-          treated as one.
+        <Item term="How the day felt">
+          A single number from one to a hundred, set by dragging a slider, on
+          the days you choose to set it. Nothing else — the app asks one
+          question and it is optional.
         </Item>
         <Item term="A push token">
           Only if you turn alerts on. It is an identifier issued by Apple or
@@ -99,13 +99,20 @@ export default function PrivacyPage() {
         </p>
       </Section>
 
-      <Section title="Energy, sleep and weight">
+      <Section title="The daily reading">
         <p className="text-ink-dim">
-          These are health-adjacent, so they get said plainly: they are stored
-          exactly like everything else you log, visible only to your account,
-          and never shared with anyone or used for any purpose other than
-          drawing your own history back to you. They are not sent to any health
-          platform and they are not used to profile you.
+          It is health-adjacent, so it gets said plainly: it is stored exactly
+          like everything else you log, visible only to your account, and never
+          shared with anyone or used for any purpose other than drawing your
+          own history back to you. It is not sent to any health platform and it
+          is not used to profile you.
+        </p>
+        <p className="text-ink-dim mt-4">
+          Earlier versions of the app also recorded energy, sleep and an
+          optional weight. Those readings are no longer collected. Anything you
+          already wrote is kept and still shown on the day it belongs to,
+          because deleting your history without asking would be the worse
+          answer — and everything of yours leaves with your account.
         </p>
       </Section>
 

@@ -10,6 +10,7 @@ import {
   UPTIME_MILESTONES,
 } from "./monitor";
 import { addDays, type Entry } from "./uptime";
+import { MOOD_KIND } from "./mood";
 
 const PLAYBOOK = ["shake @ lunch", "treadmill + 2 machines"];
 
@@ -149,14 +150,14 @@ describe("plateau monitor", () => {
     values.flatMap((v, i) =>
       Array.from({ length: perWeek }, (_, d) => ({
         observed_on: addDays(today, -7 * (values.length - 1 - i) - d),
-        kind: "energy",
+        kind: MOOD_KIND,
         value: v,
       })),
     );
 
   it("stays silent while signals are rising", () => {
     const r = evaluatePlateau({
-      signals: weekly([2, 3, 3, 4]),
+      signals: weekly([40, 52, 58, 70]),
       uptimePct: 90,
       today,
       lastPlateauOn: null,
@@ -166,7 +167,7 @@ describe("plateau monitor", () => {
 
   it("fires when signals go flat while uptime holds — the state a long run dies in", () => {
     const r = evaluatePlateau({
-      signals: weekly([3, 3, 3, 3]),
+      signals: weekly([55, 55, 55, 55]),
       uptimePct: 93,
       today,
       lastPlateauOn: null,
@@ -176,7 +177,7 @@ describe("plateau monitor", () => {
 
   it("defers to the fade monitor when uptime is low; no double-paging", () => {
     const r = evaluatePlateau({
-      signals: weekly([3, 3, 3, 3]),
+      signals: weekly([55, 55, 55, 55]),
       uptimePct: 40,
       today,
       lastPlateauOn: null,
@@ -186,7 +187,7 @@ describe("plateau monitor", () => {
 
   it("respects the 6-week cooldown", () => {
     const r = evaluatePlateau({
-      signals: weekly([3, 3, 3, 3]),
+      signals: weekly([55, 55, 55, 55]),
       uptimePct: 93,
       today,
       lastPlateauOn: addDays(today, -21),
@@ -197,7 +198,7 @@ describe("plateau monitor", () => {
   it("treats missing weeks as unknown, never as a flat line", () => {
     // Two sampled weeks only. Silence is not evidence of a plateau.
     const r = evaluatePlateau({
-      signals: weekly([3, 3]),
+      signals: weekly([55, 55]),
       uptimePct: 93,
       today,
       lastPlateauOn: null,
@@ -212,9 +213,9 @@ describe("plateau monitor", () => {
 
   it("does not fire on four flat days — four days is a mood, not a plateau", () => {
     const r = evaluatePlateau({
-      signals: [3, 3, 3, 3].map((v, i) => ({
+      signals: [55, 55, 55, 55].map((v, i) => ({
         observed_on: addDays(today, -i),
-        kind: "energy",
+        kind: MOOD_KIND,
         value: v,
       })),
       uptimePct: 93,
@@ -229,7 +230,50 @@ describe("plateau monitor", () => {
     // Four weeks on the calendar, but only 1 day sampled in each: not enough
     // to call any of them a week, so there is nothing to conclude.
     const r = evaluatePlateau({
-      signals: weekly([3, 3, 3, 3], 1),
+      signals: weekly([55, 55, 55, 55], 1),
+      uptimePct: 93,
+      today,
+      lastPlateauOn: null,
+    });
+    expect(r.flat).toBe(false);
+    expect(r.reason).toContain("only 0 weeks");
+  });
+
+  // --- the 1-100 scale ------------------------------------------------------
+  // The threshold is a FRACTION of the scale's range, not a number of points.
+  // These two pin that: on the old raw `last - first <= 0.25` comparison the
+  // first of them reads as rising and the check would have gone permanently
+  // silent when the slider replaced the 1-5 rating.
+
+  it("fires on a crawl that is flat in proportion to the scale", () => {
+    // Three points out of ninety-nine is under a twentieth of the range. On a
+    // 1-5 scale the same shape would be a whole point of movement.
+    const r = evaluatePlateau({
+      signals: weekly([50, 51, 52, 53]),
+      uptimePct: 93,
+      today,
+      lastPlateauOn: null,
+    });
+    expect(r.flat).toBe(true);
+  });
+
+  it("stays silent on real movement, even without reaching the top", () => {
+    const r = evaluatePlateau({
+      signals: weekly([30, 40, 50, 70]),
+      uptimePct: 93,
+      today,
+      lastPlateauOn: null,
+    });
+    expect(r.flat).toBe(false);
+    expect(r.reason).toContain("rising");
+  });
+
+  it("ignores the retired energy and sleep kinds", () => {
+    // Both are still in the table and still shown in the day sheet, but they
+    // are on a 1-5 scale. Averaging one into a 1-100 window would produce a
+    // number that is on neither scale.
+    const r = evaluatePlateau({
+      signals: weekly([55, 55, 55, 55]).map((s) => ({ ...s, kind: "energy" })),
       uptimePct: 93,
       today,
       lastPlateauOn: null,

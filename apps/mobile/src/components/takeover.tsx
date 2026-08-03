@@ -1,6 +1,6 @@
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { type Interval } from "@uptime/core";
+import { rankActivities, type Interval } from "@uptime/core";
 import { androidMetrics, Body, Label, Mono } from "./ui";
 import { committed } from "@/lib/haptics";
 import { pressFill, pressFillFlat, ripple } from "@/lib/press";
@@ -42,14 +42,16 @@ export function Takeover({
 }) {
   const insets = useSafeAreaInsets();
 
-  // Ranked by what has actually worked for this person — pinned, then use
-  // count, which is the order the query already returns. This used to put the
+  // Ranked by what has actually worked for this person. This used to put the
   // food lever first, on the principle that coming back must be lighter than
   // starting; that cannot survive user-defined levers, since we have no way to
   // know which of someone's levers is the light one.
-  const options = [...playbook]
-    .sort((a, b) => Number(b.is_pinned) - Number(a.is_pinned))
-    .slice(0, 3);
+  //
+  // Ranked in core — the query is deliberately unordered now, because this and
+  // the log sheet and the browser all sorting for themselves is how the "top
+  // three" came to mean two different things. It also drops archived rows,
+  // which the loader returns for the editor's retired list.
+  const options = rankActivities(playbook).slice(0, 3);
 
   const byKey = new Map(levers.map((l) => [l.key, l.label]));
 

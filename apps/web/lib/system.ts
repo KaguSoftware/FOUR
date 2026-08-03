@@ -11,19 +11,21 @@ import {
   logicalDate,
   uptimeWindow,
   ACTIVE_LEVERS,
+  type ActivityRow,
   type Entry,
-  type Lever,
   type LeverSpan,
   type Signal,
 } from "@uptime/core";
 
-export type PlaybookItem = {
-  id: string;
-  lever: Lever;
-  label: string;
-  use_count: number;
-  is_pinned: boolean;
-};
+/**
+ * An activity — a remembered thing that worked, attached to one lever.
+ *
+ * This IS core's `ActivityRow`; the alias survives because the name
+ * "playbook" is what the table and half the UI call it. Archived rows come
+ * back too, because the editor's retired list needs them — every consumer
+ * passes the array through `rankActivities`, which drops them.
+ */
+export type PlaybookItem = ActivityRow;
 
 export type LeverRow = {
   id: string;
@@ -40,8 +42,7 @@ export type SystemState = {
   timezone: string;
   slammed_until: string | null;
   telegram_chat_id: string | null;
-  weight_enabled: boolean;
-  weight_unit: "kg" | "lb";
+
   /**
    * Whether first-run setup is finished. **Derived, not the raw column.**
    *
@@ -124,7 +125,6 @@ export async function getSupabase() {
  * upsert makes that case invisible rather than a crash.
  */
 const BASE_COLUMNS = "user_id, timezone, slammed_until, telegram_chat_id";
-const WEIGHT_COLUMNS = "weight_enabled, weight_unit";
 const ONBOARDING_COLUMNS = "onboarded_at";
 
 /**
@@ -137,11 +137,7 @@ const ONBOARDING_COLUMNS = "onboarded_at";
  * actually behind.
  */
 const COLUMN_LADDER = [
-  {
-    columns: `${BASE_COLUMNS}, ${WEIGHT_COLUMNS}, ${ONBOARDING_COLUMNS}`,
-    onboarding: true,
-  },
-  { columns: `${BASE_COLUMNS}, ${WEIGHT_COLUMNS}`, onboarding: false },
+  { columns: `${BASE_COLUMNS}, ${ONBOARDING_COLUMNS}`, onboarding: true },
   { columns: BASE_COLUMNS, onboarding: false },
 ] as const;
 
@@ -162,8 +158,6 @@ function toSystemState(
     timezone: (row.timezone as string | null) ?? DEFAULT_TZ,
     slammed_until: (row.slammed_until as string | null) ?? null,
     telegram_chat_id: (row.telegram_chat_id as string | null) ?? null,
-    weight_enabled: row.weight_enabled === true,
-    weight_unit: row.weight_unit === "lb" ? "lb" : "kg",
     onboarded: hasOnboarding ? row.onboarded_at != null : true,
   };
 }
@@ -237,12 +231,12 @@ export async function getStatus() {
       .order("logged_for", { ascending: true }),
     supabase
       .from("playbook")
-      .select("id, lever, label, use_count, is_pinned")
-      .eq("user_id", user.id)
-      .eq("archived", false)
-      .order("is_pinned", { ascending: false })
-      .order("use_count", { ascending: false })
-      .order("last_used_at", { ascending: false, nullsFirst: false }),
+      // Unordered on purpose. This used to sort in SQL and the mobile client
+      // sorted differently — the "top three" on a phone could be a different
+      // three from the "top three" in a browser. `rankActivities` in core is
+      // the single answer now, and every consumer goes through it.
+      .select("id, lever, label, use_count, last_used_at, is_pinned, archived")
+      .eq("user_id", user.id),
     supabase
       .from("milestones")
       .select("kind, first_hit_on")

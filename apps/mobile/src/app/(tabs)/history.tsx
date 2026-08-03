@@ -43,7 +43,11 @@ export default function HistoryScreen() {
       {/* Calendar months rather than a dense block of ninety squares. Each
           month names itself and says how much of it was up, so the span is
           never a guess — and seven columns mean a column IS a weekday, which
-          is the question this screen exists to answer. */}
+          is the question this screen exists to answer.
+
+          One per swipe, not a stack. A year-old account turned this screen
+          into thirteen calendars you scrolled past to reach the incidents;
+          months are peers you compare, not a single long document. */}
       <View style={{ marginTop: space[8] }}>
         <MonthStack
           entries={entries}

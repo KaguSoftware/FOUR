@@ -1,8 +1,9 @@
 import { NavLink } from "./components/nav-link";
 import { requireStatus } from "@/lib/system";
-import { MILESTONE_COPY } from "@uptime/core";
+import { MILESTONE_COPY, MOOD_KIND, type Signal } from "@uptime/core";
 import { DayGrid } from "./components/day-grid";
 import { Levers } from "./components/levers";
+import { MoodSlider } from "./components/mood-slider";
 import { Takeover } from "./components/takeover";
 import { Wordmark } from "@/app/components/wordmark";
 
@@ -125,6 +126,12 @@ export default async function StatusPage() {
         )}
       </section>
 
+      {/* Below the levers, always. Logging is what this screen is for, and a
+          question placed above the buttons would be a toll gate on it. */}
+      <section className="mt-10">
+        <MoodSlider initial={todaysMood(status.signals, today)} />
+      </section>
+
       <LastActivity entries={entries} today={today} />
 
       {/* Trails the content. The dashboard is deliberately five elements;
@@ -148,6 +155,20 @@ export default async function StatusPage() {
         ))}
       </nav>
     </main>
+  );
+}
+
+/**
+ * Today's mood, out of the signals the status query already loaded.
+ *
+ * Read from the existing list rather than queried for: the dashboard has every
+ * signal in hand for the day sheet, and a second round trip for one row it is
+ * already holding would be pure latency.
+ */
+function todaysMood(signals: Signal[], today: string): number | null {
+  return (
+    signals.find((s) => s.observed_on === today && s.kind === MOOD_KIND)
+      ?.value ?? null
   );
 }
 

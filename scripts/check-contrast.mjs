@@ -167,9 +167,45 @@ const ENFORCED = [
   // the log sheet. A statement rather than a surface match, and the one place
   // the ripple takes a hue. It was `down-dim` at 1.52:1, which is nothing.
   ["ripple · destructive on a panel", "down", "surface", NONTEXT],
+
+  // --- the pixel wall ------------------------------------------------------
+  //
+  // The wall is TWO states drawn and a third that must be indistinguishable
+  // from one of them. A lit cell against an unlit one is the entire readout —
+  // it carries the whole month — so it is measured as a non-text graphic.
+  //
+  // The masked cells (the message stencil) are deliberately NOT a third
+  // colour: they are drawn in exactly `surface`, the same as an unearned
+  // cell. If they ever separate, the message becomes legible at zero percent
+  // and the screen's whole idea collapses. That is why there is no
+  // "mask vs dark" row here — a difference of zero is the requirement, and a
+  // contrast floor is the wrong tool for it.
+  ["pixel wall · lit against unearned", "ink", "line", NONTEXT],
+
+  // --- the mood slider -----------------------------------------------------
+  //
+  // A real `<input type=range>` on web and the platform Slider on mobile, so
+  // only the skin is ours. The thumb is the control; the filled track states
+  // how far along it is; the face above states the same thing again in a
+  // second modality, which is what keeps this off colour alone.
+  ["mood slider · thumb against the page", "ink", "bg", NONTEXT],
+  ["mood slider · filled track against the rest", "ink-dim", "line", NONTEXT],
+  ["mood slider · unset thumb against the page", "line-hi", "bg", NONTEXT],
+  ["mood slider · face at rest", "ink", "bg", NONTEXT],
+  ["mood slider · face before it is set", "ink-mute", "bg", NONTEXT],
 ];
 
 const EXEMPT = [
+  [
+    "pixel wall · unearned cell against the page",
+    "line", "bg",
+    "1.45:1, and it does not owe 3:1 because it carries no information. What the wall SAYS is carried entirely by lit-against-unearned (11.36:1, enforced above); this pair only decides whether you can see that there is a grid there at all when the month is empty. It was `surface` at 1.08:1 and the screen read as blank rather than as a wall waiting to fill, which is why it moved up a step. Above `line` the unlit state starts reading as lit, which would be worse than invisible — it would be wrong.",
+  ],
+  [
+    "pixel wall · the message stencil against an unearned cell",
+    "line", "line",
+    "1.00:1, and that is the REQUIREMENT rather than a failure. The message is made of cells that never light, and they are drawn in exactly the same colour as a cell that has not been earned yet. If these two ever separate by even one step, the message becomes legible at zero percent and the entire idea of the screen — that it is revealed by the month rather than printed on it — stops working. Recorded here so nobody 'fixes' it.",
+  ],
   [
     "onboarding · resting field border",
     "line", "bg",

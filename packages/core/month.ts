@@ -17,6 +17,8 @@
  * safe on this runtime.
  */
 
+import { upDates, type Entry } from "./uptime";
+
 /** Monday-first, matching how a week is written in the product's locale. */
 const WEEK = 7;
 
@@ -79,8 +81,18 @@ function mondayIndex(d: Date): number {
  * Throws on a malformed date rather than returning a plausible-looking grid for
  * the wrong month — every caller has a real date from `logicalDateLocal`, so a
  * bad one here means something upstream is broken and should say so.
+ *
+ * **`minWeeks` pads every month to the same number of rows.** A real calendar
+ * month occupies four, five or six rows depending on how its 1st falls, which
+ * is fine in a vertical stack where each month is simply as tall as it is —
+ * and wrong in a horizontal pager, where the container takes the height of the
+ * page on screen and every swipe between a five-row and a six-row month makes
+ * the whole layout jump. Six is the maximum any month can need, so
+ * `minWeeks: 6` makes every page identical in height. The extra rows are the
+ * same `null` padding as the leading and trailing days, and clients already
+ * draw padding as nothing.
  */
-export function monthGrid(iso: string): MonthGrid {
+export function monthGrid(iso: string, opts: { minWeeks?: number } = {}): MonthGrid {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
   if (!match) throw new Error(`monthGrid: expected YYYY-MM-DD, got "${iso}"`);
 
@@ -99,6 +111,12 @@ export function monthGrid(iso: string): MonthGrid {
   // Pad out the final week so the grid is rectangular and the last row does not
   // reflow its cells across the width.
   while (cells.length % WEEK !== 0) cells.push(null);
+
+  // Then, optionally, out to a fixed number of rows. Clamped at 6 because no
+  // calendar month can span more, and a caller asking for more would only be
+  // adding empty rows to every page.
+  const minWeeks = Math.min(Math.max(Math.trunc(opts.minWeeks ?? 0), 0), 6);
+  while (cells.length < minWeeks * WEEK) cells.push(null);
 
   return {
     label: MONTHS[month1 - 1],
@@ -174,4 +192,55 @@ export function monthsBetween(fromIso: string, toIso: string): string[] {
 /** The 1st of the month containing `iso`. Validates via `addMonths`. */
 function firstOfMonth(iso: string): string {
   return `${addMonths(iso, 0).slice(0, 7)}-01`;
+}
+
+export type MonthUptime = {
+  /** Days in this month with at least one entry. */
+  up: number;
+  /** The denominator — see `basis`. */
+  total: number;
+  /** `up / total`, 0..1. Zero rather than NaN when `total` is 0. */
+  pct: number;
+};
+
+/**
+ * Days up in the calendar month containing `today`.
+ *
+ * This drives the pixel wall, which is the one screen in the product that
+ * measures a MONTH rather than a rolling window. Everywhere else — the hero,
+ * the day grid — deliberately does not, for the reason in this file's own
+ * docblock at the top.
+ *
+ * **`basis` is a product decision wearing a parameter's clothes.**
+ *
+ * - `"month"` divides by the whole month, so a perfect record still reads
+ *   `2/31` on the 2nd. The wall is near-dark for the first week of every month
+ *   and its message unreadable, then fills. That is a monthly reset, and it is
+ *   the shape the owner asked for on 2026-08-03.
+ * - `"elapsed"` divides by the days so far, so a clean month is a full wall
+ *   from day one and each missed day chips it. No reset.
+ *
+ * Both are one call-site away, on purpose: this is the kind of decision that is
+ * only really made by living with it for a month.
+ *
+ * Future days in the current month are never counted as up — they have not
+ * happened, and `"month"` already puts them in the denominator, which is
+ * exactly what makes the two bases differ.
+ */
+export function monthUptime(
+  entries: readonly Entry[],
+  today: string,
+  basis: "month" | "elapsed" = "month",
+): MonthUptime {
+  const grid = monthGrid(today);
+  const up = upDates(entries as Entry[]);
+
+  let count = 0;
+  for (const date of grid.cells) {
+    if (date === null || date > today) continue;
+    if (up.has(date)) count++;
+  }
+
+  const total = basis === "elapsed" ? grid.dayOfMonth : grid.daysInMonth;
+  return { up: count, total, pct: total > 0 ? count / total : 0 };
 }

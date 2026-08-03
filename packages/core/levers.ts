@@ -28,17 +28,6 @@ export const leverCount = (): number =>
 export const LEVER_KEY_MAX = 32;
 export const LEVER_LABEL_MAX = 24;
 
-/**
- * How much someone may write in a day's note.
- *
- * It was 160 characters, on the assumption the field was for a one-line
- * observation like "incline 8 → 10". In practice it gets used as a journal, so
- * the ceiling is now a generous one rather than a shape imposed on what people
- * write — roughly a thousand words. It exists to bound a runaway paste, not to
- * ration the entry.
- */
-export const NOTE_MAX = 6000;
-
 /** A key is lowercase, alphanumeric plus single hyphens, never edge-hyphenated. */
 const KEY_SHAPE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
@@ -126,8 +115,9 @@ export const DETAIL_MAX = 160;
  *
  * Deliberately joined with a middot on one line, not a newline: this is a
  * label that appears inside a lever button's sheet and in the takeover's
- * playbook, both of which are single-line. The journal is the place for
- * paragraphs, and it has its own `appendNote`.
+ * playbook, both of which are single-line. There is nowhere in the product
+ * that takes a paragraph — the journal that used to was removed on
+ * 2026-08-03 along with the rest of `/proof`'s old contents.
  *
  * Duplicates are dropped. Tapping the same playbook item twice in a day is a
  * mis-tap, not two facts.

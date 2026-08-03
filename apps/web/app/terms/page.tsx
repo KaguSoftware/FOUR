@@ -13,7 +13,7 @@ import { Wordmark } from "@/app/components/wordmark";
  * Short on purpose. The app is free, collects almost nothing, and sells
  * nothing, so most boilerplate has nothing to govern here. The clause that
  * actually matters for this product is "not medical advice" — the app stores
- * energy, sleep and weight, and the line between "a diary that draws charts"
+ * a daily felt-state reading, and the line between "a diary that draws charts"
  * and "a health product" should be drawn by us before anyone else draws it.
  */
 
@@ -47,7 +47,7 @@ export default function TermsPage() {
         <p className="text-ink-dim">
           four is a self-tracking tool. It is <span className="text-ink">not
           a medical device, not medical advice, and not a treatment for
-          anything</span>. The energy, sleep and weight you log are drawn back
+          anything</span>. The daily reading you set is drawn back
           to you as your own history and nothing more — no diagnosis, no
           recommendation, no score of your health. If something about your
           health worries you, talk to a professional, not an app.

@@ -1,5 +1,5 @@
-import { useCallback } from "react";
-import { Pressable, View } from "react-native";
+import { useCallback, useState } from "react";
+import { FlatList, Pressable, View } from "react-native";
 import Animated, {
   cancelAnimation,
   Easing,
@@ -17,6 +17,7 @@ import {
   monthGrid,
   monthsBetween,
   WEEKDAY_INITIALS,
+  windowStart,
   type Entry,
   type LeverSpan,
 } from "@uptime/core";
@@ -52,10 +53,11 @@ import { color, radius, size, space } from "@/theme";
  *
  * Two shapes, because the two screens ask different questions:
  *
- * - **`DayGrid`** on Home: the trailing 30 days, ten to a row, no calendar
- *   structure at all. "How has it been lately." Ten and not seven on purpose —
- *   a seven-wide row invites reading a weekday pattern down the columns, and
- *   this layout does not encode one.
+ * - **`DayGrid`** on Home: thirty days, ten to a row, no calendar structure at
+ *   all. "How has it been lately." Ten and not seven on purpose — a seven-wide
+ *   row invites reading a weekday pattern down the columns, and this layout
+ *   does not encode one. It begins at day one until the account is thirty days
+ *   old and rolls thereafter; see `windowStart`.
  * - **`MonthStack`** on History: every month since the first entry, seven
  *   columns, so a column IS a weekday. "Which months, and which days do I
  *   actually lose." The calendar earns its place here and not on Home, where
@@ -79,6 +81,22 @@ function firedByDate(entries: readonly Entry[]) {
   return fired;
 }
 
+/**
+ * The earliest logged day, or null.
+ *
+ * Scanned rather than read off `entries[0]`. The query does order ascending,
+ * but Home passes a re-assembled array — the server list filtered, with
+ * optimistic taps appended — and "the first element is the oldest" is a
+ * property nobody maintaining that assembly would think to preserve.
+ */
+function firstLogged(entries: readonly Entry[]): string | null {
+  let first: string | null = null;
+  for (const e of entries) {
+    if (first === null || e.logged_for < first) first = e.logged_for;
+  }
+  return first;
+}
+
 export function DayGrid({
   entries,
   today,
@@ -96,8 +114,18 @@ export function DayGrid({
 }) {
   const fired = firedByDate(entries);
 
-  const start = addDays(today, -(days - 1));
+  /**
+   * Where the block begins — day one, until there is a full window of history.
+   *
+   * See `windowStart`. The short version: a plain rolling window is read
+   * backwards on a new account. Three days in, twenty-seven cells were blank
+   * and the three real ones sat at the bottom-right, so the grid appeared to
+   * fill from the end — and every cell shifted one place left overnight, so
+   * yesterday's square was never where you left it.
+   */
+  const start = windowStart(firstLogged(entries), today, days);
   const cells = Array.from({ length: days }, (_, i) => addDays(start, i));
+  const elapsed = cells.filter((d) => d <= today).length;
 
   /**
    * Chunked into explicit rows, never left to `flexWrap`.
@@ -116,7 +144,14 @@ export function DayGrid({
 
   return (
     <View
-      accessibilityLabel={`Last ${days} days. ${fired.size} logged.`}
+      // "Last 30 days" is a lie while the block is pinned to day one — most of
+      // it has not happened yet. It says which day of the window this is
+      // instead, which is also the more useful thing to hear on day three.
+      accessibilityLabel={
+        elapsed < days
+          ? `Day ${elapsed} of ${days}. ${fired.size} logged.`
+          : `Last ${days} days. ${fired.size} logged.`
+      }
       style={{ gap: GAP }}
     >
       {rows.map((row, r) => (
@@ -127,6 +162,11 @@ export function DayGrid({
               date={date}
               fill={gridFill(fired.get(date)?.size ?? 0, leversOn(spans, date))}
               isToday={date === today}
+              // Days the block reaches that have not happened yet. Drawn as
+              // nothing, exactly as a calendar's trailing pad is — a day that
+              // has not arrived is not a day that was missed. Only reachable
+              // while the block is pinned to day one.
+              future={date > today}
               onPress={onPressDay}
               // Home's cells land near 31pt — under the 44pt minimum, and the
               // reason History's calendar is the comfortable place to open a
@@ -141,9 +181,14 @@ export function DayGrid({
 }
 
 /**
- * Every month since the first entry, newest first.
+ * Every month since the first entry, newest first, **one per swipe**.
  *
- * Anchors come from core so the walk cannot skip a month — stepping back from
+ * It was a vertical stack, and an account a year old made History a page you
+ * scrolled through thirteen calendars of to reach the incident list under
+ * them. Months are peers — you look at one, then at another — and a stack made
+ * them a single long document.
+ *
+ * Anchors come from core so the walk cannot skip a month; stepping back from
  * the 31st with naive date maths lands in March twice and never in February.
  */
 export function MonthStack({
@@ -157,24 +202,50 @@ export function MonthStack({
   spans: LeverSpan[];
   onPressDay?: (date: string) => void;
 }) {
+  const [width, setWidth] = useState(0);
   const fired = firedByDate(entries);
-  // From the first entry rather than from signup: a stack that opens on empty
-  // months is a wall of nothing in front of the real history.
-  const earliest = entries[0]?.logged_for ?? today;
+  // From the first entry rather than from signup: a pager that opens on empty
+  // months is a stack of nothing in front of the real history.
+  const earliest = firstLogged(entries) ?? today;
   const anchors = monthsBetween(earliest, today);
 
   return (
-    <View style={{ gap: space[8] }}>
-      {anchors.map((anchor) => (
-        <MonthView
-          key={anchor}
-          anchor={anchor}
-          fired={fired}
-          today={today}
-          spans={spans}
-          onPressDay={onPressDay}
+    <View
+      onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
+      // Every page is `minWeeks: 6` tall, so this never changes between
+      // months and the incident list below it does not jump on each swipe.
+      // Measured from the widest month a calendar can be: six rows plus the
+      // header block.
+      accessibilityHint="Swipe left for earlier months"
+    >
+      {width > 0 && (
+        <FlatList
+          data={anchors}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          keyExtractor={(anchor) => anchor}
+          // Fixed page width, so `getItemLayout` is exact and the list can
+          // jump straight to an index without measuring anything.
+          getItemLayout={(_, index) => ({
+            length: width,
+            offset: width * index,
+            index,
+          })}
+          renderItem={({ item, index }) => (
+            <View style={{ width }}>
+              <MonthView
+                anchor={item}
+                fired={fired}
+                today={today}
+                spans={spans}
+                onPressDay={onPressDay}
+                position={`${index + 1} of ${anchors.length}`}
+              />
+            </View>
+          )}
         />
-      ))}
+      )}
     </View>
   );
 }
@@ -185,14 +256,26 @@ function MonthView({
   today,
   spans,
   onPressDay,
+  position,
 }: {
   anchor: string;
   fired: Map<string, Set<string>>;
   today: string;
   spans: LeverSpan[];
   onPressDay?: (date: string) => void;
+  /** "1 of 14" — where this page sits, since a swipe has no other cue. */
+  position?: string;
 }) {
-  const month = monthGrid(anchor);
+  /**
+   * Six rows, always.
+   *
+   * A real month occupies four, five or six depending on how its 1st falls,
+   * which was fine in a vertical stack where each was simply as tall as it
+   * was. In a pager the container takes the height of the page on screen, so
+   * swiping between a four-row February and a six-row August would resize the
+   * whole screen and shunt the incident list under it up and down.
+   */
+  const month = monthGrid(anchor, { minWeeks: 6 });
 
   // Days already past, so the current month does not count its own future as
   // days that failed to happen.
@@ -223,6 +306,7 @@ function MonthView({
           {month.label} {month.year}
         </Label>
         <Mono style={{ fontSize: size.xs, color: color.inkMute }}>
+          {position ? `${position} · ` : ""}
           {upThisMonth} up
         </Mono>
       </View>

@@ -35,10 +35,11 @@ Credential Manager) is now in the tree, by the owner's explicit decision.
 Testing means an **EAS dev build**. See *Gotchas* and *Development builds and
 push*.
 
-**Two rounds are now stacked up unseen on hardware** — the 07-31 grid swap and
-the 07-31 Android-native pass. Both are `tsc`-clean and both touch layout, which
-is exactly the class of change `tsc` cannot judge. Get them onto a device before
-adding a third.
+**THREE rounds are now stacked up unseen on hardware** — the 07-31 grid swap,
+the 07-31 Android-native pass, and the **08-03 proof/mood/activities round**
+(below). All three are `tsc`-clean and all three touch layout, which is exactly
+the class of change `tsc` cannot judge. Get them onto a device before adding a
+fourth.
 
 ---
 
@@ -164,7 +165,7 @@ manager or backup drive — see *Gotchas*.
 
 **Done and verified:**
 
-- Schema pushed — 9 tables, RLS on all. Verified: anon reads return zero rows, cross-user insert rejected (42501). **Nine of the ten migrations are applied to the live database, confirmed by `npx supabase migration list` on 2026-07-31** — including `delete_account` and `integrity_hardening`, which this file previously listed as outstanding. The only local-only migration is `20260730120000_drop_posture.sql`, and it is deliberately held (see *Blocked*).
+- Schema pushed — 9 tables, RLS on all. Verified: anon reads return zero rows, cross-user insert rejected (42501). **All twelve migrations are applied to the live database, confirmed by `npx supabase migration list` on 2026-08-03** — including `drop_posture`, which this file long listed as deliberately held, and the two from the 08-03 round (`mood`, `activity_cap`). Local and remote match exactly; there is nothing outstanding.
 - Auth: password sign-in + magic link fallback; deep link survives sign-in via `?next=`.
 - Status dashboard, re-entry takeover, day grid, two-tap logging with playbook chips, history, playbook, proof, settings.
 - Monitor route with fade tiers, milestone ledger, plateau detection. **Verified end-to-end** against seeded data: silent at 1 day, pages at 2, escalates at 3, same-day dedupe works.
@@ -262,6 +263,34 @@ manager or backup drive — see *Gotchas*.
   `expo prebuild --platform android` and then deleting it — no JS-only check
   can see them. **Nothing in this round has been on hardware.**
 
+- **The proof/mood/activities round, 2026-08-03.** Five owner-requested
+  changes, both clients:
+  **(1) `/proof` is a pixel wall.** Its entire contents were deleted — both
+  1–5 scales, both trend charts, the weight chart and the written journal —
+  and replaced with a screen of cells, as many lit as `days up ÷ days in this
+  calendar month`. A fixed set stays permanently dark in the shape of
+  `KEEP GOING`, so the message is what the lit cells leave behind: nothing to
+  read at the start of a month, readable a word at a time as it fills. Core
+  gained `font5x7.ts` (a hand-drawn 5×7 bitmap font, parsed from `#`/`.`
+  pictures, throwing on a malformed glyph) and `pixels.ts` (`pixelWall`,
+  `wallGrid`, `pixelPaths`, `wallCaption`). Drawn as **two SVG paths** for
+  ~2,500 cells, not 2,500 views.
+  **(2) One mood slider on the dashboard**, frowny→smiley, continuous 1–100,
+  replacing energy and sleep. The face geometry is `facePath` in core so both
+  clients draw the same one; the input is the platform's
+  (`@react-native-community/slider` on mobile, `<input type=range>` on web).
+  **(3) Home's grid starts at day one** — `windowStart` in core is
+  `max(firstLoggedDay, today − 29)`, one formula with no modes. A new account
+  fills from the top-left instead of showing 27 blanks and three cells at the
+  bottom-right that shifted every morning.
+  **(4) History swipes between months**, one calendar per page, every page
+  padded to six rows (`monthGrid(iso, { minWeeks: 6 })`) so the pager cannot
+  jump.
+  **(5) Activities are editable, capped at ten per lever**, from both the log
+  sheet and Settings → Activities. Verified: **264 core tests, tsc clean ×3,
+  eslint + expo lint clean, 39 migration checks, contrast clean, the web app
+  builds, both bundles export.** **Nothing in it has been on hardware.**
+
 **Written but NOT verified end-to-end:**
 
 - **Vercel cron has never run.** The route works locally; the schedule is unproven.
@@ -288,6 +317,26 @@ manager or backup drive — see *Gotchas*.
      under Settings → Apps → four → Permissions.
   5. The dialog theme, the notification icon, and the two channels — none of
      which exist outside a real build.
+- **The whole 2026-08-03 round is untested on hardware.** In rough order of
+  how likely each is to be wrong:
+  1. **The pixel wall's fit.** `Frame` is a new non-scrolling screen shell and
+     the wall is sized from a measured box. If the bottom rows sit under the
+     tab bar, `Frame`'s `insets.bottom + TAB_BAR` allowance is wrong — the
+     same trap that has caught this project four times. Check on both a small
+     phone and a large one; the message must be whole on both.
+  2. **The wall's legibility at low percentages.** Early in a month it is
+     nearly all unlit, and unlit-vs-page measures 1.45:1 by design. If the
+     screen reads as blank rather than as a wall waiting to fill, the ground
+     tone needs another look — it was `surface` at 1.08:1 and already moved up
+     one step for this reason.
+  3. **The slider.** It is a native module added for this round. It must drag
+     smoothly, write on release only, and still show the value after the app
+     is backgrounded and reopened.
+  4. **The month pager**, and specifically whether the page height stays put
+     between a four-row and a six-row month.
+  5. **The activity cap under a real log.** Fill a lever to ten, then log it
+     with a brand-new note. **The day must still land.** That is the whole
+     safety property of the round.
 - Plateau thresholds pass unit tests but have no longitudinal data behind them. `PLATEAU_WEEKS` (4) and `MIN_DAYS_PER_WEEK` (3) are educated guesses.
 
 ### The Android release, exactly where it stands (2026-07-31)
@@ -323,11 +372,12 @@ gate.
 
 - **Rotate two credentials** — see Gotchas. Still outstanding from 2026-07-19.
 - **A development build** — see *Roadmap* step 15. This is the gate on push.
-- **`20260730120000_drop_posture.sql` is written but MUST WAIT for build 5.**
-  TestFlight build 4 still selects the `posture` column in its status query;
-  dropping it while build 4 is anyone's installed version breaks their
-  dashboard load. Sequence: build 5 on TestFlight and installed → then
-  `db push`. The column with default `'strict'` is harmless in the meantime.
+- ~~**`20260730120000_drop_posture.sql` MUST WAIT for build 5**~~ — **resolved.
+  It is applied**, confirmed by `npx supabase migration list` on 2026-08-03.
+  The same sequencing rule now applies to the weight columns and the retired
+  signal kinds, which the 08-03 round stopped reading but deliberately did NOT
+  drop: a shipped build still selects them. They go in a later migration, once
+  no installed client reads them.
 - **Supabase dashboard config — items 1–3 are DONE, verified 2026-07-31** by a
   browser audit of the dashboard (see Gotchas for the full result). Apple's
   Client IDs, Google's provider + Web-application client, and the redirect
@@ -428,12 +478,19 @@ gate.
 | `apps/mobile/src/app/day.tsx` | The day sheet — read-only, native `formSheet`. Reads `cachedStatus`, not `useStatus()`, because iOS measures the sheet to size it. |
 | `packages/core/day.ts` | `dayDetail()` — assembles what a day contained from entries + signals + lever labels. Derives nothing about uptime; a day's detail is a lookup, not a judgement. |
 | `packages/core/month.ts` | `monthGrid()` — a calendar month as a Monday-first 7-column grid, **History's grid now, not Home's**. Plus `addMonths()` (day-clamped, so stepping back from the 31st cannot skip February) and `monthsBetween()`, which drive the stack. |
-| `apps/web/app/proof/page.tsx` | Signal check-in + daily trend, with the optional weight line. |
+| `packages/core/pixels.ts` | The pixel wall: layout, the mask, the reveal order, the SVG paths, the caption. **The mask and the unlit cells must render in the SAME colour** — see its docblock. |
+| `packages/core/font5x7.ts` | A hand-drawn 5×7 bitmap font, written as `#`/`.` pictures and parsed at import. **Throws on a malformed glyph**, so a bad edit fails `npm test` rather than rendering a smeared letter. |
+| `packages/core/mood.ts` | The 1–100 daily reading and `facePath` — the frowny→smiley mouth, computed once so both clients draw the same face. |
+| `packages/core/playbook.ts` | Activity rules: `MAX_ACTIVITIES` (10), `rankActivities` (the single answer to "the top three"), and `retireCandidate` — which row an implicit create may evict, and when it must evict nothing. |
+| `apps/web/app/proof/page.tsx` · `proof/wall.tsx` | The pixel wall. The page is a server component; `wall.tsx` exists only to MEASURE, because the cell count is an integer the message layout depends on. |
+| `apps/mobile/src/app/(tabs)/proof.tsx` | The same wall, measured with `onLayout` inside `Frame`. |
+| `apps/mobile/src/components/mood-slider.tsx` · `apps/web/app/components/mood-slider.tsx` | The dashboard's one question. Platform control, shared face. |
+| `apps/mobile/src/components/activity-manager.tsx` · `apps/web/app/settings/activity-manager.tsx` | Activity CRUD. Lifted from the two lever managers — read those first. |
 | `apps/web/app/api/monitor/check/route.ts` | Daily cron pass. Service-role, `CRON_SECRET`-authed, logs every run to `monitor_runs`. |
 | `apps/web/app/globals.css` | Tailwind v4 `@theme` tokens. Normative in oklch. |
 | `apps/web/proxy.ts` | Session refresh + route protection (Next 16 name for middleware). |
 | `apps/web/vercel.ts` | Cron schedule. Inside the app dir because Vercel's Root Directory points there. |
-| `packages/core/grid.ts` | The day-grid ramp **and `leversOn`** — how many levers existed on a given day, which is the denominator each cell is shaded against. |
+| `packages/core/grid.ts` | The day-grid ramp, `leversOn` (how many levers existed on a given day, which is the denominator each cell is shaded against) **and `windowStart`** — why Home's block begins at day one on a new account and rolls thereafter. |
 | `apps/mobile/AGENTS.md` | **Read before touching mobile.** SDK **54** facts, and the two run-it-from-the-right-directory traps (`expo`/`eas` from the root, `supabase` from `apps/mobile`). |
 | `apps/mobile/src/lib/store.ts` | A subscribable value. **The fix for cross-screen sync** — read the docblock before touching either hook below. |
 | `apps/mobile/src/lib/use-status.ts` | The shared status store + the focus staleness guard. `refreshStatus()` is callable from anywhere, including the sheets. |
@@ -457,7 +514,7 @@ gate.
 | `apps/mobile/plugins/with-android-dialog-theme.js` | Puts the palette on native dialogs. **AppCompat attributes, not Material 3** — RN builds them with AppCompat's builder. Third copy of the palette hexes; `check:contrast` cannot see it. |
 | `scripts/make-notification-icon.mjs` | `npm run icon:notification`. Crops, scales and whitens the monochrome mark into a 96×96 alpha silhouette. Android reads **only the alpha** of a small icon. |
 | `supabase/migrations/20260729030000_delete_account.sql` | `delete_own_account()` — security definer, no parameters, target comes from the JWT. Apple-required. |
-| `apps/mobile/src/components/screen.tsx` | Every tab screen's frame. Owns the safe-area insets, the tab-bar allowance and the status-bar scrim. |
+| `apps/mobile/src/components/screen.tsx` | Every tab screen's frame. Owns the safe-area insets, the tab-bar allowance and the status-bar scrim. Also `Frame` — the same insets **without** a ScrollView, for the pixel wall. |
 | `apps/mobile/src/components/lever-buttons.tsx` | The lever grid, with long-press drag-to-reorder and drag-to-archive. |
 | `apps/mobile/src/app/_layout.tsx` | The auth + onboarding gate via `Stack.Protected`, plus `GestureHandlerRootView`. |
 | `apps/mobile/src/app/(tabs)/_layout.tsx` | The native tab bar — real `UITabBar` / Material 3, SF Symbols and Material Symbols per platform. |
@@ -509,8 +566,7 @@ gate.
     wording before submitting. Then: add it to both TestFlight groups, submit
     the external group for **Beta App Review** (needs Test Information + a demo
     account in the review notes; the public link is dead until approval), and
-    only after build 5 is installed run the deferred
-    `20260730120000_drop_posture.sql` push. Apple + Google sign-in still need
+    Apple + Google sign-in still need
     verifying on the TestFlight build — Google has worked once since the
     account-picker fix; Apple is unproven.
 22. ~~The Android-native pass~~ — done 2026-07-31, **not yet seen on hardware.**
@@ -538,7 +594,16 @@ gate.
     phone-dependent things in one sitting — Play Console app sign-in, APK
     install, and the ranked test checklist under *Written but NOT verified*.
     Full state table in *Current status → The Android release*.
-24. Then: **custom SMTP** (it unblocks the Magic Link template, which the OTP
+24. ~~The proof/mood/activities round~~ — done 2026-08-03, **not yet seen on
+    hardware.** Five owner-requested changes across both clients: `/proof`
+    gutted and rebuilt as the pixel wall; one mood slider on the dashboard
+    replacing energy + sleep; Home's grid pinned to day one until the account
+    is thirty days old; History paged one month per swipe; per-lever activities
+    editable and capped at ten. The journal and optional weight were removed
+    with the old `/proof`. Two migrations, both applied. Verified: **264 core
+    tests, tsc ×3, both linters, 39 migration checks, contrast, the web build,
+    both bundles export.** Full notes under *Current status*.
+25. Then: **custom SMTP** (it unblocks the Magic Link template, which the OTP
     screen depends on — see *Blocked*) · store listings · Play Console identity
     verification · the `eas.json` Android submit block.
 
@@ -550,11 +615,12 @@ gate.
 | Onboarding | Web: one screen (rule + 1–4 levers). Mobile: four steps + a first-open walkthrough | Unchanged | Done both, 2026-07-30 |
 | Auth | Email + password, explicit create-account, magic link | Apple · Google · 6-digit code | With mobile |
 | Day grid | Lightness ramp, generated per lever count | Unchanged; steps grow with user-defined levers | Done |
-| Proof trend | Daily points, 60-day window | Unchanged | Done |
-| Weight | Opt-in toggle, field, and line — **migration not yet applied** | Unchanged | Needs `db push` |
-| Posture | **Removed 2026-07-30** — strict-only, one voice. Column drop deferred to after build 5 (see Blocked) | — | Closed |
+| Proof | **The pixel wall** — cells lit to `days up ÷ days in month`, unlit ones spelling `KEEP GOING`. The trend charts, both 1–5 scales and the journal were deleted 2026-08-03 | Unchanged — this IS the intended shape | Both done 2026-08-03 |
+| Felt state | **One mood slider on the dashboard**, continuous 1–100, replacing energy + sleep. Platform control, shared `facePath` | Unchanged | Both done 2026-08-03 |
+| Weight | **Removed 2026-08-03**, with the journal. Owner decision. Columns and rows are kept — a shipped build still selects them — and drop in a later migration | — | Closed |
+| Posture | **Removed 2026-07-30** — strict-only, one voice. The column drop is applied as of 2026-08-03 | — | Closed |
 | Walkthrough | **Mobile: 7-page manual of real rendered components**, auto-once per device, reopens from About. Web: none | Web parity if anyone asks | Mobile done 2026-07-30 |
-| Mobile `/proof` | Full: daily check, journal, trend, optional weight, the log | Unchanged | Done |
+| Activities | **Editable and capped at ten per lever**, from the log sheet (long-press a chip, or "manage activities") and Settings → Activities. Rename, delete, restore a retired one. The cap ARCHIVES rather than refusing on the logging path | Unchanged | Both done 2026-08-03 |
 | Mobile levers | Full: create, rename, archive, with native alerts | Unchanged | Done |
 | Mobile auth | **Email + password, Sign in with Apple, Google, and a 6-digit email code** (the code doubles as forgot-password: sign in by code, set a new password in Settings). All built 2026-07-29; Apple/Google/OTP are inert until the Supabase dashboard config in *Blocked* is done | Verified on device, with custom SMTP | Config, then device test |
 | Daily reminder | **Mobile: opt-in toggle + native time picker in Alerts and onboarding; local notification, reconciled on app start.** Web: none | Unchanged — the reminder is a phone thing | Mobile done 2026-07-29 |
@@ -563,16 +629,16 @@ gate.
 | Widgets | None | Interactive Home/Lock Screen widget: tap a lever without opening the app | v1.1 — SwiftUI + Glance, App Groups |
 | Alerts | Telegram | Native push, same escalation ladder | Step 8 |
 | Playbook | **No tab.** Still exists, still self-populates from logging, still feeds the lever sheet and the takeover | Unchanged — browsing it is not coming back | Decided 2026-07-28 |
-| Daily note | A journal: auto-growing box, 6000 chars, today's entry loaded back for editing | Same on mobile | With mobile `/proof` |
+| Daily note | **Removed 2026-08-03** with the rest of the old `/proof`. Existing note rows are kept and still render in the day panel where they were written | — | Closed |
 | Outage annotation | `annotateOutage` action exists; no UI | Tap an outage in `/history` to label it | After real outages exist |
 | Undo | **Mobile: there is no undo control.** A logged lever stays tappable; its sheet offers "add what else you did" or "remove today's <lever>". Web: still a per-lever undo | Same on web | Mobile done 2026-07-29 |
 | Lever order | **Mobile: long-press and drag.** Drag to the trash to archive | Same on web (the RPC is shared and ready) | Mobile done 2026-07-29 |
-| Settings layout | **Mobile: an index pushing into eight sub-screens on a native stack** (levers, alerts, tracking, account, change-email, change-password, delete-account, about). Web: one flat page | Same shape on web | Mobile done 2026-07-29 |
-| Weight unit | **Mobile: kg/lb segmented in Tracking** (display only, never converts). Web: no control | Same on web | Mobile done 2026-07-29 |
+| Settings layout | **Mobile: an index pushing into eight sub-screens on a native stack** (levers, activities, alerts, account, change-email, change-password, delete-account, about). Web: one flat page | Same shape on web | Mobile done 2026-07-29; Tracking replaced by Activities 2026-08-03 |
+
 | Archive motion | **Mobile: fade + collapse, with the list carried up.** Web: instant | Same on web | Mobile done 2026-07-29 |
 | Settings "accessibility" section | None. The owner named it as an example of the pattern; there is nothing real to put in it — reduce-motion and text size are OS settings the app already honours | **Ask before inventing one** | Undecided |
-| Day grid | **Both clients: Home is the trailing 30 (10×3), History is a stack of calendar months (7 wide).** Today pulses on both. Every day opens a read-only panel | Done — the swap is the final shape | Both done 2026-07-31 |
-| Day panel | Levers + their detail text + that day's signals, read-only. **No weight** — `signals.amount` only exists after the optional-weight migration, so selecting it unconditionally would break a database without it; weight stays on `/proof` behind its opt-in | Weight here too, once the migration is universal | Done 2026-07-31 |
+| Day grid | **Both clients: Home is 30 cells (10×3) beginning at day one until the account is 30 days old, then rolling; History is one calendar month per swipe (7 wide, padded to 6 rows).** Today pulses on both. Every day opens a read-only panel | Done — this is the final shape | 07-31, revised 2026-08-03 |
+| Day panel | Levers + their detail text + that day's signals, read-only. Historical `energy`/`sleep`/`note` rows still render here; only `mood` is written going forward. **No `amount`** — that column exists only after the optional-weight migration, and nothing reads it any more | Unchanged | Done 2026-07-31 |
 | Android nativeness | **Full pass done 2026-07-31, unseen on hardware.** Ripples, Android haptic constants, Material snackbar, summary settings rows, M3 segmented group, sheet drag handle, hardware Back, edge-to-edge, notification icon, two channels, dialog theme, Credential Manager sign-in | Unchanged — this IS the intended shape | Needs a device |
 | Android widgets | None | Glance/Kotlin, same as the iOS WidgetKit one | v1.1 |
 | Android launcher shortcuts | **None.** Long-press → "log a lever" is genuinely native and genuinely wanted | A `shortcuts.xml` config plugin + a deep-link route | Deferred with the widget work — same surface, same build |
@@ -581,6 +647,71 @@ gate.
 | Monetization | Free | Undecided. **The usual paywalls are all ruled out by the thesis**, not by preference — lever count is the product's name, longer history attacks re-entry, gamification fails a build test. Any model has to sell something other than a feature | Post-launch |
 
 ## Gotchas / open issues
+
+- **The pixel wall's message is made of cells that must be INVISIBLE.** The
+  masked cells and the not-yet-earned cells are drawn in exactly the same
+  colour (`line`). If they ever separate by one step, `KEEP GOING` is legible
+  at zero percent and the screen stops being something the month reveals.
+  `check:contrast` records that pair at 1.00:1 as an EXEMPT row with the
+  reasoning, precisely so nobody "fixes" it. The pair that DOES owe a floor is
+  lit-against-unearned, at 11.37:1.
+
+- **`GOING` is 29 cells wide, and that is what sets the wall's cell size.**
+  Five glyphs of five columns plus four gaps, before any margin. A wall
+  narrower than that cannot draw the word and silently degrades to `KEEP`
+  alone. `GRID_TARGET` is 8dp for that reason — at the day grid's 14dp a
+  390pt phone yields 23 columns and loses half the message. Do not raise it
+  without recomputing that; `pixels.test.ts` has a regression test across four
+  screen sizes.
+
+- **The activity cap must never `raise`.** `isPermanent` in
+  `apps/mobile/src/lib/outbox.ts` treats SQLSTATE `23xxx` as unrecoverable and
+  dead-letters the queued item forever, so a constraint violation on the
+  playbook would convert "you already have ten activities" into "the day you
+  logged in the gym is gone". Both the trigger (`cap_playbook()`) and the
+  client rule (`retireCandidate`) archive instead. The client picks the row —
+  never pinned, never used more than once, and nothing at all if neither
+  applies — and archives it first, so the trigger finds room and does not have
+  to choose for itself.
+
+- **A hard delete of a playbook row was impossible until 2026-08-03, and
+  nothing had noticed.** `entries_playbook_fk` is composite —
+  `(user_id, playbook_id)` → `playbook (user_id, id)` — with a bare
+  `on delete set null`, which nulls EVERY referencing column, including
+  `entries.user_id`, which is `not null`. So the delete failed its own
+  cascade. It went unnoticed because nothing had ever deleted a playbook row.
+  Fixed with Postgres 15's column list: `on delete set null (playbook_id)`.
+  **The migration test now covers it**, because the composite key's intent
+  (an entry cannot borrow another user's activity) is right and must not be
+  lost while fixing the action.
+
+- **The plateau threshold is a fraction of the scale, not a number of points.**
+  It was `last - first <= 0.25` against raw 1–5 values. When the reading became
+  a 1–100 slider the same literal became 0.25% of the range — a threshold
+  nothing could ever clear, so every month would have read as a plateau and the
+  pager would have fired constantly. It is `PLATEAU_FLAT_FRACTION` (0.0625)
+  against a normalised range now, and `evaluatePlateau` filters on `mood`
+  only: mixing a historical 1–5 `energy` row into a 1–100 average produces a
+  number that is on neither scale.
+
+- **The log sheet is measured exactly once, so nothing in it may grow.**
+  `apps/mobile/src/app/log.tsx` is a `formSheet` with
+  `sheetAllowedDetents: "fitToContents"`, which is why it reads
+  `cachedStatus()` rather than subscribing. Activity editing therefore arrives
+  as a long-press `Alert` (no layout change) and one always-present "manage
+  activities" link that is part of the single measurement. That link uses
+  `router.replace`, **not `push`** — returning to a sheet measured before an
+  edit would show the chips it was measured with. `Alert.prompt` is iOS-only,
+  so Android's "Rename" routes to the full editor instead of silently doing
+  nothing.
+
+- **Both status loaders now return the playbook UNORDERED, archived rows
+  included.** They used to sort in SQL and they sorted differently — the web
+  query tie-broke on `last_used_at` and the mobile one did not — so "the top
+  three" could be a different three on a phone than in a browser. Every
+  consumer passes the array through `rankActivities`, which sorts and drops
+  archived rows. A new consumer that forgets will show retired activities.
+
 
 - **Supabase + Google Cloud auth config was audited in the browser on
   2026-07-31 and came back CLEAN. Do not re-audit it; do not "fix" it.**

@@ -4,7 +4,7 @@ import { NavLink } from "./nav-link";
 import { useState, useTransition } from "react";
 import { logEntry } from "@/app/actions";
 import type { LeverRow, PlaybookItem } from "@/lib/system";
-import { type Interval } from "@uptime/core";
+import { rankActivities, type Interval } from "@uptime/core";
 
 /**
  * Re-entry. This replaces the dashboard entirely when down 3+ days.
@@ -45,11 +45,13 @@ export function Takeover({
   // put the hardest thing at the top of the re-entry screen.
   //
   // The honest proxy is what has actually worked most often for this person,
-  // which is use_count — already the order the query returns. So the lever tier
-  // is simply gone rather than replaced with a guess, and only the pin remains.
-  const options = [...playbook]
-    .sort((a, b) => Number(b.is_pinned) - Number(a.is_pinned))
-    .slice(0, 3);
+  // so the lever tier is simply gone rather than replaced with a guess.
+  //
+  // Ranked in core — the query is deliberately unordered now, because this and
+  // the lever sheet and the phone all sorting for themselves is how the "top
+  // three" came to mean two different things. It also drops archived rows,
+  // which the loader returns for the editor's retired list.
+  const options = rankActivities(playbook).slice(0, 3);
 
   // With nothing in the playbook the levers ARE the screen, so they are not
   // hidden behind a disclosure. With one lever there is nothing to choose.

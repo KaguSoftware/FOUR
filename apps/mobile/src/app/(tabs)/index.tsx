@@ -1,6 +1,6 @@
-import { useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Alert, RefreshControl, Text, View } from "react-native";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import * as Localization from "expo-localization";
 import { applyToDay, MILESTONE_COPY } from "@uptime/core";
 
@@ -8,11 +8,13 @@ import { Body, Label, Mono } from "@/components/ui";
 import { useNotify } from "@/components/snackbar";
 import { DayGrid } from "@/components/day-grid";
 import { LeverButtons } from "@/components/lever-buttons";
+import { MoodSlider } from "@/components/mood-slider";
 import { Screen } from "@/components/screen";
 import { Takeover } from "@/components/takeover";
 import { useStatus } from "@/lib/use-status";
 import { useOutbox } from "@/lib/use-outbox";
 import { archiveLever, reorderLevers } from "@/lib/levers";
+import { loadMood, saveMood } from "@/lib/mood";
 import { syncTimeZone, type LeverRow } from "@/lib/status";
 import { markWalkthroughSeen, walkthroughSeen } from "@/lib/walkthrough";
 import { color, size, space } from "@/theme";
@@ -45,6 +47,31 @@ export default function StatusScreen() {
       syncTimeZone(userId, deviceZone);
     }
   }, [userId, storedZone]);
+
+  /**
+   * Today's mood, loaded separately from the status object.
+   *
+   * Not folded into `getStatus`: it is one row for one day, on a different
+   * cadence to everything else here, and putting it in the status query would
+   * make every lever tap's refresh re-fetch it.
+   */
+  const [mood, setMood] = useState<number | null>(null);
+  const [moodFailed, setMoodFailed] = useState(false);
+  const todayDate = status?.today;
+  const loadTodaysMood = useCallback(async () => {
+    if (!userId || !todayDate) return;
+    const { value, error } = await loadMood(userId, todayDate);
+    // A failed read leaves whatever is on screen rather than blanking it.
+    // Resetting the face to unset because the network blinked looks exactly
+    // like the save having been lost.
+    if (!error) setMood(value);
+  }, [userId, todayDate]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadTodaysMood();
+    }, [loadTodaysMood]),
+  );
 
   // First open on this device: explain the system once, then never again —
   // marked seen BEFORE the push so no failure mode replays it on every mount.
@@ -246,6 +273,30 @@ export default function StatusScreen() {
           pager waits an extra day.
         </Body>
       )}
+
+      {/* Below the levers, always. Logging is what this screen is for, and a
+          question placed above the buttons would be a toll gate on it. */}
+      <View style={{ marginTop: space[10] }}>
+        <MoodSlider
+          value={mood}
+          onCommit={async (next) => {
+            // Optimistic: the face is already where the finger left it, and
+            // snapping it back while a write lands would read as the drag
+            // having failed.
+            setMood(next);
+            setMoodFailed(false);
+            const { error } = await saveMood(state.user_id, today, next);
+            // Reported, not swallowed. Six paths in this app used to claim
+            // success unconditionally and this is not becoming the seventh.
+            if (error) setMoodFailed(true);
+          }}
+        />
+        {moodFailed && (
+          <Body tone="degraded" style={{ marginTop: space[2] }}>
+            Didn&apos;t save. Move it again when you have a connection.
+          </Body>
+        )}
+      </View>
     </Screen>
   );
 }

@@ -1,10 +1,15 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
+  canAddActivity,
   capped,
   enqueue,
+  findActivity,
+  normalizeActivityLabel,
   pending,
+  retireCandidate,
   settle,
   OUTBOX_MAX,
+  type ActivityRow,
   type OutboxItem,
 } from "@uptime/core";
 import { createStore } from "./store";
@@ -296,25 +301,67 @@ async function send(userId: string, item: OutboxItem): Promise<SendResult> {
   let playbookId: string | null = null;
   const detail = item.detail?.trim();
 
+  /**
+   * Remember what worked — the IMPLICIT half of the activity cap.
+   *
+   * **Every failure here is swallowed on purpose.** The entry write below is
+   * the thing that matters; this is a convenience index on top of it, and
+   * `entries.detail` keeps the text regardless. A playbook write that fails
+   * must never turn a logged day into a lost one.
+   *
+   * At the cap this retires something first rather than being refused. The
+   * choice is `retireCandidate`'s: never a pinned row, never one used more
+   * than once. If nothing qualifies it creates nothing at all — the day still
+   * logs, and the playbook simply stops learning until the list is pruned.
+   *
+   * The database has its own cap trigger as a backstop, which archives rather
+   * than raising for exactly the same reason. Retiring the chosen row here
+   * first means the trigger finds room and does not have to pick for itself.
+   */
   if (detail) {
-    const { data } = await supabase
+    const label = normalizeActivityLabel(detail);
+    const { data: existing } = await supabase
       .from("playbook")
-      .upsert(
-        { user_id: userId, lever: item.lever, label: detail.slice(0, 80) },
-        { onConflict: "user_id,lever,label" },
-      )
-      .select("id, use_count")
-      .single();
+      .select("id, lever, label, use_count, last_used_at, is_pinned, archived")
+      .eq("user_id", userId)
+      .eq("lever", item.lever)
+      .eq("archived", false);
 
-    if (data) {
-      playbookId = data.id;
+    const rows = (existing ?? []) as ActivityRow[];
+    const known = findActivity(rows, label);
+    const retire = retireCandidate(rows, label);
+    // At the cap with nothing safe to evict: skip the playbook entirely. The
+    // entry still carries the full detail.
+    const blocked = !known && !retire && !canAddActivity(rows.length);
+
+    if (retire) {
       await supabase
         .from("playbook")
-        .update({
-          use_count: (data.use_count ?? 0) + 1,
-          last_used_at: new Date().toISOString(),
-        })
-        .eq("id", data.id);
+        .update({ archived: true })
+        .eq("id", retire.id)
+        .eq("user_id", userId);
+    }
+
+    if (!blocked) {
+      const { data } = await supabase
+        .from("playbook")
+        .upsert(
+          { user_id: userId, lever: item.lever, label },
+          { onConflict: "user_id,lever,label" },
+        )
+        .select("id, use_count")
+        .single();
+
+      if (data) {
+        playbookId = data.id;
+        await supabase
+          .from("playbook")
+          .update({
+            use_count: (data.use_count ?? 0) + 1,
+            last_used_at: new Date().toISOString(),
+          })
+          .eq("id", data.id);
+      }
     }
   }
 

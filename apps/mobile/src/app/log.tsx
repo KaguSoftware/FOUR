@@ -1,14 +1,15 @@
 import { useState } from "react";
-import { Pressable, TextInput, View } from "react-native";
+import { Alert, Pressable, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { appendDetail } from "@uptime/core";
+import { appendDetail, rankActivities, type ActivityRow } from "@uptime/core";
 import { field, fieldTint } from "@/components/fields";
 import { Body, Label } from "@/components/ui";
 import { SheetHandle } from "@/components/sheet";
 import { committed } from "@/lib/haptics";
+import { deleteActivity } from "@/lib/playbook";
 import { pressFill, pressFillFlat, ripple } from "@/lib/press";
-import { cachedStatus } from "@/lib/use-status";
+import { cachedStatus, refreshStatus } from "@/lib/use-status";
 import { outboxStore, queueWrite } from "@/lib/outbox";
 import { color, radius, size, space, TAP } from "@/theme";
 
@@ -51,9 +52,59 @@ export default function LogSheet() {
 
   const leverRow = status?.levers.find((l) => l.key === lever);
   const label = leverRow?.label ?? lever;
-  const items = (status?.playbook ?? [])
-    .filter((p) => p.lever === lever)
-    .slice(0, 3);
+  /**
+   * Three, and it stays three.
+   *
+   * Ten 56pt chips plus the input, the "something else" row and the footer is
+   * roughly 800pt — taller than a phone — and `fitToContents` would happily
+   * let this sheet try. Editing has to be REACHABLE from here, which it is;
+   * all ten do not have to be listed here.
+   *
+   * Ranked through core so this and the takeover and the browser cannot
+   * disagree about which three are the top three.
+   */
+  const items = rankActivities(
+    (status?.playbook ?? []).filter((p) => p.lever === lever) as ActivityRow[],
+  ).slice(0, 3);
+
+  /**
+   * Open the editor, REPLACING this sheet rather than pushing over it.
+   *
+   * This screen read `cachedStatus()` once so it could be measured once.
+   * Coming back to it after an edit would therefore show the chips it was
+   * measured with, not the ones that now exist.
+   */
+  function manage() {
+    if (chosen !== null) return;
+    router.replace({ pathname: "/activities", params: { lever } });
+  }
+
+  /**
+   * Long-press a chip to fix it.
+   *
+   * An `Alert` and not an inline editor, because an inline editor changes this
+   * sheet's height and the sheet is measured once. A dialog changes nothing.
+   *
+   * `Alert.prompt` is **iOS-only**, so renaming on Android routes to the full
+   * editor rather than silently doing nothing.
+   */
+  function editItem(item: { id: string; label: string }) {
+    if (chosen !== null || !status) return;
+    Alert.alert(item.label, undefined, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Rename", onPress: manage },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          const res = await deleteActivity(status.state.user_id, item.id);
+          if (!res.ok) return;
+          await refreshStatus().catch(() => {});
+          router.back();
+        },
+      },
+    ]);
+  }
 
   /**
    * What is already recorded for today, if anything.
@@ -142,8 +193,10 @@ export default function LogSheet() {
         <Pressable
           key={item.id}
           accessibilityRole="button"
+          accessibilityHint="Long press to rename or delete"
           disabled={chosen !== null}
           onPress={() => commit(item.label)}
+          onLongPress={() => editItem(item)}
           android_ripple={chosen !== null ? undefined : ripple()}
           style={({ pressed }) => ({
             minHeight: 56,
@@ -210,6 +263,26 @@ export default function LogSheet() {
           <Body tone="mute">something else</Body>
         </Pressable>
       )}
+
+      {/* Always present, so it is part of the single measurement this sheet
+          gets. The long-press on a chip covers the common fix; this is the way
+          in when there is nothing on screen to long-press. */}
+      <Pressable
+        accessibilityRole="button"
+        disabled={chosen !== null}
+        onPress={manage}
+        android_ripple={chosen !== null ? undefined : ripple()}
+        style={{
+          minHeight: TAP,
+          alignItems: "center",
+          justifyContent: "center",
+          borderRadius: radius.md,
+        }}
+      >
+        <Body tone="mute" style={{ fontSize: size.xs }}>
+          manage activities
+        </Body>
+      </Pressable>
 
       {/* The floor when nothing is logged yet; the way back when something is.
           Exactly one of these is ever offered, so the sheet never asks you to

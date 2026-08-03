@@ -37,8 +37,8 @@ export default function SettingsLayout() {
           other three rather than like a screen you already navigated into. */}
       <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen name="levers" options={{ title: "Levers" }} />
+      <Stack.Screen name="activities" options={{ title: "Activities" }} />
       <Stack.Screen name="alerts" options={{ title: "Alerts" }} />
-      <Stack.Screen name="tracking" options={{ title: "Tracking" }} />
       <Stack.Screen name="account" options={{ title: "Account" }} />
       <Stack.Screen name="change-password" options={{ title: "Change password" }} />
       <Stack.Screen name="change-email" options={{ title: "Change email" }} />

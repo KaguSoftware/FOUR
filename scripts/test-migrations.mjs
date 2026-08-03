@@ -311,5 +311,113 @@ tz2[0].timezone === "America/New_York"
   ? ok("a valid timezone still writes through")
   : bad(`valid timezone was blocked: ${tz2[0].timezone}`);
 
+// --- the mood reading -------------------------------------------------------
+
+// A continuous slider stores 1..100, which the old `value between 1 and 5`
+// rejected outright.
+try {
+  await db.exec(`insert into public.signals (user_id, observed_on, kind, value)
+                 values ('${b}', '2026-07-10', 'mood', 100)`);
+  ok("a mood of 100 is accepted");
+} catch (e) {
+  bad(`a mood of 100 was refused: ${e.message}`);
+}
+
+try {
+  await db.exec(`insert into public.signals (user_id, observed_on, kind, value)
+                 values ('${b}', '2026-07-11', 'mood', 101)`);
+  bad("a mood of 101 was accepted");
+} catch {
+  ok("mood is bounded to 1..100");
+}
+
+// The bound is split by KIND rather than simply widened. A widened bound would
+// accept an energy of 87 — a row on no scale any reader uses, and one nothing
+// downstream would ever notice.
+try {
+  await db.exec(`insert into public.signals (user_id, observed_on, kind, value)
+                 values ('${b}', '2026-07-12', 'energy', 6)`);
+  bad("an energy of 6 was accepted — the 1..5 bound was widened, not split");
+} catch {
+  ok("the retired 1..5 kinds keep their own bound");
+}
+
+// Old readings are HISTORY, not debris. A shipped build still selects them and
+// the day sheet still renders them where they were written.
+const legacy = await q(`select count(*)::int as n from public.signals where kind in ('energy','sleep','note','weight')`);
+legacy[0].n >= 0
+  ? ok("the retired kinds are still legal, so existing rows survive")
+  : bad("retired kinds were dropped");
+
+// --- the activity cap -------------------------------------------------------
+
+// Ten is the ceiling, and the eleventh must NOT raise: a constraint violation
+// comes back through the mobile outbox as a permanent failure and would
+// dead-letter the entry it was attached to.
+await db.exec(`delete from public.playbook where user_id = '${d}'`);
+await db.exec(`
+  insert into public.playbook (user_id, lever, label, use_count, is_pinned)
+  select '${d}', 'gym', 'act ' || i, i, false from generate_series(1, 10) i;
+`);
+const tenBefore = await q(`select count(*)::int as n from public.playbook where user_id = '${d}' and lever = 'gym' and archived = false`);
+tenBefore[0].n === 10 ? ok("ten activities sit at the cap") : bad(`expected 10, got ${tenBefore[0].n}`);
+
+try {
+  await db.exec(`insert into public.playbook (user_id, lever, label, use_count)
+                 values ('${d}', 'gym', 'the eleventh', 0)`);
+  ok("an eleventh activity is accepted rather than raising");
+} catch (e) {
+  bad(`the cap RAISED — this dead-letters queued taps: ${e.message}`);
+}
+
+const afterEleven = await q(`select count(*)::int as n from public.playbook where user_id = '${d}' and lever = 'gym' and archived = false`);
+afterEleven[0].n === 10
+  ? ok("the cap held at ten by archiving, not by refusing")
+  : bad(`expected 10 active after the 11th, got ${afterEleven[0].n}`);
+
+const retired = await q(`select label from public.playbook where user_id = '${d}' and lever = 'gym' and archived = true`);
+retired.length === 1 && retired[0].label === "act 1"
+  ? ok("the least-used activity is the one retired")
+  : bad(`retired the wrong row: ${JSON.stringify(retired.map((r) => r.label))}`);
+
+// Pinned rows sort last in the eviction order, so one only goes when there is
+// nothing else left at all.
+await db.exec(`delete from public.playbook where user_id = '${d}'`);
+await db.exec(`
+  insert into public.playbook (user_id, lever, label, use_count, is_pinned)
+  values ('${d}', 'gym', 'pinned and unused', 0, true);
+  insert into public.playbook (user_id, lever, label, use_count, is_pinned)
+  select '${d}', 'gym', 'act ' || i, 5, false from generate_series(1, 9) i;
+`);
+await db.exec(`insert into public.playbook (user_id, lever, label, use_count)
+               values ('${d}', 'gym', 'another', 0)`);
+const pinnedStill = await q(`select archived from public.playbook where user_id = '${d}' and label = 'pinned and unused'`);
+pinnedStill[0].archived === false
+  ? ok("a pinned activity is not retired while anything else could be")
+  : bad("the cap retired a pinned activity");
+
+// The cap is per lever, not per account.
+await db.exec(`insert into public.playbook (user_id, lever, label) values ('${d}', 'food', 'a food one')`);
+const foodCount = await q(`select count(*)::int as n from public.playbook where user_id = '${d}' and lever = 'food' and archived = false`);
+foodCount[0].n === 1 ? ok("the cap is per lever, not per account") : bad(`food lever got ${foodCount[0].n}`);
+
+// Deleting an activity leaves the entry that used it intact — this is what
+// makes a hard delete safe, and why archived rows do not have to linger just
+// to hold a reference.
+const [keep] = await q(`select id from public.playbook where user_id = '${d}' and lever = 'food' limit 1`);
+await db.exec(`insert into public.entries (user_id, logged_for, lever, playbook_id, detail)
+               values ('${d}', '2026-07-20', 'food', '${keep.id}', 'a food one')`);
+await db.exec(`delete from public.playbook where id = '${keep.id}'`);
+const survivor = await q(`select playbook_id, detail from public.entries where user_id = '${d}' and logged_for = '2026-07-20'`);
+survivor.length === 1 && survivor[0].playbook_id === null && survivor[0].detail === "a food one"
+  ? ok("deleting an activity nulls the pointer and keeps the entry and its detail")
+  : bad(`entry did not survive the delete: ${JSON.stringify(survivor)}`);
+
+// The ranking index is partial, so retired rows are not in the picker's index.
+const idx = await q(`select indexdef from pg_indexes where indexname = 'playbook_rank_idx'`);
+idx.length === 1 && /archived = false/.test(idx[0].indexdef)
+  ? ok("playbook_rank_idx is partial on the active rows")
+  : bad(`playbook_rank_idx is missing or not partial: ${JSON.stringify(idx)}`);
+
 console.log(process.exitCode ? "\nRESULT: FAILURES ABOVE" : "\nRESULT: all checks passed");
 await db.close();

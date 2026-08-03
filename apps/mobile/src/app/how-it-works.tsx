@@ -7,7 +7,14 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { addDays, gridFill, type Entry } from "@uptime/core";
+import {
+  addDays,
+  gridFill,
+  pixelPaths,
+  pixelWall,
+  type Entry,
+} from "@uptime/core";
+import Svg, { Path } from "react-native-svg";
 
 import { Button, TextButton } from "@/components/button";
 import { DayGrid } from "@/components/day-grid";
@@ -34,7 +41,7 @@ const TITLES = [
   "The grid",
   "The outage screen",
   "The pager",
-  "The journal",
+  "The wall",
   "The rest",
 ] as const;
 
@@ -125,7 +132,7 @@ export default function HowItWorksScreen() {
       {step === 2 && <TheGrid />}
       {step === 3 && <TheOutage />}
       {step === 4 && <ThePager />}
-      {step === 5 && <TheJournal />}
+      {step === 5 && <TheWall />}
       {step === 6 && <TheRest />}
 
       <View style={{ marginTop: "auto", paddingTop: space[8] }}>
@@ -377,10 +384,15 @@ function TheGrid() {
         Opens what you logged that day — the levers, and anything you wrote
         down with them. Reading only; days are logged as they happen.
       </Callout>
+      <Callout term="It starts where you did">
+        On a new account the first cell is your first day and the block fills
+        forward from there. Once you have thirty days it rolls, so the last
+        cell is always today.
+      </Callout>
       <Callout term="History is a calendar">
         The History tab shows the same days month by month, seven to a row, so
-        a column is a weekday. That is where you notice you always lose
-        Sundays.
+        a column is a weekday — swipe between months. That is where you notice
+        you always lose Sundays.
       </Callout>
       <Callout term="History is permanent">
         Renaming or archiving a lever never rewrites a day you already logged.
@@ -485,60 +497,48 @@ function ThePager() {
   );
 }
 
-function TheJournal() {
+/**
+ * The wall page.
+ *
+ * The specimen is the REAL `pixelWall`, at a specimen-sized grid and a made-up
+ * 60% — so it cannot describe a screen the app no longer draws, which is
+ * exactly what happened to the page this replaced.
+ */
+function TheWall() {
+  const CELL = 4;
+  const GAP = 1;
+  const wall = pixelWall({ cols: 60, rows: 26, pct: 0.6 });
+  const paths = pixelPaths(wall, { cell: CELL, gap: GAP });
+  const span = (n: number) => n * (CELL + GAP) - GAP;
+
   return (
     <>
-      <Text style={heading}>Proof. The file of what came back.</Text>
+      <Text style={heading}>Proof. The month, as a wall.</Text>
 
       <Specimen>
-        <Label style={{ marginBottom: space[2] }}>energy</Label>
-        <View style={{ flexDirection: "row", gap: 6 }}>
-          {[1, 2, 3, 4, 5].map((n) => {
-            const on = n === 4;
-            return (
-              <View
-                key={n}
-                style={{
-                  flex: 1,
-                  minHeight: 40,
-                  borderRadius: radius.md,
-                  borderWidth: on ? 2 : 1,
-                  borderColor: on ? color.lineHi : color.line,
-                  backgroundColor: on ? color.line : color.surface,
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <Mono
-                  style={{
-                    fontSize: size.sm,
-                    color: on ? color.ink : color.inkMute,
-                  }}
-                >
-                  {n}
-                </Mono>
-              </View>
-            );
-          })}
-        </View>
+        <Svg width={span(wall.cols)} height={span(wall.rows)}>
+          <Path d={paths.ground} fill={color.line} />
+          <Path d={paths.lit} fill={color.ink} />
+        </Svg>
       </Specimen>
 
-      <Callout term="A daily check, if you want it">
-        Energy and sleep on a 1–5, and &ldquo;what&rsquo;s up?&rdquo; — a
-        journal that takes as much or as little as you write. Skipping costs
-        nothing.
+      <Callout term="One pixel per fraction of the month">
+        Every day the system is up lights more of it. Nothing to fill in and
+        nothing to answer — it is drawn from the days you already logged.
       </Callout>
-      <Callout term="Writing twice in a day adds, never replaces">
-        The field opens blank each time; the evening&rsquo;s entry lands under
-        the morning&rsquo;s. Tap any day in the log to edit it properly.
+      <Callout term="The message is made of the dark pixels">
+        It is not printed on the wall; it is what the lit ones leave behind. At
+        the start of a month there is nothing to read, and it becomes readable
+        a word at a time as the month fills.
       </Callout>
-      <Callout term="Weight, only if you turn it on">
-        Settings → Tracking. A number you chose to keep, plotted with no goal
-        and no judgement.
+      <Callout term="It resets on the 1st">
+        A fresh month starts dark. That is the one screen in the app that does,
+        and it is deliberate: the number on the dashboard never resets, so this
+        one is free to.
       </Callout>
-      <Callout term="None of this touches uptime">
-        Structurally: the journal is stored beside the system, not inside it.
-        A blank week of Proof changes nothing on the dashboard.
+      <Callout term="Nothing here touches uptime">
+        It only reads the days. There is no way to make the wall lie, and no
+        way to lose anything by ignoring it.
       </Callout>
     </>
   );
@@ -550,14 +550,15 @@ function TheRest() {
       <Text style={heading}>The other two tabs, and where this lives.</Text>
 
       <Callout term="History">
-        Every run and every outage as ranges, the all-time figures, and a
-        dense grid of the last quarter. All of it derived from the same
-        entries — nothing is stored that could drift.
+        Every run and every outage as ranges, the all-time figures, and one
+        calendar month per swipe. All of it derived from the same entries —
+        nothing is stored that could drift.
       </Callout>
       <Callout term="Settings">
-        Levers (rename, archive, add) · Alerts (slammed mode, the reminder, a
-        test page) · Tracking (weight) · Account (export everything as JSON,
-        sign out, delete — deletion is immediate and total).
+        Levers (rename, archive, add) · Activities (the shortcuts each lever
+        remembers — ten each, rename or delete any) · Alerts (slammed mode,
+        the reminder, a test page) · Account (export everything as JSON, sign
+        out, delete — deletion is immediate and total).
       </Callout>
       <View style={{ marginTop: space[6] }}>
         <Rule />

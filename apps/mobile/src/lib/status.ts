@@ -8,6 +8,7 @@ import {
   leverLabels,
   logicalDateLocal,
   uptimeWindow,
+  type ActivityRow,
   type Entry,
   type LeverSpan,
   type Signal,
@@ -60,20 +61,20 @@ export const leverSpans = (levers: LeverRow[]): LeverSpan[] =>
     archived_on: l.archived_at?.slice(0, 10) ?? null,
   }));
 
-export type PlaybookItem = {
-  id: string;
-  lever: string;
-  label: string;
-  use_count: number;
-  is_pinned: boolean;
-};
+/**
+ * An activity — a remembered thing that worked, attached to one lever.
+ *
+ * This IS core's `ActivityRow`; the alias survives because "playbook" is what
+ * the table and half the UI call it. Archived rows come back too, because the
+ * editor's retired list needs them — every consumer passes the array through
+ * `rankActivities`, which drops them.
+ */
+export type PlaybookItem = ActivityRow;
 
 export type SystemState = {
   user_id: string;
   timezone: string;
   slammed_until: string | null;
-  weight_enabled: boolean;
-  weight_unit: "kg" | "lb";
   onboarded: boolean;
   /** Postgres `time` as "HH:MM:SS"; null means off, which is the default. */
   daily_reminder_at: string | null;
@@ -106,7 +107,7 @@ export async function loadStatus() {
       supabase
         .from("system_state")
         .select(
-          "user_id, timezone, slammed_until, weight_enabled, weight_unit, onboarded_at, daily_reminder_at",
+          "user_id, timezone, slammed_until, onboarded_at, daily_reminder_at",
         )
         .eq("user_id", user.id)
         .maybeSingle(),
@@ -120,11 +121,13 @@ export async function loadStatus() {
         .order("logged_for", { ascending: true }),
       supabase
         .from("playbook")
-        .select("id, lever, label, use_count, is_pinned")
-        .eq("user_id", user.id)
-        .eq("archived", false)
-        .order("is_pinned", { ascending: false })
-        .order("use_count", { ascending: false }),
+        // Unordered on purpose. This sorted differently from the web query —
+        // it omitted the `last_used_at` tie-break — so the "top three" on a
+        // phone could be a different three from the browser's, which is
+        // exactly the divergence core exists to prevent. `rankActivities` is
+        // the single answer now, and every consumer goes through it.
+        .select("id, lever, label, use_count, last_used_at, is_pinned, archived")
+        .eq("user_id", user.id),
       supabase
         .from("levers")
         // ARCHIVED ROWS INCLUDED, deliberately. The button list filters them
@@ -140,12 +143,18 @@ export async function loadStatus() {
         .order("first_hit_on", { ascending: false })
         .limit(1)
         .maybeSingle(),
-      // For the day sheet. Unbounded like `entries`, because any day in
-      // history can be tapped and a row limit would quietly empty old ones.
+      // For the day sheet, and for today's mood on the dashboard. Unbounded
+      // like `entries`, because any day in history can be tapped and a row
+      // limit would quietly empty old ones.
       //
-      // No `amount`: that column only exists after the optional-weight
+      // The retired kinds — `energy`, `sleep`, `note`, `weight` — still come
+      // back and still render where they were written. Only `mood` is written
+      // from here on; a reading stops being COLLECTED, it does not stop
+      // having happened.
+      //
+      // No `amount`: that column exists only after the optional-weight
       // migration, so selecting it unconditionally would break the dashboard
-      // on a database without it. Weight stays on `/proof`, behind its opt-in.
+      // on a database without it. Nothing reads it any more either way.
       supabase
         .from("signals")
         .select("observed_on, kind, value, detail")
@@ -158,8 +167,6 @@ export async function loadStatus() {
     user_id: user.id,
     timezone: (row.timezone as string | null) ?? "UTC",
     slammed_until: (row.slammed_until as string | null) ?? null,
-    weight_enabled: row.weight_enabled === true,
-    weight_unit: row.weight_unit === "lb" ? "lb" : "kg",
     // No row yet means the signup trigger has not run — treat that as
     // un-onboarded rather than crashing, and let onboarding create it.
     onboarded: row.onboarded_at != null,

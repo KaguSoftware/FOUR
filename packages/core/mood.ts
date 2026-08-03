@@ -87,10 +87,14 @@ const MOUTH_BOW = 0.46;
 export function facePath(value: number): Face {
   const f = moodFraction(value);
 
-  // f = 0 → control point well BELOW the mouth line (frown)
-  // f = 0.5 → exactly on it (flat)
-  // f = 1 → well above (smile)
-  const control = MOUTH_Y + MOUTH_BOW * (0.5 - f);
+  // SVG Y grows DOWNWARD. A smile bows below the mouth line (larger y), a
+  // frown above it (smaller y). The first cut of this had the sign flipped —
+  // written y-up, so 1 drew the frown — and shipped that way; the fix is
+  // this comment's reason to exist.
+  //   f = 0   → control above the line (frown)
+  //   f = 0.5 → exactly on it (flat)
+  //   f = 1   → below it (smile)
+  const control = MOUTH_Y - MOUTH_BOW * (0.5 - f);
 
   const left = 0.5 - MOUTH_HALF_W;
   const right = 0.5 + MOUTH_HALF_W;

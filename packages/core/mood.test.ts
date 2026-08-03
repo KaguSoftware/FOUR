@@ -61,18 +61,20 @@ describe("facePath", () => {
   });
 
   it("frowns at the bottom and smiles at the top", () => {
-    // SVG Y grows downward, so a frown's control point is the LARGER number.
-    expect(controlY(MOOD_MIN)).toBeGreaterThan(controlY(MOOD_NEUTRAL));
-    expect(controlY(MOOD_MAX)).toBeLessThan(controlY(MOOD_NEUTRAL));
+    // SVG Y grows downward: a frown bows ABOVE the mouth line (smaller y), a
+    // smile below it (larger y). The first version of this test asserted the
+    // opposite — reasoning y-up — and green-lit a face that smiled at 1.
+    expect(controlY(MOOD_MIN)).toBeLessThan(controlY(MOOD_NEUTRAL));
+    expect(controlY(MOOD_MAX)).toBeGreaterThan(controlY(MOOD_NEUTRAL));
   });
 
   it("moves monotonically across the whole range", () => {
     // The face must never reverse direction mid-drag — it tracks a finger, and
     // a mouth that dips back down at 70 reads as a bug in the control.
-    let prev = Infinity;
+    let prev = -Infinity;
     for (let v = MOOD_MIN; v <= MOOD_MAX; v++) {
       const y = controlY(v);
-      expect(y).toBeLessThan(prev);
+      expect(y).toBeGreaterThan(prev);
       prev = y;
     }
   });

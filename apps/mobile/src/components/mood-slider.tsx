@@ -29,6 +29,8 @@ import { color, space } from "@/theme";
  * The face comes from `facePath` in core, so the web draws the identical one.
  */
 const FACE = 56;
+/** The little axis anchors at the slider's ends. */
+const END_FACE = 20;
 
 export function MoodSlider({
   value,
@@ -78,36 +80,52 @@ export function MoodSlider({
       <View style={{ alignItems: "center" }}>
         <Face value={position} muted={!set} />
 
-        <Slider
-          style={{ width: "100%", marginTop: space[2] }}
-          minimumValue={MOOD_MIN}
-          maximumValue={MOOD_MAX}
-          // Whole numbers, because that is what the column stores. Left
-          // continuous, the platform hands back 63.42711 and the write is
-          // rejected by the int column with no visible cause.
-          step={1}
-          value={position}
-          onValueChange={setDragging}
-          onSlidingComplete={(next) => {
-            const rounded = Math.round(next);
-            setDragging(null);
-            setShown(rounded);
-            lastSeen.current = rounded;
-            onCommit(rounded);
+        {/* The ends, anchored: sad on the left, happy on the right. Same
+            `facePath` geometry as the big face, drawn small and muted so they
+            read as axis labels rather than competing answers. Not accessible
+            individually — the slider's own accessibilityValue speaks. */}
+        <View
+          style={{
+            width: "100%",
+            marginTop: space[2],
+            flexDirection: "row",
+            alignItems: "center",
+            gap: space[2],
           }}
-          minimumTrackTintColor={set ? color.inkDim : color.line}
-          maximumTrackTintColor={color.line}
-          thumbTintColor={set ? color.ink : color.lineHi}
-          accessibilityLabel="How was today"
-          // The announcement is a word, not a number out of a hundred —
-          // "sixty-three" is not an answer to "how was today".
-          accessibilityValue={{
-            min: MOOD_MIN,
-            max: MOOD_MAX,
-            now: position,
-            text: moodLabel(set ? position : null),
-          }}
-        />
+        >
+          <Face value={MOOD_MIN} muted size={END_FACE} />
+          <Slider
+            style={{ flex: 1 }}
+            minimumValue={MOOD_MIN}
+            maximumValue={MOOD_MAX}
+            // Whole numbers, because that is what the column stores. Left
+            // continuous, the platform hands back 63.42711 and the write is
+            // rejected by the int column with no visible cause.
+            step={1}
+            value={position}
+            onValueChange={setDragging}
+            onSlidingComplete={(next) => {
+              const rounded = Math.round(next);
+              setDragging(null);
+              setShown(rounded);
+              lastSeen.current = rounded;
+              onCommit(rounded);
+            }}
+            minimumTrackTintColor={set ? color.inkDim : color.line}
+            maximumTrackTintColor={color.line}
+            thumbTintColor={set ? color.ink : color.lineHi}
+            accessibilityLabel="How was today"
+            // The announcement is a word, not a number out of a hundred —
+            // "sixty-three" is not an answer to "how was today".
+            accessibilityValue={{
+              min: MOOD_MIN,
+              max: MOOD_MAX,
+              now: position,
+              text: moodLabel(set ? position : null),
+            }}
+          />
+          <Face value={MOOD_MAX} muted size={END_FACE} />
+        </View>
       </View>
     </View>
   );
@@ -122,12 +140,20 @@ export function MoodSlider({
  * control in the app whose whole point is that answering it honestly is free.
  * Only the mouth moves.
  */
-function Face({ value, muted }: { value: number; muted: boolean }) {
+function Face({
+  value,
+  muted,
+  size = FACE,
+}: {
+  value: number;
+  muted: boolean;
+  size?: number;
+}) {
   const face = facePath(value);
   const stroke = muted ? color.inkMute : color.ink;
 
   return (
-    <Svg width={FACE} height={FACE} viewBox="0 0 1 1" accessible={false}>
+    <Svg width={size} height={size} viewBox="0 0 1 1" accessible={false}>
       {face.eyes.map((eye, i) => (
         <Circle key={i} cx={eye.cx} cy={eye.cy} r={eye.r} fill={stroke} />
       ))}

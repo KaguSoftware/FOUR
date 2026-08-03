@@ -32,10 +32,11 @@ import { color, size } from "@/theme";
 export const androidMetrics = { includeFontPadding: false } as const;
 
 /**
- * The FOUR logo as an image — the 2x2 "FO/UR" mark, white on transparency.
- * For hero surfaces (auth, onboarding, about, the splash). Headers keep the
- * text `Wordmark`: at ~20pt the mark's counters close up, and an Image has
- * no baseline to align against `headerRight`.
+ * The FOUR logo — the 2x2 "FO/UR" mark, white on transparency. THE brand
+ * mark, everywhere the app says its own name: hero surfaces at 72–96, tab
+ * headers small at 40. It replaced a text wordmark ("four" in ArchivoBlack)
+ * on 2026-08-03. An Image has no text baseline, so any row pairing it with
+ * text must `alignItems: "center"`, never `"baseline"`.
  */
 export function Logo({ width = 96 }: { width?: number }) {
   return (
@@ -45,22 +46,6 @@ export function Logo({ width = 96 }: { width?: number }) {
       style={{ width, height: width * (2148 / 2048) }}
       resizeMode="contain"
     />
-  );
-}
-
-export function Wordmark() {
-  return (
-    <Text
-      style={{
-        ...androidMetrics,
-        fontFamily: "ArchivoBlack_400Regular",
-        fontSize: size.lg,
-        color: color.ink,
-        letterSpacing: -0.6,
-      }}
-    >
-      four
-    </Text>
   );
 }
 

@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { ScrollView, View, type ScrollViewProps } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { Wordmark } from "./ui";
+import { Logo } from "./ui";
 import { color, space, TAB_BAR } from "@/theme";
 
 /**
@@ -74,12 +74,13 @@ export function Screen({
           <View
             style={{
               flexDirection: "row",
-              alignItems: "baseline",
+              // The logo is an image — no baseline to align, so centre.
+              alignItems: "center",
               justifyContent: "space-between",
               marginBottom: space[8],
             }}
           >
-            <Wordmark />
+            <Logo width={40} />
             {headerRight}
           </View>
         )}
@@ -149,12 +150,13 @@ export function Frame({
         <View
           style={{
             flexDirection: "row",
-            alignItems: "baseline",
+            // The logo is an image — no baseline to align, so centre.
+            alignItems: "center",
             justifyContent: "space-between",
             marginBottom: space[5],
           }}
         >
-          <Wordmark />
+          <Logo width={40} />
           {headerRight}
         </View>
       )}

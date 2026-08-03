@@ -1,13 +1,17 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_BLEED,
+  GLOW_OPACITY,
+  monthMotto,
   MOTTO,
+  MOTTOS,
   pixelPaths,
   pixelWall,
   wallCaption,
   wallGrid,
   type PixelWall,
 } from "./pixels";
+import { normalizeMessage, textWidth } from "./font5x7";
 
 /** A phone-shaped wall — what `wallGrid` produces for a 390×700pt screen. */
 const wall = (pct: number, over: Partial<Parameters<typeof pixelWall>[0]> = {}) =>
@@ -322,10 +326,13 @@ describe("wallGrid", () => {
 });
 
 describe("pixelPaths", () => {
+  const litSubpaths = (bands: readonly { d: string }[]) =>
+    bands.reduce((n, b) => n + (b.d.match(/M/g) ?? []).length, 0);
+
   it("emits one subpath per cell, split by state", () => {
     const w = wall(0.5);
     const { lit, ground } = pixelPaths(w, { cell: 10, gap: 2 });
-    expect((lit.match(/M/g) ?? []).length).toBe(w.lit);
+    expect(litSubpaths(lit)).toBe(w.lit);
     expect((ground.match(/M/g) ?? []).length).toBe(w.cells.length - w.lit);
   });
 
@@ -334,7 +341,7 @@ describe("pixelPaths", () => {
     // message would be readable at 0%.
     const w = wall(0);
     const { lit, ground } = pixelPaths(w, { cell: 10, gap: 2 });
-    expect(lit).toBe("");
+    expect(lit).toEqual([]);
     expect((ground.match(/M/g) ?? []).length).toBe(w.cells.length);
   });
 
@@ -342,18 +349,84 @@ describe("pixelPaths", () => {
     const w = wall(1);
     const { lit } = pixelPaths(w, { cell: 10, gap: 2 });
     const maxX = w.cols * (10 + 2);
-    for (const [, x, y] of lit.matchAll(/M([\d.]+) ([\d.]+)h/g)) {
-      expect(Number(x)).toBeLessThanOrEqual(maxX);
-      expect(Number(y)).toBeGreaterThanOrEqual(0);
+    for (const band of lit) {
+      for (const [, x, y] of band.d.matchAll(/M([\d.]+) ([\d.]+)h/g)) {
+        expect(Number(x)).toBeLessThanOrEqual(maxX);
+        expect(Number(y)).toBeGreaterThanOrEqual(0);
+      }
     }
   });
 
   it("draws nothing for an empty wall", () => {
     const empty = pixelWall({ cols: 0, rows: 0, pct: 1 });
     expect(pixelPaths(empty, { cell: 10, gap: 2 })).toEqual({
-      lit: "",
+      lit: [],
       ground: "",
     });
+  });
+
+  it("fades the reveal front and only the reveal front", () => {
+    // Mid-month, the freshest columns glow below full; at 100% the fade is
+    // gone entirely — a finished wall must not keep a tide mark down its edge.
+    const mid = pixelPaths(wall(0.5), { cell: 10, gap: 2 });
+    expect(mid.lit.length).toBeGreaterThan(1);
+    expect(Math.min(...mid.lit.map((b) => b.opacity))).toBeLessThan(1);
+
+    const done = pixelPaths(wall(1), { cell: 10, gap: 2 });
+    expect(done.lit).toHaveLength(1);
+    expect(done.lit[0].opacity).toBe(1);
+  });
+
+  it("dims cells the nearer they sit to the front", () => {
+    // Left-most lit cells are the oldest ground and must be the brightest;
+    // every opacity comes from the shared table so both clients agree.
+    const w = wall(0.5);
+    for (const band of pixelPaths(w, { cell: 10, gap: 2 }).lit) {
+      expect(GLOW_OPACITY).toContain(band.opacity);
+    }
+    const glows = w.cells
+      .map((c, i) => (c === "lit" ? { x: i % w.cols, g: w.glow[i] } : null))
+      .filter((v): v is { x: number; g: number } => v !== null);
+    const leftmost = Math.min(...glows.map((v) => v.x));
+    for (const v of glows) {
+      if (v.x === leftmost) expect(v.g).toBe(1);
+    }
+  });
+});
+
+describe("MOTTOS / monthMotto", () => {
+  it("keeps every word inside the narrowest wall", () => {
+    // 32 columns is the narrowest supported phone; margin 1 each side leaves
+    // 30. A word wider than that degrades the message on exactly the screens
+    // where it is hardest to read — see the MOTTOS docblock.
+    for (const motto of MOTTOS) {
+      for (const word of motto.split(" ")) {
+        expect(textWidth(word), word).toBeLessThanOrEqual(30);
+      }
+    }
+  });
+
+  it("only contains messages the font can actually draw", () => {
+    for (const motto of MOTTOS) {
+      expect(normalizeMessage(motto)).toBe(motto);
+    }
+  });
+
+  it("is stable within a month and picked from the pool", () => {
+    expect(monthMotto("2026-08-01")).toBe(monthMotto("2026-08-31"));
+    expect(MOTTOS).toContain(monthMotto("2026-08-03"));
+  });
+
+  it("varies across months rather than sticking on one message", () => {
+    const year = Array.from({ length: 12 }, (_, m) =>
+      monthMotto(`2026-${String(m + 1).padStart(2, "0")}-15`),
+    );
+    expect(new Set(year).size).toBeGreaterThan(3);
+  });
+
+  it("falls back to the motto on a date it cannot read", () => {
+    expect(monthMotto("")).toBe(MOTTO);
+    expect(monthMotto("garbage")).toBe(MOTTO);
   });
 });
 

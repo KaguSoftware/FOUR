@@ -39,6 +39,57 @@ import {
 export const MOTTO = "KEEP GOING";
 
 /**
+ * The pool the monthly message is drawn from.
+ *
+ * Every word is at most five letters, and that is a hard rule, not taste: the
+ * narrowest supported phone yields a 32-column wall, and a five-letter word at
+ * scale 1 is 29 columns (see `GRID_TARGET`). A six-letter word is 35 and
+ * silently degrades the message to its first words on exactly the screens
+ * where it is hardest to read.
+ *
+ * The register is DESIGN.md's: flat, no praise, no scolding. The wall never
+ * congratulates — it only stops hiding what it would say.
+ */
+export const MOTTOS: readonly string[] = [
+  MOTTO,
+  "STILL HERE",
+  "ONE REAL THING",
+  "DAY BY DAY",
+  "BACK AGAIN",
+  "IT ADDS UP",
+  "SLOW IS FINE",
+  "NO ZERO DAYS",
+  "SHOW UP AGAIN",
+  "THIS IS PROOF",
+  "NOT DONE YET",
+  "JUST TODAY",
+  "ONE MORE DAY",
+  "SMALL IS REAL",
+  "UP IS UP",
+  "STILL GOING",
+];
+
+/**
+ * The message for the month containing `todayISO` (`YYYY-MM-DD`).
+ *
+ * Keyed on the calendar month and nothing else, so it is stable for the whole
+ * month — a wall that changed its stencil mid-reveal would throw away the
+ * half-emerged message someone had been earning — and both clients pick the
+ * SAME one from the same date, which is the doctrine of this whole package.
+ * The month index goes through an integer mix rather than a plain modulo so
+ * consecutive months do not simply walk the list in order.
+ */
+export function monthMotto(todayISO: string): string {
+  const m = /^(\d{4})-(\d{2})/.exec(todayISO ?? "");
+  if (!m) return MOTTO;
+  const key = Number(m[1]) * 12 + (Number(m[2]) - 1);
+  let h = Math.imul(key ^ 0x9e3779b9, 2246822507);
+  h = Math.imul(h ^ (h >>> 13), 3266489909);
+  h = (h ^ (h >>> 16)) >>> 0;
+  return MOTTOS[h % MOTTOS.length];
+}
+
+/**
  * - `mask` — part of a letter. NEVER lights, at any percentage.
  * - `lit` — ground that has been earned.
  * - `dark` — ground that has not.
@@ -59,6 +110,14 @@ export type PixelWall = {
   fillable: number;
   /** How many are lit at this percentage. */
   lit: number;
+  /**
+   * Per-cell luminosity, `cols * rows` long. `0` for anything unlit (mask and
+   * dark alike); a lit cell carries `0..1` — dim at the reveal front, full
+   * once the front has moved `GLOW_SPAN` columns past it. At 100% every lit
+   * cell is `1`: a finished month is a solid wall, not one with a stale tide
+   * mark down its right edge.
+   */
+  glow: readonly number[];
   /**
    * The text ACTUALLY painted, which on a small grid is shorter than what was
    * asked for, and `""` when nothing fit. Never assume it equals `message` —
@@ -97,6 +156,19 @@ const DEFAULT_MARGIN = 1;
  * emerging cleanly a letter at a time.
  */
 export const DEFAULT_BLEED = 3;
+
+/**
+ * How many columns of earned ground it takes to reach full brightness behind
+ * the reveal front.
+ *
+ * The freshest cells glow faintly and brighten as the front moves on, so the
+ * frontier reads as a tide coming in rather than a hard-edged fill. Wider than
+ * the bleed on purpose: the bleed roughens the front's SHAPE, this fades its
+ * LIGHT, and at three columns each the two would cancel into mush. Bounded
+ * above by honesty — ground earned more than a week ago should simply be lit,
+ * not still visibly "newer" than the rest.
+ */
+export const GLOW_SPAN = 8;
 /** No calendar month needs more than six rows of glyphs; more is unreadable. */
 const MAX_LINES = 3;
 
@@ -203,7 +275,16 @@ export function pixelWall(opts: WallOpts): PixelWall {
     : 0;
 
   if (total === 0) {
-    return { cols, rows, cells: [], fillable: 0, lit: 0, shown: "", scale: 0 };
+    return {
+      cols,
+      rows,
+      cells: [],
+      fillable: 0,
+      lit: 0,
+      glow: [],
+      shown: "",
+      scale: 0,
+    };
   }
 
   const message = normalizeMessage(opts.message ?? MOTTO);
@@ -243,6 +324,7 @@ export function pixelWall(opts: WallOpts): PixelWall {
   const lit =
     pct <= 0 ? 0 : pct >= 1 ? fillable : Math.min(Math.round(pct * fillable), fillable);
 
+  const glow: number[] = new Array(total).fill(0);
   if (lit > 0) {
     const order: { i: number; rank: number }[] = [];
     for (let i = 0; i < total; i++) {
@@ -254,10 +336,27 @@ export function pixelWall(opts: WallOpts): PixelWall {
     // Index as the final tie-break, so the order is total and two identical
     // calls cannot come out differently.
     order.sort((a, b) => (a.rank !== b.rank ? a.rank - b.rank : a.i - b.i));
-    for (let n = 0; n < lit; n++) cells[order[n].i] = "lit";
+
+    // The front's own rank, which the fade is measured back from. At 100%
+    // there is no front, so everything is simply lit at full.
+    const front = order[lit - 1].rank;
+    for (let n = 0; n < lit; n++) {
+      cells[order[n].i] = "lit";
+      glow[order[n].i] =
+        pct >= 1 ? 1 : Math.min((front - order[n].rank) / GLOW_SPAN, 1);
+    }
   }
 
-  return { cols, rows, cells, fillable, lit, shown, scale: block?.scale ?? 0 };
+  return {
+    cols,
+    rows,
+    cells,
+    fillable,
+    lit,
+    glow,
+    shown,
+    scale: block?.scale ?? 0,
+  };
 }
 
 function clampDim(n: number): number {
@@ -374,13 +473,30 @@ export function wallGrid(opts: {
 }
 
 /**
- * The two layers as SVG path data.
+ * The lit layer's brightness steps, dimmest first.
  *
- * One path for every lit cell and one for every cell that is not, so a wall of
- * a thousand cells is two nodes rather than a thousand — which is the
+ * Four, not a per-cell opacity: the point of `pixelPaths` is a handful of
+ * path nodes instead of thousands, and four bands are indistinguishable from
+ * a continuous fade at 8dp cells. The floor is 0.35 — the freshest cells must
+ * still read as LIT against the ground, or the earned area looks smaller than
+ * the number in the corner says.
+ */
+export const GLOW_OPACITY: readonly number[] = [0.35, 0.55, 0.75, 1];
+
+export type LitBand = { d: string; opacity: number };
+
+/**
+ * The layers as SVG path data.
+ *
+ * One path for every unlit cell and a handful for the lit ones, so a wall of
+ * a thousand cells is a few nodes rather than a thousand — which is the
  * difference between a screen that mounts instantly and one that stutters on
  * an older phone. Same doctrine as `trendPath`: the SHAPE is computed here and
  * each client hands it to its own primitive.
+ *
+ * `lit` splits into `GLOW_OPACITY.length` bands by the wall's per-cell glow —
+ * the tide fading in behind the reveal front. The OPACITY comes from core too,
+ * so the two clients cannot disagree about what half-earned looks like.
  *
  * `ground` covers `mask` AND `dark` together, because they are the same colour
  * — see `PixelCell`. Nothing downstream should be able to tell them apart.
@@ -388,10 +504,10 @@ export function wallGrid(opts: {
 export function pixelPaths(
   wall: PixelWall,
   box: { cell: number; gap: number },
-): { lit: string; ground: string } {
+): { lit: readonly LitBand[]; ground: string } {
   const cell = Math.max(box.cell, 0);
   const gap = Math.max(box.gap, 0);
-  const lit: string[] = [];
+  const bands: string[][] = GLOW_OPACITY.map(() => []);
   const ground: string[] = [];
 
   for (let i = 0; i < wall.cells.length; i++) {
@@ -399,10 +515,23 @@ export function pixelPaths(
     const y = round(((i / wall.cols) | 0) * (cell + gap));
     const s = round(cell);
     const rect = `M${x} ${y}h${s}v${s}h${-s}Z`;
-    (wall.cells[i] === "lit" ? lit : ground).push(rect);
+    if (wall.cells[i] === "lit") {
+      const band = Math.min(
+        Math.floor((wall.glow[i] ?? 1) * GLOW_OPACITY.length),
+        GLOW_OPACITY.length - 1,
+      );
+      bands[band].push(rect);
+    } else {
+      ground.push(rect);
+    }
   }
 
-  return { lit: lit.join(""), ground: ground.join("") };
+  return {
+    lit: bands
+      .map((d, b) => ({ d: d.join(""), opacity: GLOW_OPACITY[b] }))
+      .filter((band) => band.d !== ""),
+    ground: ground.join(""),
+  };
 }
 
 function round(n: number): number {

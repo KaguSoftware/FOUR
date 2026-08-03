@@ -23,10 +23,12 @@ export function Wall({
   up,
   total,
   pct,
+  message,
 }: {
   up: number;
   total: number;
   pct: number;
+  message: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [box, setBox] = useState<{ width: number; height: number } | null>(null);
@@ -54,7 +56,7 @@ export function Wall({
 
   const grid = box ? wallGrid(box) : null;
   const wall = grid
-    ? pixelWall({ cols: grid.cols, rows: grid.rows, pct })
+    ? pixelWall({ cols: grid.cols, rows: grid.rows, pct, message })
     : null;
   const paths = wall && grid ? pixelPaths(wall, grid) : null;
   const span = (n: number, g: { cell: number; gap: number }) =>
@@ -74,13 +76,23 @@ export function Wall({
           aria-label={wallCaption(wall, up, total)}
         >
           {/*
-            Two paths for ~1,300 cells rather than 1,300 elements. `ground`
-            covers the masked cells AND the unearned ones together, and they
-            MUST stay the same colour: draw them even one step apart and the
-            message is legible at zero, which is the whole idea undone.
+            A handful of paths for ~1,300 cells rather than 1,300 elements.
+            `ground` covers the masked cells AND the unearned ones together,
+            and they MUST stay the same colour: draw them even one step apart
+            and the message is legible at zero, which is the whole idea
+            undone. The lit layer is a few opacity bands — the tide fading in
+            behind the reveal front — with both the split and the opacities
+            computed in core so the phone draws the identical fade.
           */}
           <path d={paths.ground} fill="var(--color-line)" />
-          <path d={paths.lit} fill="var(--color-ink)" />
+          {paths.lit.map((band) => (
+            <path
+              key={band.opacity}
+              d={band.d}
+              fill="var(--color-ink)"
+              fillOpacity={band.opacity}
+            />
+          ))}
         </svg>
       )}
     </div>

@@ -519,7 +519,14 @@ function TheWall() {
       <Specimen>
         <Svg width={span(wall.cols)} height={span(wall.rows)}>
           <Path d={paths.ground} fill={color.line} />
-          <Path d={paths.lit} fill={color.ink} />
+          {paths.lit.map((band) => (
+            <Path
+              key={band.opacity}
+              d={band.d}
+              fill={color.ink}
+              fillOpacity={band.opacity}
+            />
+          ))}
         </Svg>
       </Specimen>
 

@@ -1,7 +1,14 @@
 import { useState } from "react";
 import { View, type LayoutChangeEvent } from "react-native";
 import Svg, { Path } from "react-native-svg";
-import { monthUptime, pixelPaths, pixelWall, wallCaption, wallGrid } from "@uptime/core";
+import {
+  monthMotto,
+  monthUptime,
+  pixelPaths,
+  pixelWall,
+  wallCaption,
+  wallGrid,
+} from "@uptime/core";
 
 import { Label, Mono } from "@/components/ui";
 import { Frame } from "@/components/screen";
@@ -66,7 +73,18 @@ export default function ProofScreen() {
       <Label style={{ marginBottom: space[3] }}>this month</Label>
 
       <View style={{ flex: 1 }} onLayout={onLayout}>
-        {box && <Wall width={box.width} height={box.height} up={month.up} total={month.total} pct={month.pct} />}
+        {box && (
+          <Wall
+            width={box.width}
+            height={box.height}
+            up={month.up}
+            total={month.total}
+            pct={month.pct}
+            // Drawn from the pool, keyed on the calendar month — stable while
+            // it is being earned, different the next time one starts.
+            message={monthMotto(status.today)}
+          />
+        )}
       </View>
     </Frame>
   );
@@ -78,15 +96,17 @@ function Wall({
   up,
   total,
   pct,
+  message,
 }: {
   width: number;
   height: number;
   up: number;
   total: number;
   pct: number;
+  message: string;
 }) {
   const grid = wallGrid({ width, height });
-  const wall = pixelWall({ cols: grid.cols, rows: grid.rows, pct });
+  const wall = pixelWall({ cols: grid.cols, rows: grid.rows, pct, message });
   const paths = pixelPaths(wall, grid);
 
   const span = (n: number) => n * (grid.cell + grid.gap) - grid.gap;
@@ -103,13 +123,23 @@ function Wall({
     >
       <Svg width={span(grid.cols)} height={span(grid.rows)}>
         {/*
-          Two paths for ~2,500 cells rather than 2,500 views. `ground` covers
-          the masked cells AND the unearned ones together, and they MUST stay
-          the same colour: draw them even one step apart and the message is
-          legible at zero, which is the whole idea undone.
+          A handful of paths for ~2,500 cells rather than 2,500 views. `ground`
+          covers the masked cells AND the unearned ones together, and they MUST
+          stay the same colour: draw them even one step apart and the message
+          is legible at zero, which is the whole idea undone. The lit layer is
+          a few opacity bands — the tide fading in behind the reveal front —
+          with both the split and the opacities computed in core so the web
+          draws the identical fade.
         */}
         <Path d={paths.ground} fill={color.line} />
-        <Path d={paths.lit} fill={color.ink} />
+        {paths.lit.map((band) => (
+          <Path
+            key={band.opacity}
+            d={band.d}
+            fill={color.ink}
+            fillOpacity={band.opacity}
+          />
+        ))}
       </Svg>
     </View>
   );

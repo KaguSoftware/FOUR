@@ -1,7 +1,7 @@
 import { requireStatus } from "@/lib/system";
 import { BackLink } from "@/app/components/nav-link";
 import { Wordmark } from "@/app/components/wordmark";
-import { monthUptime } from "@uptime/core";
+import { monthMotto, monthUptime } from "@uptime/core";
 import { Wall } from "./wall";
 
 export const dynamic = "force-dynamic";
@@ -43,7 +43,14 @@ export default async function ProofPage() {
           which refuses to shrink below its content and would push the wall off
           the bottom of a short viewport instead of sizing it to fit. */}
       <section className="min-h-0 flex-1">
-        <Wall up={month.up} total={month.total} pct={month.pct} />
+        {/* Drawn from the pool, keyed on the calendar month — stable while it
+            is being earned, different the next time one starts. */}
+        <Wall
+          up={month.up}
+          total={month.total}
+          pct={month.pct}
+          message={monthMotto(status.today)}
+        />
       </section>
 
       <nav className="mt-6 shrink-0">

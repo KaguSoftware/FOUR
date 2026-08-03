@@ -122,8 +122,8 @@ has to reconstruct the list or guess which project is which.
 
 | Service | Dashboard | Identifier | Owns |
 | --- | --- | --- | --- |
-| **Expo / EAS** | [expo.dev/accounts/parsa-mansouri/projects/uptime](https://expo.dev/accounts/parsa-mansouri/projects/uptime) | project `3570cebf-a9dd-458f-a2ce-14093600c025`, slug `uptime` | Builds, submissions, env vars, iOS + Android credentials, **the Android keystore** |
-| **App Store Connect** | [appstoreconnect.apple.com](https://appstoreconnect.apple.com) | app `6796259740`, name **FOUR** | iOS builds, TestFlight, App Store listing |
+| **Expo / EAS** | [expo.dev/accounts/parsa-mansouri/projects/uptime](https://expo.dev/accounts/parsa-mansouri/projects/uptime) | project `3570cebf-a9dd-458f-a2ce-14093600c025`, slug `uptime` | Builds, submissions, env vars, iOS + Android credentials, **the Android keystore**, and the **registered device list** (`eas device:list --apple-team-id BR42V976FS`) |
+| **App Store Connect** | [appstoreconnect.apple.com](https://appstoreconnect.apple.com) | app `6796259740`, name **FOUR**, **Apple team `BR42V976FS`** (Individual) | iOS builds, TestFlight, App Store listing. One device registered for ad-hoc: the owner's iPhone, `00008110-000674641EEA201E`, 2026-08-03 |
 | **Google Play Console** | [play.google.com/console](https://play.google.com/console) | account `8319744677397056181` | Android store listing. **Created 2026-07-31, Personal account, unverified** |
 | **Google Cloud** | [console.cloud.google.com](https://console.cloud.google.com) | project `high-office-503913-q9` ("four") | OAuth clients + consent screen for Google sign-in |
 | **Firebase** | [console.firebase.google.com](https://console.firebase.google.com) | — | FCM V1 for Android push. **Not set up as of 2026-07-31** |
@@ -649,6 +649,7 @@ gate.
 | Settings "accessibility" section | None. The owner named it as an example of the pattern; there is nothing real to put in it — reduce-motion and text size are OS settings the app already honours | **Ask before inventing one** | Undecided |
 | Day grid | **Both clients: Home is 30 cells (10×3) beginning at day one until the account is 30 days old, then rolling; History is one calendar month per swipe (7 wide, padded to 6 rows).** Today pulses on both. Every day opens a read-only panel | Done — this is the final shape | 07-31, revised 2026-08-03 |
 | Day panel | Levers + their detail text + that day's signals, read-only. Historical `energy`/`sleep`/`note` rows still render here; only `mood` is written going forward. **No `amount`** — that column exists only after the optional-weight migration, and nothing reads it any more | Unchanged | Done 2026-07-31 |
+| iOS device testing | **The owner's iPhone is registered to the Apple team** (2026-08-03), so ad-hoc builds can install. Expo Go also boots again since google-signin went lazy. **No iOS development build has ever been made** | A dev build, then push and native sign-in verified on it | Just needs the build |
 | Android nativeness | **Full pass done 2026-07-31, unseen on hardware.** Ripples, Android haptic constants, Material snackbar, summary settings rows, M3 segmented group, sheet drag handle, hardware Back, edge-to-edge, notification icon, two channels, dialog theme, Credential Manager sign-in | Unchanged — this IS the intended shape | Needs a device |
 | Android widgets | None | Glance/Kotlin, same as the iOS WidgetKit one | v1.1 |
 | Android launcher shortcuts | **None.** Long-press → "log a lever" is genuinely native and genuinely wanted | A `shortcuts.xml` config plugin + a deep-link route | Deferred with the widget work — same surface, same build |
@@ -676,12 +677,31 @@ gate.
      which is circular.
   4. **A local iOS build needs macOS + Xcode.** The dev machine is Windows.
 
+  **Two of the four are now resolved (2026-08-03):**
+
+  - **(1) is fixed.** `src/lib/google-native.ts` loads the module lazily and
+    returns `null` when `Constants.executionEnvironment === "storeClient"`, so
+    **Expo Go boots the app again**. It is the only dependency outside Expo
+    Go's bundled set — everything else in `package.json` is pure JS. Expo Go
+    is therefore a real zero-build way to look at a JS round. What it cannot
+    do: **push notifications** and **native Google sign-in**, both of which
+    need a real binary.
+  - **(2)'s prerequisite is done.** **The owner's iPhone is registered to
+    Apple team `BR42V976FS`** — UDID `00008110-000674641EEA201E`, confirmed
+    by `eas device:list` on 2026-08-03. Ad-hoc builds can now install on it.
+    An iOS development build has still never been MADE; the gate is now just
+    running the build.
+
   **The fix is one `--profile development` build**, and it is a ONE-TIME
   cost: a dev build is a native shell, so every JS change afterwards streams
   from Metro over localhost with no rebuild. Rebuild only when the native
-  module list changes, which has happened twice since July. It needs the
-  device's UDID registered first (`eas device:create` — the profile is
-  `distribution: internal` with `ios.simulator: false`, i.e. ad-hoc).
+  module list changes, which has happened twice since July.
+
+  **Register before you build, never after.** The ad-hoc provisioning profile
+  embeds the allowed UDIDs at generation time, so a profile made before the
+  device existed produces a binary that downloads fine and then refuses to
+  install. EAS regenerates credentials on the next build, which is what picks
+  the device up.
 
   **Worth doing in the same build:** add `expo-updates` and a channel, so
   JS-only rounds afterwards reach the phone with no build at all.

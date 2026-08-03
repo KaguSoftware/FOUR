@@ -11,7 +11,7 @@ import {
   RowRule,
   ValueRow,
 } from "@/components/settings-ui";
-import { Wordmark } from "@/components/ui";
+import { Logo } from "@/components/ui";
 import { space } from "@/theme";
 
 /**
@@ -36,8 +36,8 @@ export default function AboutScreen() {
   return (
     <Screen underHeader>
       <View style={{ marginBottom: space[8] }}>
-        <Wordmark />
-        <Note style={{ paddingHorizontal: 0 }}>
+        <Logo width={72} />
+        <Note style={{ paddingHorizontal: 0, marginTop: space[4] }}>
           Uptime monitoring for one body. A day is up if one small real thing
           got logged — the rest is derived.
         </Note>

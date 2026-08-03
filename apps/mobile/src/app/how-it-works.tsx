@@ -23,9 +23,9 @@ import {
   androidMetrics,
   Body,
   Label,
+  Logo,
   Mono,
   Rule,
-  Wordmark,
 } from "@/components/ui";
 import { useAndroidBack } from "@/lib/back";
 import { today } from "@/lib/status";
@@ -116,12 +116,13 @@ export default function HowItWorksScreen() {
       <View
         style={{
           flexDirection: "row",
-          alignItems: "baseline",
+          // The logo is an image — no baseline to align, so centre the row.
+          alignItems: "center",
           justifyContent: "space-between",
           marginBottom: space[8],
         }}
       >
-        <Wordmark />
+        <Logo width={44} />
         <Label accessibilityLabel={`Page ${step + 1} of ${STEPS}`}>
           {step + 1} / {STEPS}
         </Label>

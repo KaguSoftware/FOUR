@@ -1,4 +1,5 @@
-import { useEffect } from "react";
+import { useState } from "react";
+import { View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Stack } from "expo-router/stack";
 import * as SplashScreen from "expo-splash-screen";
@@ -14,6 +15,7 @@ import {
   JetBrainsMono_500Medium,
 } from "@expo-google-fonts/jetbrains-mono";
 
+import { AnimatedSplash } from "@/components/animated-splash";
 import { SnackbarProvider } from "@/components/snackbar";
 import { SessionProvider, useSession } from "@/lib/session";
 import { color } from "@/theme";
@@ -88,17 +90,32 @@ export default function RootLayout() {
 function RootNavigator({ fontsLoaded }: { fontsLoaded: boolean }) {
   const { session, onboarded, loading } = useSession();
 
-  // Both answers must be known before the first frame. Hiding the splash early
-  // would show an empty stack for the moment before the guards resolve, which
-  // reads as a crash.
+  // Both answers must be known before the first frame. Mounting the stack
+  // early would show an empty navigator for the moment before the guards
+  // resolve, which reads as a crash. Until then the animated splash covers
+  // everything — it renders the same mark as the native splash, and it is
+  // the one that calls `SplashScreen.hideAsync()`, from its own `onLayout`,
+  // so the native image is only dropped once its twin is actually painted.
   const ready = fontsLoaded && !loading && (!session || onboarded !== null);
+  const [splashDone, setSplashDone] = useState(false);
 
-  useEffect(() => {
-    if (ready) SplashScreen.hideAsync();
-  }, [ready]);
+  return (
+    <View style={{ flex: 1, backgroundColor: color.bg }}>
+      {ready && <RootStack session={session} onboarded={onboarded} />}
+      {!splashDone && (
+        <AnimatedSplash canFinish={ready} onDone={() => setSplashDone(true)} />
+      )}
+    </View>
+  );
+}
 
-  if (!ready) return null;
-
+function RootStack({
+  session,
+  onboarded,
+}: {
+  session: ReturnType<typeof useSession>["session"];
+  onboarded: boolean | null;
+}) {
   return (
     <Stack
       screenOptions={{

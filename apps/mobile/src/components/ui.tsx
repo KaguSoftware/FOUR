@@ -1,4 +1,4 @@
-import { Text, View, type TextProps, type ViewProps } from "react-native";
+import { Image, Text, View, type TextProps, type ViewProps } from "react-native";
 import { color, size } from "@/theme";
 
 /**
@@ -30,6 +30,23 @@ import { color, size } from "@/theme";
  * costs nothing and cannot move an iOS pixel.
  */
 export const androidMetrics = { includeFontPadding: false } as const;
+
+/**
+ * The FOUR logo as an image — the 2x2 "FO/UR" mark, white on transparency.
+ * For hero surfaces (auth, onboarding, about, the splash). Headers keep the
+ * text `Wordmark`: at ~20pt the mark's counters close up, and an Image has
+ * no baseline to align against `headerRight`.
+ */
+export function Logo({ width = 96 }: { width?: number }) {
+  return (
+    <Image
+      source={require("../../assets/images/FOUR LOGO White Alpha.png")}
+      accessibilityLabel="four"
+      style={{ width, height: width * (2148 / 2048) }}
+      resizeMode="contain"
+    />
+  );
+}
 
 export function Wordmark() {
   return (

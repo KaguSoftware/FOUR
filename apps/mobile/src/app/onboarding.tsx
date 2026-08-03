@@ -20,7 +20,7 @@ import {
 
 import { Button, TextButton } from "@/components/button";
 import { field, fieldTint } from "@/components/fields";
-import { androidMetrics, Body, Label, Wordmark } from "@/components/ui";
+import { androidMetrics, Body, Label, Logo } from "@/components/ui";
 import { Group, RowRule, SwitchRow, TimeRow } from "@/components/settings-ui";
 import { useAndroidBack } from "@/lib/back";
 import { registerForPush } from "@/lib/push";
@@ -195,12 +195,13 @@ export default function OnboardingScreen() {
         <View
           style={{
             flexDirection: "row",
-            alignItems: "baseline",
+            // The logo is an image — no baseline to align, so centre the row.
+            alignItems: "center",
             justifyContent: "space-between",
             marginBottom: space[10],
           }}
         >
-          <Wordmark />
+          <Logo width={44} />
           <Label>
             {step + 1} / {STEPS}
           </Label>

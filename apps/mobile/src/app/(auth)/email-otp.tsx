@@ -10,7 +10,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 
 import { Button, TextButton } from "@/components/button";
 import { field, fieldTint } from "@/components/fields";
-import { Body, Wordmark } from "@/components/ui";
+import { Body, Logo } from "@/components/ui";
 import { supabase } from "@/lib/supabase";
 import { color, size, space } from "@/theme";
 
@@ -100,8 +100,8 @@ export default function EmailOtpScreen() {
         paddingBottom: insets.bottom + space[6],
       }}
     >
-      <Wordmark />
-      <Body tone="mute" style={{ marginTop: space[2], marginBottom: space[10] }}>
+      <Logo width={88} />
+      <Body tone="mute" style={{ marginTop: space[4], marginBottom: space[10] }}>
         {phase === "email"
           ? "A 6-digit code, emailed. Works with or without a password — this is also how you get back in after forgetting one."
           : `Code sent to ${email.trim()}.`}

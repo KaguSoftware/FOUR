@@ -22,7 +22,8 @@
     "shoot": "node scripts/shoot.mjs",
     "test:migrations": "node scripts/test-migrations.mjs",
     "check:contrast": "node scripts/check-contrast.mjs",
-    "icon:notification": "node scripts/make-notification-icon.mjs"
+    "icon:notification": "node scripts/make-notification-icon.mjs",
+    "icon:brand": "node scripts/make-brand-icons.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.3.11",

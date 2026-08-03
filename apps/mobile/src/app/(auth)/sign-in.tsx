@@ -15,7 +15,7 @@ import { useRouter } from "expo-router";
 
 import { Button, TextButton } from "@/components/button";
 import { field, fieldTint } from "@/components/fields";
-import { Body, Label, Rule, Wordmark } from "@/components/ui";
+import { Body, Label, Logo, Rule } from "@/components/ui";
 import { signInWithApple, signInWithGoogle } from "@/lib/oauth";
 import { supabase } from "@/lib/supabase";
 import { color, radius, space } from "@/theme";
@@ -143,8 +143,8 @@ export default function SignInScreen() {
         }}
         keyboardShouldPersistTaps="handled"
       >
-        <Wordmark />
-        <Body tone="mute" style={{ marginTop: space[2], marginBottom: space[10] }}>
+        <Logo width={88} />
+        <Body tone="mute" style={{ marginTop: space[4], marginBottom: space[10] }}>
           Authentication required.
         </Body>
 

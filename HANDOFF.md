@@ -549,9 +549,19 @@ gate.
     blockers), P2 (web catch-up + data-model debt) and P3 (quality). **Read
     that file before picking the next thing** — it is the audit's full output,
     not just what got built.
-19. ~~A development build~~ — done 2026-07-30. Apple Developer enrollment
-    (Individual), EAS env vars on all three environments, distribution
-    credentials, APNs push key, `ITSAppUsesNonExemptEncryption` set.
+19. ~~Apple Developer enrollment and iOS credentials~~ — done 2026-07-30.
+    Enrollment (Individual), EAS env vars on all three environments,
+    distribution credentials, APNs push key,
+    `ITSAppUsesNonExemptEncryption` set.
+
+    **This step was previously written as "a development build" and that is
+    wrong** — corrected 2026-08-03 by reading `eas build:list`. **Every iOS
+    build that has ever existed is `production` / STORE distribution.** There
+    has never been an iOS build with `developmentClient: true`, so there is
+    nothing installed on the owner's phone that can connect to Metro, and
+    scanning the `expo start` QR simply opens the TestFlight app, which runs
+    its own bundled JS. See *Seeing a change on the owner's iPhone* in
+    Gotchas.
 20. ~~First store build on TestFlight~~ — done 2026-07-30. Build 4 (0.1.0)
     submitted via `eas submit` (ASC app `6796259740`, name **FOUR**, API key
     stored on EAS so future submits are non-interactive). `/privacy` and
@@ -647,6 +657,41 @@ gate.
 | Monetization | Free | Undecided. **The usual paywalls are all ruled out by the thesis**, not by preference — lever count is the product's name, longer history attacks re-entry, gamification fails a build test. Any model has to sell something other than a feature | Post-launch |
 
 ## Gotchas / open issues
+
+- **Seeing a change on the owner's iPhone: there is no zero-build path, and
+  the reasons compound (established 2026-08-03).**
+  1. **Expo Go cannot run this app** and has not since 2026-07-31 —
+     `@react-native-google-signin/google-signin` is a native module and is not
+     in its binary. Scanning the QR opens Expo Go's project page and it
+     reports "No EAS Update branches".
+  2. **There has never been an iOS development build.** `eas build:list`
+     shows six iOS builds, all `production` / STORE. Roadmap step 19 claimed
+     otherwise until this was checked. So scanning `expo start`'s QR opens the
+     installed TestFlight app — which is a production build, runs its own
+     bundled JS, and ignores Metro. It looks like it worked; it is showing old
+     code.
+  3. **EAS Update is not configured.** `expo-updates` is not a dependency and
+     there is no `runtimeVersion` or `updates` block in `app.json`. So there
+     is no over-the-air JS path either — and adding one requires a build,
+     which is circular.
+  4. **A local iOS build needs macOS + Xcode.** The dev machine is Windows.
+
+  **The fix is one `--profile development` build**, and it is a ONE-TIME
+  cost: a dev build is a native shell, so every JS change afterwards streams
+  from Metro over localhost with no rebuild. Rebuild only when the native
+  module list changes, which has happened twice since July. It needs the
+  device's UDID registered first (`eas device:create` — the profile is
+  `distribution: internal` with `ios.simulator: false`, i.e. ad-hoc).
+
+  **Worth doing in the same build:** add `expo-updates` and a channel, so
+  JS-only rounds afterwards reach the phone with no build at all.
+
+  **The zero-build alternative is the web app**, which shares `packages/core`
+  and therefore the identical wall geometry, face, month maths and activity
+  rules. Run it and open it from the phone's browser on the same wifi. It
+  cannot test the RN-specific risks — `Frame`'s tab-bar inset, the native
+  slider, the pager gesture — but it shows the round. Needs
+  `apps/web/.env.local`, which is **not on the work PC**; pull from Vercel.
 
 - **The pixel wall's message is made of cells that must be INVISIBLE.** The
   masked cells and the not-yet-earned cells are drawn in exactly the same

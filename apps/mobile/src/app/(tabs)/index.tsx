@@ -57,6 +57,7 @@ export default function StatusScreen() {
    */
   const [mood, setMood] = useState<number | null>(null);
   const [moodFailed, setMoodFailed] = useState(false);
+  const [moodSaving, setMoodSaving] = useState(false);
   const todayDate = status?.today;
   const loadTodaysMood = useCallback(async () => {
     if (!userId || !todayDate) return;
@@ -275,25 +276,34 @@ export default function StatusScreen() {
       )}
 
       {/* Below the levers, always. Logging is what this screen is for, and a
-          question placed above the buttons would be a toll gate on it. */}
-      <View style={{ marginTop: space[10] }}>
+          question placed above the buttons would be a toll gate on it.
+
+          `space[6]`, not `space[10]`: the slider is one row now rather than a
+          titled block, so it needs separating from the levers, not its own
+          chapter heading's worth of air. */}
+      <View style={{ marginTop: space[6] }}>
         <MoodSlider
           value={mood}
+          busy={moodSaving}
           onCommit={async (next) => {
-            // Optimistic: the face is already where the finger left it, and
-            // snapping it back while a write lands would read as the drag
-            // having failed.
-            setMood(next);
             setMoodFailed(false);
+            setMoodSaving(true);
             const { error } = await saveMood(state.user_id, today, next);
+            setMoodSaving(false);
             // Reported, not swallowed. Six paths in this app used to claim
             // success unconditionally and this is not becoming the seventh.
-            if (error) setMoodFailed(true);
+            //
+            // `mood` advances only on success, which is what keeps the Save
+            // button on screen after a failure: it is shown while the position
+            // differs from the last CONFIRMED value, so a failed write leaves
+            // something to press again rather than looking saved.
+            if (error) return setMoodFailed(true);
+            setMood(next);
           }}
         />
         {moodFailed && (
           <Body tone="degraded" style={{ marginTop: space[2] }}>
-            Didn&apos;t save. Move it again when you have a connection.
+            Didn&apos;t save. Tap save again when you have a connection.
           </Body>
         )}
       </View>

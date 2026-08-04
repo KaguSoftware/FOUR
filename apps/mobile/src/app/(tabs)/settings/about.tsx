@@ -11,7 +11,10 @@ import {
   RowRule,
   ValueRow,
 } from "@/components/settings-ui";
+import { useNotify } from "@/components/snackbar";
 import { Logo } from "@/components/ui";
+import { useStatus } from "@/lib/use-status";
+import { resetWalkthrough } from "@/lib/walkthrough";
 import { space } from "@/theme";
 
 /**
@@ -31,7 +34,29 @@ const open = (path: string) => WebBrowser.openBrowserAsync(`${SITE}${path}`);
 
 export default function AboutScreen() {
   const router = useRouter();
+  const notify = useNotify();
+  const { status } = useStatus();
   const version = Constants.expoConfig?.version ?? "—";
+
+  /**
+   * Clear the seen-once flag, and SAY that nothing visible happened.
+   *
+   * The effect of this row is entirely in the future — the guide appears on the
+   * next launch, not now — so without a confirmation it reads as a dead
+   * control. A statement, so it goes through `notify` (a snackbar on Android,
+   * an Alert on iOS) rather than a blocking dialog.
+   */
+  async function replay() {
+    const userId = status?.state.user_id;
+    if (!userId) return;
+    const ok = await resetWalkthrough(userId);
+    notify(
+      ok ? "The guide will open next launch" : "Couldn't reset the guide",
+      ok
+        ? "Fully close the app and reopen it."
+        : "This device wouldn't let go of the setting.",
+    );
+  }
 
   return (
     <Screen underHeader>
@@ -52,6 +77,13 @@ export default function AboutScreen() {
           title="How four works"
           onPress={() => router.push("/how-it-works")}
         />
+        <RowRule />
+        {/* Replays the FIRST-LAUNCH behaviour, which the row above cannot.
+            That one opens the guide; this one forgets the device ever saw it,
+            so the automatic open on next launch happens again. It is the only
+            way to retest a path that otherwise runs once per install without
+            deleting the app. */}
+        <ActionRow title="Show the guide again on next launch" onPress={replay} />
       </Group>
 
       <Group>

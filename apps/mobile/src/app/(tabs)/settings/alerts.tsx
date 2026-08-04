@@ -2,7 +2,7 @@ import { useCallback, useState } from "react";
 import { Linking, Platform } from "react-native";
 import * as Notifications from "expo-notifications";
 import { useFocusEffect } from "expo-router";
-import { addDays } from "@uptime/core";
+import { addDays, clampBoundaryHour } from "@uptime/core";
 
 import { useNotify } from "@/components/snackbar";
 import { Loading } from "@/components/states";
@@ -17,6 +17,7 @@ import {
   ValueRow,
 } from "@/components/settings-ui";
 import { cancelReminder, sendTestAlert, syncReminder } from "@/lib/reminder";
+import { setBoundaryHour } from "@/lib/status";
 import { supabase } from "@/lib/supabase";
 import { useStatus } from "@/lib/use-status";
 
@@ -24,6 +25,7 @@ import { useStatus } from "@/lib/use-status";
 type Pending = {
   slammed?: boolean;
   reminder?: string | null;
+  boundary?: number;
 };
 
 const DEFAULT_REMINDER = "21:00:00";
@@ -99,6 +101,7 @@ export default function AlertsScreen() {
   const slammed = pending.slammed ?? status.slammed;
   const reminder =
     pending.reminder !== undefined ? pending.reminder : state.daily_reminder_at;
+  const boundary = pending.boundary ?? state.day_boundary_hour;
 
   async function update(patch: Record<string, unknown>, optimistic: Pending) {
     setPending((p) => ({ ...p, ...optimistic }));
@@ -194,6 +197,33 @@ export default function AlertsScreen() {
             // The fallback is the same expression the write sends.
             `Raised thresholds until ${state.slammed_until ?? addDays(status.today, 14)}.`
           : "Raises the alert thresholds for 14 days. Never pauses the system."}
+      </Note>
+
+      {/* When the day rolls over.
+          Not midnight by default: a 01:30 session belongs to the day that just
+          ended, not the one that technically started. It sits with thresholds
+          rather than with the reminder because it is a rule about what counts,
+          not a notification. */}
+      <Group title="the day">
+        <TimeRow
+          title="A new day starts at"
+          // `TimeRow` speaks "HH:MM:SS"; the boundary is whole hours, so the
+          // minutes are shown as :00 and thrown away on the way back. A
+          // half-past boundary is a complication with no use case.
+          value={`${String(boundary).padStart(2, "0")}:00:00`}
+          onChange={(time) => {
+            const hour = clampBoundaryHour(Number(time.slice(0, 2)));
+            if (hour === boundary) return;
+            // Local first, so `today()` is right before the reload lands.
+            setBoundaryHour(hour);
+            update({ day_boundary_hour: hour }, { boundary: hour });
+          }}
+        />
+      </Group>
+      <Note>
+        Anything logged before {String(boundary).padStart(2, "0")}:00 counts for
+        the previous day. Days already logged keep the boundary they were logged
+        under — changing this never re-dates your history.
       </Note>
 
       <Group title="daily reminder">

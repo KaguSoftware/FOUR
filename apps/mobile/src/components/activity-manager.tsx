@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, Pressable, TextInput, View } from "react-native";
 import Animated, {
   FadeIn,
@@ -51,10 +51,20 @@ export function ActivityManager({
   userId,
   lever,
   leverLabel,
+  focus,
 }: {
   userId: string;
   lever: string;
   leverLabel: string;
+  /**
+   * An activity id to open for editing as soon as the rows arrive.
+   *
+   * Android's long-press "Rename" in the log sheet routes here rather than
+   * prompting, because `Alert.prompt` is iOS-only. Without this the rename
+   * simply stopped: you landed on a list with nothing selected and no sign
+   * anything had been asked for.
+   */
+  focus?: string;
 }) {
   const [rows, setRows] = useState<ActivityRow[]>([]);
   const [editing, setEditing] = useState<string | null>(null);
@@ -63,6 +73,13 @@ export function ActivityManager({
   const [busy, setBusy] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [showRetired, setShowRetired] = useState(false);
+  /**
+   * Set by "cancel" so the blur it causes does not save what it just discarded.
+   *
+   * A ref rather than state: it is written and read inside the same event
+   * sequence, and a state update would not have landed by the time blur runs.
+   */
+  const cancelled = useRef(false);
   // Statements go through `notify` — a snackbar on Android, an Alert on iOS.
   // The delete CONFIRMATION below stays `Alert.alert` on both, because it asks
   // a question and must block. See `snackbar.tsx`.
@@ -79,6 +96,23 @@ export function ActivityManager({
     load();
   }, [load]);
 
+  /**
+   * Open the requested row for editing, once — and only once.
+   *
+   * Guarded by a ref rather than by `editing`, because re-running this after a
+   * save would reopen the editor the user just closed. It fires when the rows
+   * land, since the label to prefill is not known before then.
+   */
+  const focused = useRef(false);
+  useEffect(() => {
+    if (focused.current || !focus || !loaded) return;
+    const row = rows.find((r) => r.id === focus);
+    if (!row) return;
+    focused.current = true;
+    setDraft(row.label);
+    setEditing(row.id);
+  }, [focus, loaded, rows]);
+
   const active = rankActivities(rows);
   const retired = rows.filter((r) => r.archived);
   const full = !canAddActivity(active.length);
@@ -93,6 +127,37 @@ export function ActivityManager({
       return;
     }
     await load();
+  }
+
+  /**
+   * Save the edit in progress, from whichever exit the user took.
+   *
+   * Reachable three ways — the keyboard's "done", the save button, and blur —
+   * so it has to be idempotent: blur fires after a tap on "save" too, and
+   * without the `editing` guard that would send the same rename twice.
+   *
+   * A no-op when nothing changed, which is the common case for blur: opening
+   * an editor and tapping away should not write, and should not surface a
+   * failure if the network happens to be down.
+   */
+  function commitRename(item: ActivityRow) {
+    if (editing !== item.id) return;
+
+    // Cancel got there first. `onPressIn` beats the field's blur, so this is
+    // how "discard" stays a real discard rather than a save with extra steps.
+    if (cancelled.current) {
+      cancelled.current = false;
+      return;
+    }
+
+    const next = draft.trim();
+    setEditing(null);
+    if (next === item.label) return;
+
+    const check = validateActivityLabel(next);
+    if (!check.ok) return notify("Can't rename", check.reason);
+
+    run(() => renameActivity(userId, item.id, next));
   }
 
   function confirmDelete(item: ActivityRow) {
@@ -153,12 +218,15 @@ export function ActivityManager({
                 value={draft}
                 onChangeText={setDraft}
                 maxLength={ACTIVITY_LABEL_MAX}
-                onSubmitEditing={() => {
-                  const check = validateActivityLabel(draft);
-                  if (!check.ok) return notify("Can't rename", check.reason);
-                  setEditing(null);
-                  run(() => renameActivity(userId, item.id, draft));
-                }}
+                onSubmitEditing={() => commitRename(item)}
+                // The keyboard's "done" used to be the ONLY way to save, so
+                // tapping anywhere else — the page, the backdrop, the keyboard
+                // dismiss — threw the edit away without a word. Reported as
+                // "you can't rename a log, it doesn't save" (2026-08-04).
+                // Committing on blur means every way OUT of the field is a
+                // save, which is what a text field that is already showing
+                // your typing implies.
+                onBlur={() => commitRename(item)}
                 returnKeyType="done"
                 style={[
                   field,
@@ -170,7 +238,17 @@ export function ActivityManager({
                   },
                 ]}
               />
-              <InlineButton label="cancel" onPress={() => setEditing(null)} />
+              {/* An explicit target, because "tap away to save" is a rule you
+                  cannot see. `onPressIn` fires BEFORE the field's blur, so
+                  cancel wins the race and genuinely discards. */}
+              <InlineButton label="save" onPress={() => commitRename(item)} />
+              <InlineButton
+                label="cancel"
+                onPressIn={() => {
+                  cancelled.current = true;
+                  setEditing(null);
+                }}
+              />
             </View>
           ) : (
             <View style={ROW}>
@@ -330,16 +408,20 @@ function InlineButton({
   label,
   accessibilityLabel,
   onPress,
+  onPressIn,
 }: {
   label: string;
   accessibilityLabel?: string;
-  onPress: () => void;
+  onPress?: () => void;
+  /** For a control that must beat a neighbouring field's blur — see "cancel". */
+  onPressIn?: () => void;
 }) {
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? label}
       onPress={onPress}
+      onPressIn={onPressIn}
       // Neutral, not destructive: this row is not red, and deleting still has
       // to get past a confirmation. The destructive ripple belongs to the rows
       // that sign you out and delete the account, where the text is `down` too.

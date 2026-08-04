@@ -41,6 +41,7 @@ export default function DaySheet() {
     status.signals,
     status.leverLabels,
     status.today,
+    status.actions,
   );
   const notes = detail.signals.filter((s) => s.detail);
   const scalars = detail.signals.filter((s) => s.value !== null);
@@ -77,7 +78,26 @@ export default function DaySheet() {
               }}
             >
               <Body tone="ink">{l.label}</Body>
-              {l.detail && <Body tone="dim">{l.detail}</Body>}
+              {/* One line per thing done, rather than one run-on string.
+                  Logging "treadmill" and then "walk" used to render as
+                  `treadmill · walk`, which read as a single activity with an
+                  invented name instead of the two things it actually was.
+
+                  The lever is still listed ONCE however many actions it holds
+                  — it is the lever that fired, and that is what uptime counts.
+
+                  `detail` is the fallback, not dead code: a day written before
+                  the actions table existed, or by an older installed build, has
+                  only the joined string. */}
+              {l.actions.length > 0 ? (
+                l.actions.map((action, i) => (
+                  <Body key={`${l.key}-${i}`} tone="dim">
+                    {action}
+                  </Body>
+                ))
+              ) : l.detail ? (
+                <Body tone="dim">{l.detail}</Body>
+              ) : null}
             </View>
           ))}
 

@@ -122,6 +122,42 @@ export const DETAIL_MAX = 160;
  * Duplicates are dropped. Tapping the same playbook item twice in a day is a
  * mis-tap, not two facts.
  */
+/**
+ * The separator `appendDetail` joins with, and `splitDetail` splits on.
+ *
+ * Named because two places now depend on it agreeing, and a migration backfills
+ * against the same literal.
+ */
+export const DETAIL_SEPARATOR = " · ";
+
+/**
+ * The inverse of `appendDetail` — one entry's detail as the things it records.
+ *
+ * `entries.detail` is a joined string because the schema allows one row per
+ * lever per day. The `actions` table stores those parts separately, and this is
+ * the single definition of how one becomes the other, so the mobile write path
+ * and the SQL backfill cannot disagree about where a detail divides.
+ *
+ * Blank parts are dropped and duplicates collapse, matching both `appendDetail`
+ * (which refuses to append a repeat) and the unique constraint on `actions`.
+ */
+export function splitDetail(detail: string | null): string[] {
+  const text = detail?.trim();
+  if (!text) return [];
+
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const part of text.split(DETAIL_SEPARATOR)) {
+    const label = part.trim();
+    if (!label) continue;
+    const key = label.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(label);
+  }
+  return out;
+}
+
 export function appendDetail(
   existing: string | null,
   next: string | null,
@@ -131,8 +167,8 @@ export function appendDetail(
   if (!add) return had || null;
   if (!had) return add.slice(0, DETAIL_MAX);
 
-  const parts = had.split(" · ").map((p) => p.trim());
+  const parts = had.split(DETAIL_SEPARATOR).map((p) => p.trim());
   if (parts.some((p) => p.toLowerCase() === add.toLowerCase())) return had;
 
-  return [...parts, add].join(" · ").slice(0, DETAIL_MAX);
+  return [...parts, add].join(DETAIL_SEPARATOR).slice(0, DETAIL_MAX);
 }

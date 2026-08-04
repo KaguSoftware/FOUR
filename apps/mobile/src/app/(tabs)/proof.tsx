@@ -10,7 +10,7 @@ import {
   wallGrid,
 } from "@uptime/core";
 
-import { Label, Mono } from "@/components/ui";
+import { Body, Label, Mono } from "@/components/ui";
 import { Frame } from "@/components/screen";
 import { Loading } from "@/components/states";
 import { useStatus } from "@/lib/use-status";
@@ -70,7 +70,49 @@ export default function ProofScreen() {
         </Mono>
       }
     >
-      <Label style={{ marginBottom: space[3] }}>this month</Label>
+      {/* The one line that says what the screen is.
+
+          Until now nothing on it explained itself: a dark grid with a fraction
+          in the corner, and the fact that there is a MESSAGE in there at all
+          was only ever stated in the walkthrough you saw once on your first
+          launch. Someone opening this early in a month sees a dark rectangle
+          and no reason to come back.
+
+          It names the reward, not the mechanic. "One cell lights per day up"
+          was the first attempt and it explains the plumbing — true, and no
+          reason to look again. What makes this screen work is that the message
+          is hiding in the cells that never light, and it surfaces as the rest
+          fill in around it.
+
+          **A statement, not an instruction.** "Keep going to reveal it" would
+          make the app ask for something, which is the one register DESIGN.md
+          rules out — and this screen in particular earns its restraint by
+          never telling you to do anything. It says what is happening; the
+          wanting is the reader's.
+
+          **On the same ROW as the label, not under it.** This screen is a
+          `Frame` and the wall is measured from whatever height is left over, so
+          a second line would come straight out of the wall — and the wall's fit
+          is already the thing most likely to be wrong here. Sharing the baseline
+          costs nothing. `flex: 1` + `numberOfLines` so a long font or a small
+          phone truncates the sentence rather than pushing the fraction off. */}
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "baseline",
+          gap: space[2],
+          marginBottom: space[3],
+        }}
+      >
+        <Label>this month</Label>
+        <Body
+          tone="mute"
+          numberOfLines={1}
+          style={{ flex: 1, fontSize: size.xs, lineHeight: size.xs * 1.5 }}
+        >
+          days up uncover a message
+        </Body>
+      </View>
 
       <View style={{ flex: 1 }} onLayout={onLayout}>
         {box && (

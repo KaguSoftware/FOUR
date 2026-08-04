@@ -8,13 +8,14 @@ import {
   pending,
   retireCandidate,
   settle,
+  splitDetail,
   OUTBOX_MAX,
   type ActivityRow,
   type OutboxItem,
 } from "@uptime/core";
 import { createStore } from "./store";
 import { supabase } from "./supabase";
-import { today } from "./status";
+import { currentBoundaryHour, today } from "./status";
 
 /**
  * The outbox, persisted and shared.
@@ -293,9 +294,15 @@ async function send(userId: string, item: OutboxItem): Promise<SendResult> {
       .eq("user_id", userId)
       .eq("logged_for", item.logged_for)
       .eq("lever", item.lever);
-    return error
-      ? { ok: false, permanent: isPermanent(error), reason: error.message }
-      : { ok: true };
+    if (error) {
+      return { ok: false, permanent: isPermanent(error), reason: error.message };
+    }
+    // Take the day's actions with it. There is no foreign key from `actions` to
+    // `entries` to cascade this — the two are joined on (user, day, lever), not
+    // by id — so un-logging a lever has to clear both or the day sheet keeps
+    // listing things done on a day that no longer records them.
+    await syncActions(userId, item.logged_for, item.lever, null);
+    return { ok: true };
   }
 
   let playbookId: string | null = null;
@@ -372,13 +379,76 @@ async function send(userId: string, item: OutboxItem): Promise<SendResult> {
       // 23:50 that flushes the next morning still belongs to the night before.
       logged_for: item.logged_for,
       lever: item.lever,
+      // Still written, and still the joined string. A shipped build reads this
+      // column and knows nothing about `actions`, so it stays the record of
+      // record until no installed client depends on it. See the migration.
       detail: detail || null,
       playbook_id: playbookId,
+      // Which boundary filed this day, recorded so the row explains itself
+      // later. Nothing derives uptime from it — `logged_for` is still the only
+      // date any reader keys off — but it is what makes changing the setting
+      // safe: history keeps the rule it was written under instead of being
+      // silently re-dated. See the day-boundary migration.
+      boundary_hour: currentBoundaryHour(),
     },
     { onConflict: "user_id,logged_for,lever" },
   );
 
-  return error
-    ? { ok: false, permanent: isPermanent(error), reason: error.message }
-    : { ok: true };
+  if (error) {
+    return { ok: false, permanent: isPermanent(error), reason: error.message };
+  }
+
+  await syncActions(userId, item.logged_for, item.lever, detail || null);
+  return { ok: true };
+}
+
+/**
+ * Mirror a day's detail into `actions`, one row per thing done.
+ *
+ * **Runs AFTER the entry write, and every failure is swallowed.** Same doctrine
+ * as the playbook block above, and for a stronger reason: the entry is what
+ * makes the day up, `entries.detail` already holds the full text, and this
+ * table is a structured view of it. A failure here must never turn a logged day
+ * into a lost one — that is the single failure this product exists to prevent,
+ * and it is why the split went into a child table instead of widening the
+ * entries key.
+ *
+ * Derived from the joined string rather than from the tap, so it cannot drift
+ * from `entries.detail`: whatever that column ends up holding is exactly what
+ * this reproduces, including a detail written by an older build.
+ *
+ * Delete-then-insert rather than a diff. A day holds a handful of actions, the
+ * write is idempotent — which is what makes a replayed outbox item safe — and
+ * the alternative is reconciling two lists to save one round trip.
+ */
+async function syncActions(
+  userId: string,
+  loggedFor: string,
+  lever: string,
+  detail: string | null,
+): Promise<void> {
+  try {
+    await supabase
+      .from("actions")
+      .delete()
+      .eq("user_id", userId)
+      .eq("logged_for", loggedFor)
+      .eq("lever", lever);
+
+    const labels = splitDetail(detail);
+    if (labels.length === 0) return;
+
+    await supabase.from("actions").insert(
+      labels.map((label, i) => ({
+        user_id: userId,
+        logged_for: loggedFor,
+        lever,
+        label,
+        // Order within the day, not a clock time — actions carry no timestamp.
+        position: i + 1,
+      })),
+    );
+  } catch {
+    // Deliberately silent. See the docblock.
+  }
 }

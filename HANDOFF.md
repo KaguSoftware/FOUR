@@ -291,6 +291,69 @@ manager or backup drive — see *Gotchas*.
   eslint + expo lint clean, 39 migration checks, contrast clean, the web app
   builds, both bundles export.** **Nothing in it has been on hardware.**
 
+- **The device-feedback round, 2026-08-04 (v0.1.2).** Nine fixes reported from
+  using the app on an Android phone. Two were not defects and were put to the
+  owner before building; the rest were real.
+  **(1) Text fields are pinned LTR.** There was no RTL code in the repo at all —
+  the OS was mirroring fields from the device's system language, and the first
+  symptom was the sign-in password typing backwards. `writingDirection` +
+  `textAlign` on the shared `field` style, plus `I18nManager.allowRTL(false)`
+  in the root layout. **Android needs a full restart to show it.**
+  **(2) The mood section was rebuilt twice.** Releasing the slider used to
+  write immediately, so a drag taken to look at the faces was an answer. It is
+  behind a Save now — full width, BELOW the slider, always rendered and merely
+  `disabled` until dirty, which is the convention every other commit in the app
+  already follows. The first cut put Save inside the slider's row and the track
+  resized under the finger; the second stacked enough above it to push Home off
+  the screen. The face gained a square head (`facePath` in core, so web draws
+  the identical one) and the two axis faces and the reassurance copy are gone.
+  **(3) `/proof` says what it is** — `days up uncover a message`, on the same
+  ROW as the label because that screen is a `Frame` and any line added there
+  comes straight out of the wall.
+  **(4) Renaming an activity works.** Two separate defects: the log sheet's
+  "Rename" called `manage()` and just navigated away, discarding the intent
+  (now `Alert.prompt` on iOS, and Android routes carrying the id so the row
+  opens in edit mode); and the editor only committed on the keyboard's "done",
+  so tapping away silently discarded the edit (now commits on blur, with an
+  explicit save button and a `cancel` that wins the race via `onPressIn`).
+  Duplicate names now say so instead of surfacing a Postgres constraint string.
+  **(5) Two actions on one lever no longer merge.** `treadmill · walk` was one
+  row by schema — `unique (user_id, logged_for, lever)` — and read as a single
+  invented activity. Owner chose a full split via a **child `actions` table**,
+  which leaves `entries` and the outbox key untouched: `uptime.ts` derives
+  up-days from a `Set` of distinct dates, so no derived figure can move, and
+  there is a test asserting exactly that. `syncActions` runs after the entry
+  write and swallows every failure — a failed action must never cost a day.
+  Backfilled by splitting on `" · "`; `splitDetail` in core is the JS twin of
+  that SQL. **No timestamps, stored or shown** — owner's explicit call.
+  **(6) History swipes the right way.** `monthsBetween` returns newest-first,
+  which put the current month at the far left. Reversed in `MonthStack` only —
+  NOT in core, which the web pager reads with arrows labelled to match — with
+  `initialScrollIndex` so it still opens on this month.
+  **(7) The day grid stopped drifting.** Cells alternated `borderWidth` 1 and 0
+  depending on whether the day was filled, and RN draws borders inside the box,
+  so up-days and down-days were different sizes and rows sat a couple of pixels
+  out. Every cell carries a 1px border now; a filled day's border is its own
+  fill. Owner traced this one from the ring around today.
+  **(8) Android's bottom inset.** The last element of every tab sat under the
+  tab bar. `TAB_BAR` (80) + `insets.bottom` cleared the chrome to the exact
+  pixel with nothing left over, so a button's border touched the bar. There is
+  one `bottomInset()` helper now, carrying a `CHROME_GAP`, and the five hand-
+  written copies of that sum are gone. **A `max()` version was tried first on
+  the theory that edge-to-edge made the bar span the inset — a device photo
+  disproved it; the two bars stack.**
+  **(9) The day boundary is a setting** (Settings → Alerts), default 4am,
+  bounded 0–12. History is never re-dated: `entries.boundary_hour` records what
+  each day was filed under, and nothing derives uptime from it. The migration
+  **drops** the old one-argument `logical_date` before recreating it — `create
+  or replace` with a new parameter makes a SECOND function and every existing
+  call then fails "function is not unique". `npm run test:migrations` caught
+  that. Also: a Settings row that resets the seen-once flag so the first-launch
+  guide can be retested without reinstalling.
+  Verified: **292 core tests, all migration checks, tsc clean ×3, eslint +
+  expo lint clean, contrast clean, both bundles export.** **Only items 1, 7 and
+  8 have been seen on hardware; the rest of this round has not.**
+
 - **The auth-screen round, 2026-08-04.** Four owner observations from looking at
   the sign-in screen, all the same underlying problem — the screen did not
   signal what was tappable.

@@ -59,7 +59,7 @@ export async function logEntry(
 ): Promise<ActionResult> {
   const { supabase, user } = await requireUser();
   const state = await getSystemState(user.id);
-  const today = logicalDate(new Date(), state.timezone);
+  const today = logicalDate(new Date(), state.timezone, state.day_boundary_hour);
 
   let playbookId: string | null = null;
 
@@ -161,7 +161,7 @@ export async function logEntry(
 export async function undoEntry(lever: Lever): Promise<ActionResult> {
   const { supabase, user } = await requireUser();
   const state = await getSystemState(user.id);
-  const today = logicalDate(new Date(), state.timezone);
+  const today = logicalDate(new Date(), state.timezone, state.day_boundary_hour);
 
   const { error } = await supabase
     .from("entries")
@@ -183,7 +183,7 @@ export async function undoEntry(lever: Lever): Promise<ActionResult> {
 export async function setSlammed(on: boolean): Promise<ActionResult> {
   const { supabase, user } = await requireUser();
   const state = await getSystemState(user.id);
-  const today = logicalDate(new Date(), state.timezone);
+  const today = logicalDate(new Date(), state.timezone, state.day_boundary_hour);
 
   const { error } = await supabase
     .from("system_state")
@@ -232,7 +232,7 @@ export async function annotateOutage(startedOn: string, note: string) {
 export async function saveMood(value: number): Promise<ActionResult> {
   const { supabase, user } = await requireUser();
   const state = await getSystemState(user.id);
-  const today = logicalDate(new Date(), state.timezone);
+  const today = logicalDate(new Date(), state.timezone, state.day_boundary_hour);
 
   if (!Number.isFinite(value)) return { ok: false, error: "not a number" };
   // Clamped here as well as in core: the column's CHECK rejects anything

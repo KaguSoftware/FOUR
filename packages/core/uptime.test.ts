@@ -6,6 +6,9 @@ import {
   deriveIntervals,
   downDays,
   lastCompletedRun,
+  clampBoundaryHour,
+  DAY_BOUNDARY_MAX,
+  DAY_BOUNDARY_MIN,
   logicalDate,
   uptimeWindow,
   type Entry,
@@ -38,6 +41,47 @@ describe("logicalDate — 04:00 boundary", () => {
     const after = new Date("2026-07-20T01:01:00Z"); // 04:01 Istanbul
     expect(logicalDate(before, TZ)).toBe("2026-07-19");
     expect(logicalDate(after, TZ)).toBe("2026-07-20");
+  });
+
+  describe("a configured boundary hour", () => {
+    // 2026-07-20T02:30 Istanbul. Which day this belongs to is exactly what the
+    // setting decides.
+    const at = new Date("2026-07-19T23:30:00Z");
+
+    it("files a 02:30 session under the previous day at the 4am default", () => {
+      expect(logicalDate(at, TZ)).toBe("2026-07-19");
+    });
+
+    it("files the same moment under its own calendar day at midnight", () => {
+      expect(logicalDate(at, TZ, 0)).toBe("2026-07-20");
+    });
+
+    it("still holds it back at a later boundary", () => {
+      expect(logicalDate(at, TZ, 6)).toBe("2026-07-19");
+    });
+
+    it("falls back to the default rather than producing an invalid date", () => {
+      // NaN reaching the shift yields `Invalid Date`, which formats as a
+      // date-shaped string nobody would question. It must never propagate.
+      expect(logicalDate(at, TZ, NaN)).toBe(logicalDate(at, TZ));
+      expect(logicalDateLocal(at, NaN)).toBe(logicalDateLocal(at));
+    });
+
+    it("clamps a value outside the allowed range", () => {
+      expect(clampBoundaryHour(-3)).toBe(DAY_BOUNDARY_MIN);
+      expect(clampBoundaryHour(23)).toBe(DAY_BOUNDARY_MAX);
+      expect(clampBoundaryHour(4)).toBe(4);
+    });
+
+    it("keeps the two date functions in agreement on a custom hour", () => {
+      // The phone uses `logicalDateLocal` and the server `logicalDate`; if
+      // they disagree the pager fires on a different day than the screen.
+      const runtimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      for (let h = 0; h < 48; h++) {
+        const when = new Date(Date.UTC(2026, 6, 1, h));
+        expect(logicalDateLocal(when, 2)).toBe(logicalDate(when, runtimeZone, 2));
+      }
+    });
   });
 
   it("advances exactly one logical day per calendar day", () => {

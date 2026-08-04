@@ -20,7 +20,7 @@ import Animated, {
 import { Body, Label } from "./ui";
 import { ripple } from "@/lib/press";
 import { useReduceMotion } from "@/lib/reduce-motion";
-import { color, radius, space, TAB_BAR, TAP } from "@/theme";
+import { bottomInset, color, radius, space, TAP } from "@/theme";
 
 /**
  * The Android answer to "that didn't save".
@@ -151,7 +151,7 @@ function Snackbar({
           position: "absolute",
           left: space[4],
           right: space[4],
-          bottom: insets.bottom + TAB_BAR + space[2],
+          bottom: bottomInset(insets.bottom) + space[2],
           flexDirection: "row",
           alignItems: "center",
           gap: space[3],

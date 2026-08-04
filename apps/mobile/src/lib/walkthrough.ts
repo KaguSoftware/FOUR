@@ -31,3 +31,25 @@ export async function markWalkthroughSeen(userId: string): Promise<void> {
     // Failing to persist means it may show again once. Harmless.
   }
 }
+
+/**
+ * Forget that this device has seen the guide, so it auto-opens again.
+ *
+ * Settings → About already has a row that OPENS the guide on demand, which is
+ * the answer for someone who wants to reread it. This is the different
+ * question: does the first-launch behaviour itself still work? That path runs
+ * once per install and is therefore the hardest thing in the app to retest —
+ * short of deleting and reinstalling, there was no way to see it twice.
+ *
+ * Returns whether the flag was actually cleared, so the caller can report a
+ * storage failure rather than claiming success. A reset that silently did
+ * nothing would send someone off to relaunch the app for no reason.
+ */
+export async function resetWalkthrough(userId: string): Promise<boolean> {
+  try {
+    await AsyncStorage.removeItem(keyFor(userId));
+    return true;
+  } catch {
+    return false;
+  }
+}

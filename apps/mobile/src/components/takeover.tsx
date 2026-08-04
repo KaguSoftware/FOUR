@@ -4,7 +4,7 @@ import { rankActivities, type Interval } from "@uptime/core";
 import { androidMetrics, Body, Label, Mono } from "./ui";
 import { committed } from "@/lib/haptics";
 import { pressFill, pressFillFlat, ripple } from "@/lib/press";
-import { color, radius, size, space, TAB_BAR, TAP } from "@/theme";
+import { bottomInset, color, radius, size, space, TAP } from "@/theme";
 import type { LeverRow, PlaybookItem } from "@/lib/status";
 
 /**
@@ -72,7 +72,7 @@ export function Takeover({
           // The tab bar is still over this screen even though the takeover
           // offers no navigation of its own, so "last run" needs the same
           // allowance every other tab screen gets.
-          paddingBottom: insets.bottom + TAB_BAR + space[8],
+          paddingBottom: bottomInset(insets.bottom) + space[8],
           paddingHorizontal: space[5],
         }}
       >

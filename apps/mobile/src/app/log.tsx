@@ -1,13 +1,18 @@
 import { useState } from "react";
-import { Alert, Pressable, TextInput, View } from "react-native";
+import { Alert, Platform, Pressable, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { appendDetail, rankActivities, type ActivityRow } from "@uptime/core";
+import {
+  appendDetail,
+  rankActivities,
+  splitDetail,
+  type ActivityRow,
+} from "@uptime/core";
 import { field, fieldTint } from "@/components/fields";
 import { Body, Label } from "@/components/ui";
 import { SheetHandle } from "@/components/sheet";
 import { committed } from "@/lib/haptics";
-import { deleteActivity } from "@/lib/playbook";
+import { deleteActivity, renameActivity } from "@/lib/playbook";
 import { pressFill, pressFillFlat, ripple } from "@/lib/press";
 import { cachedStatus, refreshStatus } from "@/lib/use-status";
 import { outboxStore, queueWrite } from "@/lib/outbox";
@@ -73,10 +78,15 @@ export default function LogSheet() {
    * This screen read `cachedStatus()` once so it could be measured once.
    * Coming back to it after an edit would therefore show the chips it was
    * measured with, not the ones that now exist.
+   *
+   * `focus` opens that screen with one row already in edit mode — see below.
    */
-  function manage() {
+  function manage(focus?: string) {
     if (chosen !== null) return;
-    router.replace({ pathname: "/activities", params: { lever } });
+    router.replace({
+      pathname: "/activities",
+      params: focus ? { lever, focus } : { lever },
+    });
   }
 
   /**
@@ -85,24 +95,74 @@ export default function LogSheet() {
    * An `Alert` and not an inline editor, because an inline editor changes this
    * sheet's height and the sheet is measured once. A dialog changes nothing.
    *
-   * `Alert.prompt` is **iOS-only**, so renaming on Android routes to the full
-   * editor rather than silently doing nothing.
+   * **"Rename" used to not rename.** It called `manage()`, which dropped you on
+   * the activities screen with nothing selected and nothing typed — the intent
+   * was simply discarded, and the screen you landed on gave no sign it was
+   * meant to be carrying one. Reported on device as renaming not saving
+   * (2026-08-04).
+   *
+   * `Alert.prompt` is **iOS-only**, so it renames in place there. Android
+   * still routes to the editor, but now names the row it should open for
+   * editing, so the rename continues instead of starting over.
    */
   function editItem(item: { id: string; label: string }) {
     if (chosen !== null || !status) return;
+    const userId = status.state.user_id;
+
+    const rename = async (next: string) => {
+      const res = await renameActivity(userId, item.id, next.trim());
+      if (!res.ok) return;
+      await refreshStatus().catch(() => {});
+      router.back();
+    };
+
+    const remove = {
+      text: "Delete",
+      style: "destructive" as const,
+      onPress: async () => {
+        const res = await deleteActivity(userId, item.id);
+        if (!res.ok) return;
+        await refreshStatus().catch(() => {});
+        router.back();
+      },
+    };
+
+    // The prompt is a SECOND dialog, opened from "Rename" — the first one has
+    // to keep offering Delete on both platforms. `Alert.prompt` cannot carry a
+    // destructive third action and a text field at once.
+    const promptForName = () =>
+      Alert.prompt(
+        "Rename",
+        undefined,
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Save",
+            onPress: (next?: string) => {
+              // Empty or unchanged is a cancel, not a write. `validateActivity
+              // Label` would reject the empty string anyway; catching it here
+              // means no error is raised for someone who simply changed their
+              // mind.
+              const trimmed = next?.trim();
+              if (!trimmed || trimmed === item.label) return;
+              rename(trimmed);
+            },
+          },
+        ],
+        "plain-text",
+        item.label,
+      );
+
     Alert.alert(item.label, undefined, [
       { text: "Cancel", style: "cancel" },
-      { text: "Rename", onPress: manage },
       {
-        text: "Delete",
-        style: "destructive",
-        onPress: async () => {
-          const res = await deleteActivity(status.state.user_id, item.id);
-          if (!res.ok) return;
-          await refreshStatus().catch(() => {});
-          router.back();
-        },
+        text: "Rename",
+        // iOS renames in place. Android has no `Alert.prompt`, so it routes to
+        // the editor — carrying the id, so the row opens already in edit mode.
+        onPress:
+          Platform.OS === "ios" ? promptForName : () => manage(item.id),
       },
+      remove,
     ]);
   }
 
@@ -176,12 +236,18 @@ export default function LogSheet() {
       </View>
 
       {/* What is already on the record. Shown before the options, so "add
-          another" is obviously an addition rather than a replacement. */}
-      {logged && detail && (
-        <Body tone="dim" style={{ marginBottom: space[1] }}>
-          {detail}
-        </Body>
-      )}
+          another" is obviously an addition rather than a replacement.
+
+          Split into one line per thing done, for the same reason the day sheet
+          is: `treadmill · walk` reads as one oddly-named activity rather than
+          the two it is. `splitDetail` is the same function the outbox uses to
+          fill the actions table, so this cannot drift from what was stored. */}
+      {logged &&
+        splitDetail(detail).map((action, i) => (
+          <Body key={i} tone="dim" style={{ marginBottom: space[1] }}>
+            {action}
+          </Body>
+        ))}
 
       {items.length > 0 && logged && (
         <Label style={{ color: color.inkMute, marginBottom: space[1] }}>
@@ -270,7 +336,9 @@ export default function LogSheet() {
       <Pressable
         accessibilityRole="button"
         disabled={chosen !== null}
-        onPress={manage}
+        // Wrapped, not passed directly: `manage` takes an optional id, and a
+        // bare reference would hand it the press event as one.
+        onPress={() => manage()}
         android_ripple={chosen !== null ? undefined : ripple()}
         style={{
           minHeight: TAP,

@@ -28,11 +28,40 @@ export type Signal = {
   detail: string | null;
 };
 
+/**
+ * One thing done on one lever on one day. Mirrors the `actions` row.
+ *
+ * **No timestamp, by design.** Actions carry an order, not a clock time — see
+ * the `actions` migration. Nothing displays when something happened and
+ * nothing should start; `position` is the only ordering that exists.
+ */
+export type Action = {
+  logged_for: string;
+  lever: string;
+  label: string;
+  position: number;
+};
+
 /** One lever that fired, named as it was named at the time. */
 export type DayLever = {
   key: string;
   label: string;
+  /**
+   * The day's record for this lever as ONE string.
+   *
+   * Kept because a client that predates the actions table still has only this,
+   * and because it is what `entries.detail` holds. Prefer `actions` when it is
+   * non-empty — this is the fallback, not the source.
+   */
   detail: string | null;
+  /**
+   * What was actually done, in order, one entry each.
+   *
+   * Empty for a day logged with no detail, and for any day written by a client
+   * that predates the split. Renderers must handle that by falling back to
+   * `detail` rather than showing nothing.
+   */
+  actions: string[];
 };
 
 export type DayDetail = {
@@ -56,6 +85,12 @@ export type DayDetail = {
  * `empty` and `future` are separate flags on purpose. A day that has not
  * happened yet is not a day you skipped, and collapsing the two is how a
  * calendar starts accusing people of missing tomorrow.
+ *
+ * **One `DayLever` per lever, however many actions it holds.** The lever is
+ * still the thing that fired — that is what `entries` records and what uptime
+ * reads — so two actions on one lever is one lever with two actions, never the
+ * lever listed twice. Getting that wrong is what made "treadmill · walk" look
+ * like a single invented activity in the first place.
  */
 export function dayDetail(
   date: string,
@@ -63,13 +98,26 @@ export function dayDetail(
   signals: readonly Signal[],
   labels: ReadonlyMap<string, string>,
   today: string,
+  actions: readonly Action[] = [],
 ): DayDetail {
+  // Indexed by lever once rather than scanned per entry, and kept in `position`
+  // order — the order they were logged, which is the only ordering actions have.
+  const byLever = new Map<string, string[]>();
+  for (const a of [...actions]
+    .filter((a) => a.logged_for === date)
+    .sort((x, y) => x.position - y.position)) {
+    const list = byLever.get(a.lever) ?? [];
+    list.push(a.label);
+    byLever.set(a.lever, list);
+  }
+
   const levers: DayLever[] = entries
     .filter((e) => e.logged_for === date)
     .map((e) => ({
       key: e.lever,
       label: labels.get(e.lever) ?? e.lever,
       detail: e.detail,
+      actions: byLever.get(e.lever) ?? [],
     }));
 
   return {

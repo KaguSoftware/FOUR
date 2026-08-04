@@ -40,6 +40,16 @@ export type Face = {
   mouth: string;
   /** The two eyes, in the same box. */
   eyes: readonly { cx: number; cy: number; r: number }[];
+  /**
+   * The head — a rounded square, in the same box.
+   *
+   * The face used to be eyes and a mouth floating in empty space, which read as
+   * marks on the page rather than as a face. A square head is also the shape
+   * this app already draws everywhere else: every cell of the day grid and
+   * every cell of the pixel wall is a rounded square, so the face belongs to
+   * the same family instead of importing a circle nothing else uses.
+   */
+  head: { x: number; y: number; size: number; radius: number };
 };
 
 /** `value` mapped to 0..1, clamped. Non-finite reads as neutral, never NaN. */
@@ -62,6 +72,20 @@ const EYE_R = 0.055;
 const EYE_X = 0.31;
 const MOUTH_Y = 0.66;
 const MOUTH_HALF_W = 0.24;
+
+/**
+ * The head, inset from the box so its own stroke has room.
+ *
+ * A stroked path is centred on its coordinates, so a head flush to the 0..1
+ * edges loses the outer half of its line to the viewBox at every size. The
+ * inset is half the largest stroke either client draws, rounded up.
+ *
+ * The corner radius is a fraction of the side rather than an absolute, so it
+ * scales with the face and matches `radius.md` on the day grid's cells at the
+ * sizes this is actually drawn.
+ */
+const HEAD_INSET = 0.045;
+const HEAD_RADIUS = 0.16;
 /** How far the mouth's control point travels between full frown and full smile. */
 const MOUTH_BOW = 0.46;
 
@@ -109,6 +133,12 @@ export function facePath(value: number): Face {
       { cx: EYE_X, cy: EYE_Y, r: EYE_R },
       { cx: 1 - EYE_X, cy: EYE_Y, r: EYE_R },
     ],
+    head: {
+      x: HEAD_INSET,
+      y: HEAD_INSET,
+      size: round(1 - 2 * HEAD_INSET),
+      radius: HEAD_RADIUS,
+    },
   };
 }
 

@@ -8,7 +8,42 @@
  */
 
 export const UPTIME_WINDOW = 30;
+
+/**
+ * When the day rolls over, if the account has not chosen otherwise.
+ *
+ * 04:00 rather than midnight, so a 01:30 session belongs to the day that just
+ * ended rather than the one that technically started. It is a SETTING as of
+ * 2026-08-04 (`system_state.day_boundary_hour`); this is the default every
+ * account starts on and the fallback wherever the real value is not to hand.
+ */
 export const DAY_BOUNDARY_HOUR = 4;
+
+/**
+ * 0 is midnight, the answer most people would give if asked. Past noon the
+ * word "day" stops matching what is being measured, so 12 is the far end.
+ * Mirrors the CHECK constraint on the column.
+ */
+export const DAY_BOUNDARY_MIN = 0;
+export const DAY_BOUNDARY_MAX = 12;
+
+/**
+ * A trustworthy boundary hour, whatever arrived.
+ *
+ * The date functions below are the most load-bearing code in this package —
+ * every screen, the run length, the down count and the pager key off them —
+ * and a `NaN` reaching one of them produces `Invalid Date`, which formats as a
+ * date-shaped string nobody would question. So a bad value falls back to the
+ * default rather than propagating: a wrong-by-hours date is recoverable, a
+ * silently corrupt one is not.
+ */
+export function clampBoundaryHour(hour: number): number {
+  if (!Number.isFinite(hour)) return DAY_BOUNDARY_HOUR;
+  return Math.min(
+    Math.max(Math.trunc(hour), DAY_BOUNDARY_MIN),
+    DAY_BOUNDARY_MAX,
+  );
+}
 
 /**
  * A lever's stable key.
@@ -70,8 +105,14 @@ export function daysBetween(a: string, b: string): number {
  * day rolls over at 04:00. A 01:30 gym session belongs to the day that just
  * ended, not the one that technically started.
  */
-export function logicalDate(now: Date, timeZone: string): string {
-  const shifted = new Date(now.getTime() - DAY_BOUNDARY_HOUR * 3_600_000);
+export function logicalDate(
+  now: Date,
+  timeZone: string,
+  boundaryHour: number = DAY_BOUNDARY_HOUR,
+): string {
+  const shifted = new Date(
+    now.getTime() - clampBoundaryHour(boundaryHour) * 3_600_000,
+  );
   // en-CA formats as YYYY-MM-DD, which is what we want.
   return new Intl.DateTimeFormat("en-CA", {
     timeZone,
@@ -101,8 +142,13 @@ export function logicalDate(now: Date, timeZone: string): string {
  * `system_state.timezone`, so the server-side monitor pages on the same day
  * the phone is showing.
  */
-export function logicalDateLocal(now: Date): string {
-  const shifted = new Date(now.getTime() - DAY_BOUNDARY_HOUR * 3_600_000);
+export function logicalDateLocal(
+  now: Date,
+  boundaryHour: number = DAY_BOUNDARY_HOUR,
+): string {
+  const shifted = new Date(
+    now.getTime() - clampBoundaryHour(boundaryHour) * 3_600_000,
+  );
   const y = shifted.getFullYear();
   const m = String(shifted.getMonth() + 1).padStart(2, "0");
   const d = String(shifted.getDate()).padStart(2, "0");

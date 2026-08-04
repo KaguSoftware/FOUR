@@ -3,7 +3,9 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import {
   allTime,
+  clampBoundaryHour,
   currentRun,
+  DAY_BOUNDARY_HOUR,
   deriveIntervals,
   downDays,
   lastCompletedRun,
@@ -40,6 +42,8 @@ export type LeverRow = {
 export type SystemState = {
   user_id: string;
   timezone: string;
+  /** When the day rolls over. The default on a database without the column. */
+  day_boundary_hour: number;
   slammed_until: string | null;
   telegram_chat_id: string | null;
 
@@ -126,6 +130,8 @@ export async function getSupabase() {
  */
 const BASE_COLUMNS = "user_id, timezone, slammed_until, telegram_chat_id";
 const ONBOARDING_COLUMNS = "onboarded_at";
+/** Its own rung: it lands after onboarding did. */
+const BOUNDARY_COLUMN = "day_boundary_hour";
 
 /**
  * Column sets, widest first — one rung per migration that might not have landed.
@@ -137,6 +143,10 @@ const ONBOARDING_COLUMNS = "onboarded_at";
  * actually behind.
  */
 const COLUMN_LADDER = [
+  {
+    columns: `${BASE_COLUMNS}, ${ONBOARDING_COLUMNS}, ${BOUNDARY_COLUMN}`,
+    onboarding: true,
+  },
   { columns: `${BASE_COLUMNS}, ${ONBOARDING_COLUMNS}`, onboarding: true },
   { columns: BASE_COLUMNS, onboarding: false },
 ] as const;
@@ -156,6 +166,10 @@ function toSystemState(
   return {
     user_id: String(row.user_id),
     timezone: (row.timezone as string | null) ?? DEFAULT_TZ,
+    // Absent on the lower rungs of the ladder, which is exactly the default.
+    day_boundary_hour: clampBoundaryHour(
+      (row.day_boundary_hour as number | null) ?? DAY_BOUNDARY_HOUR,
+    ),
     slammed_until: (row.slammed_until as string | null) ?? null,
     telegram_chat_id: (row.telegram_chat_id as string | null) ?? null,
     onboarded: hasOnboarding ? row.onboarded_at != null : true,
@@ -215,7 +229,7 @@ export async function getStatus() {
   if (!user) return null;
 
   const state = await getSystemState(user.id);
-  const today = logicalDate(new Date(), state.timezone);
+  const today = logicalDate(new Date(), state.timezone, state.day_boundary_hour);
 
   const [
     { data: entryRows },

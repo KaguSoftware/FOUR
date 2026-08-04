@@ -94,8 +94,7 @@ export const TAP = 48;
 export const LEVER_HEIGHT = 64;
 
 /**
- * The tab bar's own height, ABOVE the home indicator — add `insets.bottom` on
- * top of this, never instead of it.
+ * The tab bar's own height, NOT counting whatever system inset sits under it.
  *
  * A constant because there is nothing to ask. `NativeTabs` exposes no height
  * (see `NativeTabsProps` in expo-router's
@@ -107,5 +106,42 @@ export const LEVER_HEIGHT = 64;
  * not stop at it — it slides underneath and stays readable-but-unreachable,
  * which is how the sign-out row, the add-lever button and the oldest incident
  * all ended up under the glass.
+ *
+ * **80 on Android is correct** — that is Material 3's navigation-bar height,
+ * and `NativeTabs` renders a real one. (Material 2's was 56; do not "correct"
+ * it to that.) 49 on iOS is `UITabBar`'s own height.
+ *
+ * Neither figure includes the system inset underneath it, which is why
+ * `bottomInset()` exists and why nothing should add these by hand.
+ *
+ * **Always add it through `bottomInset()` below, never by hand.**
  */
 export const TAB_BAR = Platform.select({ ios: 49, android: 80, default: 56 });
+
+/**
+ * The whole allowance under a tab screen: the bar, the system inset it sits
+ * on, and a margin so the last element is not flush against the chrome.
+ *
+ * One function, because five call sites had `insets.bottom + TAB_BAR` written
+ * out by hand and every one of them was a place this could go wrong.
+ *
+ * **The two bars STACK; they do not overlap.** A device photo on 2026-08-04
+ * settled this: the Material tab bar sits fully above the 3-button navigation
+ * bar, both visible, neither behind the other. `edgeToEdgeEnabled` lets the app
+ * DRAW under the system bars, but `NativeTabs` still lays its own bar out above
+ * the inset rather than across it. An earlier attempt at this fix took
+ * `max(TAB_BAR, inset)` on the theory that 80dp already covered the navigation
+ * bar — that was wrong, and it would have clipped by the whole ~48dp inset.
+ *
+ * So the sum is right on both platforms. What was missing is `CHROME_GAP`: the
+ * old formula cleared the chrome to the exact pixel, which leaves a button's
+ * border touching the tab bar and reads as clipped even when it is technically
+ * reachable. The screens each add their own `space[n]` on top of this, but the
+ * ones that came closest — Home's Save button, the takeover's — were still
+ * landing hard against the bar.
+ */
+const CHROME_GAP = space[4];
+
+export function bottomInset(safeAreaBottom: number): number {
+  return safeAreaBottom + TAB_BAR + CHROME_GAP;
+}

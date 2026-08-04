@@ -98,6 +98,21 @@ await db.exec(`
 
   -- D: signed up, never did anything. Must still end up with buttons.
 `);
+
+// Details in every shape the actions backfill has to survive: several joined
+// with the middot, a single action with none, one with no detail at all, and
+// one whose parts repeat (which the new unique constraint forbids).
+//
+// On user B, NOT user A — A is deleted partway through this file to prove the
+// account-deletion cascade, and the backfill assertions run after that.
+await db.exec(`
+  insert into public.entries (user_id, logged_for, lever, detail) values
+    ('${b}', '2026-07-15', 'food', 'treadmill · walk'),
+    ('${b}', '2026-07-16', 'food', 'just a swim'),
+    ('${b}', '2026-07-17', 'food', 'rows · rows'),
+    ('${b}', '2026-07-18', 'food', '  padded  ·  spaces  '),
+    ('${b}', '2026-07-19', 'food', null);
+`);
 console.log("seeded 4 users covering: both levers, entries-only, playbook-only, empty\n");
 
 // --- the migration under test, then everything after it ---------------------
@@ -418,6 +433,124 @@ const idx = await q(`select indexdef from pg_indexes where indexname = 'playbook
 idx.length === 1 && /archived = false/.test(idx[0].indexdef)
   ? ok("playbook_rank_idx is partial on the active rows")
   : bad(`playbook_rank_idx is missing or not partial: ${JSON.stringify(idx)}`);
+
+// ---------------------------------------------------------------------------
+// actions — the split of the merged detail string
+// ---------------------------------------------------------------------------
+
+// The whole safety property of the round: entries is untouched, so every
+// uptime figure is derived from exactly the same rows as before. If this fails,
+// nothing else about the split matters.
+const entryRows = await q(
+  `select count(*)::int as n from public.entries where user_id = '${b}' and logged_for = '2026-07-15'`,
+);
+entryRows[0].n === 1
+  ? ok("a day with two actions still has exactly ONE entry row")
+  : bad(`entries per lever per day changed: ${entryRows[0].n}`);
+
+const split = await q(
+  `select label, position from public.actions
+    where user_id = '${b}' and logged_for = '2026-07-15' order by position`,
+);
+split.length === 2 && split[0].label === "treadmill" && split[1].label === "walk"
+  ? ok("the backfill splits 'treadmill · walk' into two ordered actions")
+  : bad(`bad split: ${JSON.stringify(split)}`);
+
+const single = await q(
+  `select label from public.actions where user_id = '${b}' and logged_for = '2026-07-16'`,
+);
+single.length === 1 && single[0].label === "just a swim"
+  ? ok("a detail with no separator stays one action")
+  : bad(`single-action detail split wrongly: ${JSON.stringify(single)}`);
+
+const dupes = await q(
+  `select label from public.actions where user_id = '${b}' and logged_for = '2026-07-17'`,
+);
+dupes.length === 1
+  ? ok("a repeated part collapses to one action rather than violating unique")
+  : bad(`duplicate parts produced ${dupes.length} rows`);
+
+const padded = await q(
+  `select label from public.actions where user_id = '${b}' and logged_for = '2026-07-18' order by position`,
+);
+padded.length === 2 && padded[0].label === "padded" && padded[1].label === "spaces"
+  ? ok("surrounding whitespace is trimmed off each action")
+  : bad(`padding not trimmed: ${JSON.stringify(padded)}`);
+
+const none = await q(
+  `select count(*)::int as n from public.actions where user_id = '${b}' and logged_for = '2026-07-19'`,
+);
+none[0].n === 0
+  ? ok("an entry with no detail produces no actions")
+  : bad(`null detail produced ${none[0].n} actions`);
+
+// Deleting the account has to take the actions with it, or the cascade Apple
+// requires to work leaves orphans behind.
+const cascade = await q(`
+  select confdeltype from pg_constraint
+   where conrelid = 'public.actions'::regclass and contype = 'f'
+`);
+cascade.length === 1 && cascade[0].confdeltype === "c"
+  ? ok("actions cascade on user delete")
+  : bad(`actions FK is not ON DELETE CASCADE: ${JSON.stringify(cascade)}`);
+
+const rls = await q(
+  `select relrowsecurity from pg_class where oid = 'public.actions'::regclass`,
+);
+rls[0].relrowsecurity === true
+  ? ok("RLS is enabled on actions")
+  : bad("actions has no row level security");
+
+// ---------------------------------------------------------------------------
+// day boundary — the hour a day rolls over, per account
+// ---------------------------------------------------------------------------
+
+// Every existing account keeps 04:00, so nothing about a current install moves.
+const defaultHour = await q(
+  `select day_boundary_hour from public.system_state where user_id = '${b}'`,
+);
+defaultHour[0]?.day_boundary_hour === 4
+  ? ok("existing accounts default to the 04:00 boundary")
+  : bad(`default boundary was ${JSON.stringify(defaultHour)}`);
+
+// The bound mirrors DAY_BOUNDARY_MIN/MAX in core.
+try {
+  await db.exec(
+    `update public.system_state set day_boundary_hour = 13 where user_id = '${b}'`,
+  );
+  bad("an out-of-range boundary hour was accepted");
+} catch {
+  ok("the boundary hour is bounded to 0..12");
+}
+
+await db.exec(
+  `update public.system_state set day_boundary_hour = 0 where user_id = '${b}'`,
+);
+const midnight = await q(
+  `select day_boundary_hour from public.system_state where user_id = '${b}'`,
+);
+midnight[0].day_boundary_hour === 0
+  ? ok("midnight is a legal boundary")
+  : bad("midnight was rejected");
+
+// History records the boundary it was written under, so changing the setting
+// cannot re-date a day that is already logged.
+const stamped = await q(
+  `select boundary_hour from public.entries where user_id = '${b}' limit 1`,
+);
+stamped[0]?.boundary_hour === 4
+  ? ok("existing entries record the 04:00 boundary they were logged under")
+  : bad(`entry boundary was ${JSON.stringify(stamped)}`);
+
+// `logical_date` keeps its old arity so a deployed monitor does not break the
+// moment this lands, and shifts by the hour it is given.
+const sameDay = await q(`select
+  public.logical_date('UTC') as dflt,
+  public.logical_date('UTC', 4) as four,
+  public.logical_date('UTC', 0) as midnight`);
+sameDay[0].dflt.getTime() === sameDay[0].four.getTime()
+  ? ok("logical_date's default argument still means 04:00")
+  : bad("logical_date changed behaviour for existing callers");
 
 console.log(process.exitCode ? "\nRESULT: FAILURES ABOVE" : "\nRESULT: all checks passed");
 await db.close();

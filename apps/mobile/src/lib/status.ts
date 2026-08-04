@@ -1,13 +1,16 @@
 import { supabase } from "./supabase";
 import {
   allTime,
+  clampBoundaryHour,
   currentRun,
+  DAY_BOUNDARY_HOUR,
   deriveIntervals,
   downDays,
   lastCompletedRun,
   leverLabels,
   logicalDateLocal,
   uptimeWindow,
+  type Action,
   type ActivityRow,
   type Entry,
   type LeverSpan,
@@ -78,7 +81,29 @@ export type SystemState = {
   onboarded: boolean;
   /** Postgres `time` as "HH:MM:SS"; null means off, which is the default. */
   daily_reminder_at: string | null;
+  /** When the day rolls over. 4 unless the account has changed it. */
+  day_boundary_hour: number;
 };
+
+/**
+ * The account's day boundary, cached for the synchronous `today()`.
+ *
+ * `today()` is called from everywhere — the outbox, the log sheet, the
+ * dashboard — and none of those have a user in hand or can await a query. The
+ * value is written once per status load, which is the same moment every screen
+ * refreshes anyway.
+ *
+ * It starts at the default, so the first render before any load is the
+ * behaviour every existing install already has rather than a guess.
+ */
+let boundaryHour = DAY_BOUNDARY_HOUR;
+
+/** Read by `today()`. Set from `loadStatus`, and by the settings screen. */
+export function setBoundaryHour(hour: number) {
+  boundaryHour = clampBoundaryHour(hour);
+}
+
+export const currentBoundaryHour = () => boundaryHour;
 
 /**
  * **Never `logicalDate()` here.** Hermes delegates `Intl` to platform ICU and
@@ -88,9 +113,9 @@ export type SystemState = {
  * user's, and the failure mode is every date silently shifting by a day.
  *
  * `logicalDateLocal` uses no Intl at all. A phone's `Date` is already in the
- * user's local time, which is the timezone the 04:00 boundary actually means.
+ * user's local time, which is the timezone the day boundary actually means.
  */
-export const today = () => logicalDateLocal(new Date());
+export const today = () => logicalDateLocal(new Date(), boundaryHour);
 
 export type Status = Awaited<ReturnType<typeof loadStatus>>;
 
@@ -102,12 +127,19 @@ export async function loadStatus() {
 
   const now = today();
 
-  const [stateRes, entryRes, playbookRes, leverRes, milestoneRes, signalRes] =
-    await Promise.all([
+  const [
+    stateRes,
+    entryRes,
+    playbookRes,
+    leverRes,
+    milestoneRes,
+    signalRes,
+    actionRes,
+  ] = await Promise.all([
       supabase
         .from("system_state")
         .select(
-          "user_id, timezone, slammed_until, onboarded_at, daily_reminder_at",
+          "user_id, timezone, slammed_until, onboarded_at, daily_reminder_at, day_boundary_hour",
         )
         .eq("user_id", user.id)
         .maybeSingle(),
@@ -160,6 +192,19 @@ export async function loadStatus() {
         .select("observed_on, kind, value, detail")
         .eq("user_id", user.id)
         .order("observed_on", { ascending: true }),
+      // The several things done on one lever on one day. `entries` still holds
+      // them joined into `detail`; these are the same facts kept apart, so the
+      // day sheet can list them rather than showing "treadmill · walk" as if it
+      // were one activity with a strange name.
+      //
+      // Ordered by `position` — actions carry no timestamp by design, so this
+      // is the only ordering they have. Unbounded like `entries` and `signals`,
+      // because any day in history can be tapped.
+      supabase
+        .from("actions")
+        .select("logged_for, lever, label, position")
+        .eq("user_id", user.id)
+        .order("position", { ascending: true }),
     ]);
 
   const row = (stateRes.data ?? {}) as Record<string, unknown>;
@@ -171,10 +216,22 @@ export async function loadStatus() {
     // un-onboarded rather than crashing, and let onboarding create it.
     onboarded: row.onboarded_at != null,
     daily_reminder_at: (row.daily_reminder_at as string | null) ?? null,
+    day_boundary_hour: clampBoundaryHour(
+      (row.day_boundary_hour as number | null) ?? DAY_BOUNDARY_HOUR,
+    ),
   };
+
+  // Feed the synchronous `today()` before anything derives a date from it. A
+  // database without this column reads as the default, so an older server
+  // behaves exactly as it always did rather than producing NaN dates.
+  setBoundaryHour(state.day_boundary_hour);
 
   const entries = (entryRes.data ?? []) as LoggedEntry[];
   const signals = (signalRes.data ?? []) as unknown as Signal[];
+  // Empty rather than fatal when the table is not there yet: a client that
+  // reaches a database without the actions migration still shows every day,
+  // falling back to `entries.detail` in the sheet.
+  const actions = (actionRes.data ?? []) as unknown as Action[];
   const allLevers = (leverRes.data ?? []) as LeverRow[];
   const levers = allLevers.filter((l) => !l.archived);
   const playbook = (playbookRes.data ?? []) as PlaybookItem[];
@@ -193,6 +250,7 @@ export async function loadStatus() {
     levers,
     playbook,
     signals,
+    actions,
     /** For the grid: who existed when, archived included. */
     leverSpans: leverSpans(allLevers),
     /** For the day sheet: what each lever was CALLED, archived included. */

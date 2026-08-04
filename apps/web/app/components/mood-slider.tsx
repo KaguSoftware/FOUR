@@ -111,6 +111,21 @@ function Face({ value, muted }: { value: number; muted: boolean }) {
 
   return (
     <svg width={56} height={56} viewBox="0 0 1 1" aria-hidden="true">
+      {/* The head, from core — a rounded square, because every other cell this
+          product draws is one and a circle would be the only round thing in
+          the system. Stroked, never filled. Drawn here as well as on the phone
+          because `facePath` exists precisely so the two cannot diverge. */}
+      <rect
+        x={face.head.x}
+        y={face.head.y}
+        width={face.head.size}
+        height={face.head.size}
+        rx={face.head.radius}
+        ry={face.head.radius}
+        stroke={stroke}
+        strokeWidth={0.055}
+        fill="none"
+      />
       {face.eyes.map((eye, i) => (
         <circle key={i} cx={eye.cx} cy={eye.cy} r={eye.r} fill={stroke} />
       ))}

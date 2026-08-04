@@ -21,6 +21,20 @@ import { color, radius, space, TAP } from "@/theme";
  * text itself. `paddingVertical: 0` is the Android half of the same fix: its
  * TextInput ships default vertical padding that throws off centring in a
  * min-height box.
+ *
+ * **`writingDirection` and `textAlign` are pinned LTR, and that is not a
+ * styling preference.** Nothing in this app is translated and no string in it
+ * is RTL, but a device whose SYSTEM language is Persian or Arabic makes the
+ * native field's natural direction RTL — so the caret starts on the right and
+ * a password types backwards. Reported on device (2026-08-04) on the sign-in
+ * screen, where it is worst: `secureTextEntry` shows dots, so there is no text
+ * to read as mirrored and the field just behaves wrongly for no visible
+ * reason. The email field above it was accidentally immune, because
+ * `keyboardType="email-address"` already pins direction.
+ *
+ * Set here rather than on the two auth inputs so every field in the app agrees
+ * — the log sheet's note, the activity editor and all six settings forms had
+ * the same defect and nobody had typed into them on an RTL device yet.
  */
 export const field = {
   minHeight: TAP,
@@ -33,6 +47,8 @@ export const field = {
   fontFamily: "Inter_400Regular",
   fontSize: 16,
   includeFontPadding: false,
+  writingDirection: "ltr",
+  textAlign: "left",
 } as const;
 
 /**

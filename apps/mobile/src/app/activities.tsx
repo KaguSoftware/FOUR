@@ -26,7 +26,13 @@ import { color, space } from "@/theme";
 export default function ActivitiesModal() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { lever } = useLocalSearchParams<{ lever: string }>();
+  // `focus` is an activity id the log sheet wants opened for editing — set when
+  // Android's long-press "Rename" routes here, since `Alert.prompt` is iOS-only
+  // and that path used to arrive with the user's intent silently dropped.
+  const { lever, focus } = useLocalSearchParams<{
+    lever: string;
+    focus?: string;
+  }>();
   const status = cachedStatus();
 
   if (!status) return <Loading />;
@@ -50,6 +56,7 @@ export default function ActivitiesModal() {
           userId={status.state.user_id}
           lever={String(lever)}
           leverLabel={row?.label ?? String(lever)}
+          focus={focus}
         />
 
         <View style={{ marginTop: space[10] }}>

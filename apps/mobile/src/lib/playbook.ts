@@ -27,6 +27,23 @@ const fail = (error: unknown): ActivityResult => ({
   error: error instanceof Error ? error.message : String(error),
 });
 
+/**
+ * The one database error a user can actually cause, in words.
+ *
+ * `unique (user_id, lever, label)` covers ARCHIVED rows too, so the name being
+ * collided with may be one the cap retired and which is not on screen. Without
+ * this the raw Postgres string surfaces — "duplicate key value violates unique
+ * constraint playbook_user_id_lever_label_key" — which names a constraint the
+ * reader has no way to connect to a list they cannot see.
+ */
+const DUPLICATE = "23505";
+
+function describe(error: { code?: string; message: string }): string {
+  return error.code === DUPLICATE
+    ? "You already have an activity with that name on this lever. It may be one the cap retired — check the retired list."
+    : error.message;
+}
+
 /** Active activities for one lever, unranked — callers use `rankActivities`. */
 export async function loadActivities(
   userId: string,
@@ -65,7 +82,9 @@ export async function createActivity(
     label: normalizeActivityLabel(label),
   });
 
-  return insertError ? fail(insertError) : { ok: true };
+  return insertError
+    ? { ok: false, error: describe(insertError) }
+    : { ok: true };
 }
 
 export async function renameActivity(
@@ -84,7 +103,7 @@ export async function renameActivity(
     .eq("id", id)
     .eq("user_id", userId);
 
-  return error ? fail(error) : { ok: true };
+  return error ? { ok: false, error: describe(error) } : { ok: true };
 }
 
 /**

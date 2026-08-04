@@ -3,7 +3,7 @@ import { ScrollView, View, type ScrollViewProps } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Logo } from "./ui";
-import { color, space, TAB_BAR } from "@/theme";
+import { bottomInset, color, space } from "@/theme";
 
 /**
  * Every tab screen's frame, and the one place the system chrome is accounted
@@ -63,9 +63,9 @@ export function Screen({
         contentContainerStyle={{
           paddingTop: underHeader ? space[5] : insets.top + space[4],
           paddingHorizontal: space[5],
-          // The indicator AND the bar. `insets.bottom` alone clears the
-          // indicator and leaves everything under the tab bar.
-          paddingBottom: insets.bottom + TAB_BAR + space[8],
+          // The system inset AND the bar. `insets.bottom` alone clears the
+          // home indicator and leaves everything under the tab bar.
+          paddingBottom: bottomInset(insets.bottom) + space[8],
         }}
         refreshControl={refreshControl}
         keyboardShouldPersistTaps="handled"
@@ -143,7 +143,7 @@ export function Frame({
         backgroundColor: color.bg,
         paddingTop: insets.top + space[4],
         paddingHorizontal: space[5],
-        paddingBottom: insets.bottom + TAB_BAR + space[4],
+        paddingBottom: bottomInset(insets.bottom) + space[4],
       }}
     >
       {wordmark && (
@@ -173,5 +173,5 @@ export function Frame({
  */
 export function useTabBarInset(): number {
   const insets = useSafeAreaInsets();
-  return insets.bottom + TAB_BAR;
+  return bottomInset(insets.bottom);
 }

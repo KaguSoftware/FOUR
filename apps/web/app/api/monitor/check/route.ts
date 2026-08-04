@@ -6,6 +6,8 @@ import {
   downDays,
   evaluateFade,
   evaluatePlateau,
+  clampBoundaryHour,
+  DAY_BOUNDARY_HOUR,
   hasTimeZoneSupport,
   logicalDate,
   pendingMilestones,
@@ -58,6 +60,7 @@ function secretMatches(provided: string | null, expected: string): boolean {
 type SystemStateRow = {
   user_id: string;
   timezone: string | null;
+  day_boundary_hour: number | null;
   slammed_until: string | null;
   telegram_chat_id: string | null;
   push_token: string | null;
@@ -98,7 +101,15 @@ async function runPass({
   // a bad zone degrades this user to the default, instead of ending their pass.
   const zone = state.timezone ?? DEFAULT_TZ;
   const tz = hasTimeZoneSupport(zone) ? zone : DEFAULT_TZ;
-  const today = logicalDate(new Date(), tz);
+  // The account's own day boundary, so the pager fires on the same day the
+  // phone is showing. `clampBoundaryHour` guards the same way the zone above
+  // is validated — this column is user-writable, and a bad value here would
+  // shift every date in the pass.
+  const today = logicalDate(
+    new Date(),
+    tz,
+    clampBoundaryHour(state.day_boundary_hour ?? DAY_BOUNDARY_HOUR),
+  );
   const slammed = !!state.slammed_until && state.slammed_until >= today;
 
   const [
@@ -332,7 +343,7 @@ export async function GET(request: NextRequest) {
   const { data: states } = await supabase
     .from("system_state")
     .select(
-      "user_id, timezone, slammed_until, telegram_chat_id, push_token, last_paged_on, last_paged_level, last_plateau_on",
+      "user_id, timezone, day_boundary_hour, slammed_until, telegram_chat_id, push_token, last_paged_on, last_paged_level, last_plateau_on",
     );
 
   const results: PassResult[] = [];

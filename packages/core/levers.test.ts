@@ -7,6 +7,7 @@ import {
   canAddLever,
   isValidLeverKey,
   slugifyLever,
+  splitDetail,
   uniqueLeverKey,
   validateLeverLabel,
 } from "./levers";
@@ -134,5 +135,42 @@ describe("appendDetail", () => {
 
   it("never returns an empty string — null means nothing recorded", () => {
     expect(appendDetail("   ", null)).toBeNull();
+  });
+});
+
+describe("splitDetail", () => {
+  it("recovers the parts a joined detail was built from", () => {
+    // The `actions` table stores these separately; this is how one entry's
+    // string becomes the several things it records.
+    expect(splitDetail("treadmill · walk")).toEqual(["treadmill", "walk"]);
+  });
+
+  it("round-trips with appendDetail", () => {
+    // The two must agree about where a detail divides, or the actions table
+    // drifts from `entries.detail`.
+    const joined = appendDetail(appendDetail(null, "treadmill"), "walk");
+    expect(splitDetail(joined)).toEqual(["treadmill", "walk"]);
+  });
+
+  it("treats a detail with no separator as one action", () => {
+    expect(splitDetail("just a swim")).toEqual(["just a swim"]);
+  });
+
+  it("returns nothing for an absent or blank detail", () => {
+    expect(splitDetail(null)).toEqual([]);
+    expect(splitDetail("")).toEqual([]);
+    expect(splitDetail("   ")).toEqual([]);
+  });
+
+  it("drops blank parts and collapses repeats", () => {
+    // Matches the unique constraint on `actions`, and `appendDetail`'s own
+    // rule that the same thing twice in a day is a mis-tap.
+    expect(splitDetail("a ·  · b")).toEqual(["a", "b"]);
+    expect(splitDetail("rows · rows")).toEqual(["rows"]);
+    expect(splitDetail("Rows · ROWS")).toEqual(["Rows"]);
+  });
+
+  it("trims the whitespace around each part", () => {
+    expect(splitDetail("  padded  ·  spaces  ")).toEqual(["padded", "spaces"]);
   });
 });

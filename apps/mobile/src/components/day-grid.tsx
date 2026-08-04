@@ -128,6 +128,31 @@ export function DayGrid({
   const elapsed = cells.filter((d) => d <= today).length;
 
   /**
+   * The cell size, measured once and floored to a whole pixel.
+   *
+   * **`flex: 1` + `aspectRatio: 1` is what made the rows drift.** Ten cells and
+   * nine 6pt gaps divide a phone's content width into a FRACTIONAL cell — 29.6pt
+   * at 390, 30.8 at 402, 33.4 at 428. Flex happily lays those out at sub-pixel
+   * widths, but `aspectRatio` then derives each cell's HEIGHT from its own
+   * fractional width and the platform rounds that to the pixel grid
+   * independently per cell. The rows ended up a fraction of a point apart and
+   * offset differently from one another, which reads exactly as the owner
+   * described it: rows shifted left and right. Reported on device 2026-08-04.
+   *
+   * Measuring once and flooring gives every cell in every row the identical
+   * integer box, so the three rows cannot disagree. The remainder (under 10pt)
+   * is absorbed by the row's `justifyContent`, not smeared across the cells.
+   *
+   * Same doctrine as `lever-buttons.tsx`, which measures its container and
+   * positions fixed-size cells rather than letting flex round them.
+   */
+  const [width, setWidth] = useState(0);
+  const size =
+    width > 0
+      ? Math.floor((width - GAP * (TRAILING_COLS - 1)) / TRAILING_COLS)
+      : 0;
+
+  /**
    * Chunked into explicit rows, never left to `flexWrap`.
    *
    * The column count is a design decision (see the docblock). Wrapping makes it
@@ -152,36 +177,46 @@ export function DayGrid({
           ? `Day ${elapsed} of ${days}. ${fired.size} logged.`
           : `Last ${days} days. ${fired.size} logged.`
       }
+      onLayout={(e) => {
+        const next = e.nativeEvent.layout.width;
+        // Only on a real change: onLayout fires on every re-render on Android.
+        setWidth((prev) => (Math.abs(prev - next) < 1 ? prev : next));
+      }}
       style={{ gap: GAP }}
     >
-      {rows.map((row, r) => (
-        <View key={r} style={{ flexDirection: "row", gap: GAP }}>
-          {row.map((date) => (
-            <DayCell
-              key={date}
-              date={date}
-              fill={gridFill(fired.get(date)?.size ?? 0, leversOn(spans, date))}
-              isToday={date === today}
-              // Days the block reaches that have not happened yet. Drawn as
-              // nothing, exactly as a calendar's trailing pad is — a day that
-              // has not arrived is not a day that was missed. Only reachable
-              // while the block is pinned to day one.
-              future={date > today}
-              onPress={onPressDay}
-              // Home's cells land near 31pt — under the 44pt minimum, and the
-              // reason History's calendar is the comfortable place to open a
-              // day. No hitSlop: at a 6pt gap the slop regions would overlap
-              // and the tap would become a guess between two days.
-            />
-          ))}
-        </View>
-      ))}
+      {size > 0 &&
+        rows.map((row, r) => (
+          <View key={r} style={{ flexDirection: "row", gap: GAP }}>
+            {row.map((date) => (
+              <DayCell
+                key={date}
+                date={date}
+                size={size}
+                fill={gridFill(
+                  fired.get(date)?.size ?? 0,
+                  leversOn(spans, date),
+                )}
+                isToday={date === today}
+                // Days the block reaches that have not happened yet. Drawn as
+                // nothing, exactly as a calendar's trailing pad is — a day that
+                // has not arrived is not a day that was missed. Only reachable
+                // while the block is pinned to day one.
+                future={date > today}
+                onPress={onPressDay}
+                // Home's cells land near 31pt — under the 44pt minimum, and the
+                // reason History's calendar is the comfortable place to open a
+                // day. No hitSlop: at a 6pt gap the slop regions would overlap
+                // and the tap would become a guess between two days.
+              />
+            ))}
+          </View>
+        ))}
     </View>
   );
 }
 
 /**
- * Every month since the first entry, newest first, **one per swipe**.
+ * Every month since the first entry, **one per swipe**, oldest on the left.
  *
  * It was a vertical stack, and an account a year old made History a page you
  * scrolled through thirteen calendars of to reach the incident list under
@@ -190,6 +225,17 @@ export function DayGrid({
  *
  * Anchors come from core so the walk cannot skip a month; stepping back from
  * the 31st with naive date maths lands in March twice and never in February.
+ *
+ * **The order is reversed HERE, not in core.** `monthsBetween` returns newest
+ * first, which put the current month at the far left and last month to its
+ * right: going back in time meant swiping the wrong way, against the direction
+ * every other timeline in this app runs. Reported on device (2026-08-04).
+ *
+ * Core is left alone because the web pager reads the same function and labels
+ * its arrows to match (`month-pager.tsx`); flipping the shared helper would
+ * silently invert the browser and its tests to fix a phone. The pager opens on
+ * the LAST index for the same reason it used to open on the first — the month
+ * you want to see is this one.
  */
 export function MonthStack({
   entries,
@@ -207,7 +253,10 @@ export function MonthStack({
   // From the first entry rather than from signup: a pager that opens on empty
   // months is a stack of nothing in front of the real history.
   const earliest = firstLogged(entries) ?? today;
-  const anchors = monthsBetween(earliest, today);
+  // Oldest → newest, so time runs left to right. `toReversed` is not available
+  // on this Hermes; `slice().reverse()` copies rather than mutating core's array.
+  const anchors = monthsBetween(earliest, today).slice().reverse();
+  const last = anchors.length - 1;
 
   return (
     <View
@@ -216,7 +265,7 @@ export function MonthStack({
       // months and the incident list below it does not jump on each swipe.
       // Measured from the widest month a calendar can be: six rows plus the
       // header block.
-      accessibilityHint="Swipe left for earlier months"
+      accessibilityHint="Swipe right for earlier months"
     >
       {width > 0 && (
         <FlatList
@@ -225,6 +274,11 @@ export function MonthStack({
           pagingEnabled
           showsHorizontalScrollIndicator={false}
           keyExtractor={(anchor) => anchor}
+          // Opens on this month, which is now the last page rather than the
+          // first. Safe to jump to without measuring because `getItemLayout`
+          // below is exact — without it, an initial index on a horizontal list
+          // is what makes a pager land between two pages.
+          initialScrollIndex={last}
           // Fixed page width, so `getItemLayout` is exact and the list can
           // jump straight to an index without measuring anything.
           getItemLayout={(_, index) => ({
@@ -240,7 +294,12 @@ export function MonthStack({
                 today={today}
                 spans={spans}
                 onPressDay={onPressDay}
-                position={`${index + 1} of ${anchors.length}`}
+                // Counted from the newest month, so this month is always
+                // "1 of n" however far back the history goes. The pages are
+                // ordered oldest-first for the swipe; the COUNT is what a
+                // person would say out loud, and nobody calls this month
+                // "fourteen of fourteen".
+                position={`${last - index + 1} of ${anchors.length}`}
               />
             </View>
           )}
@@ -390,36 +449,58 @@ function DayCell({
   fill,
   isToday,
   future = false,
+  size,
   onPress,
 }: {
   date: string;
   fill: string | null;
   isToday: boolean;
   future?: boolean;
+  /**
+   * A measured, whole-pixel side. Home passes one; History does not.
+   *
+   * Home's ten columns divide a phone into a fractional cell, and letting each
+   * one round its own `aspectRatio` height made the three rows drift apart —
+   * see `DayGrid`. History's seven columns are wider and it pads short weeks
+   * with flex spacers, so it keeps the simpler sizing.
+   */
+  size?: number;
   onPress?: (date: string) => void;
 }) {
   // Today breathes on BOTH grids. The pulse exists because a static ring did
   // not read as "you are here" on a real phone, and Home — the screen opened
   // to decide whether today is done — is where that has to land hardest.
   if (isToday) {
-    return <TodayCell fill={fill} date={date} onPress={onPress} />;
+    return <TodayCell fill={fill} date={date} size={size} onPress={onPress} />;
   }
 
   const style = {
-    // The row is a fixed number of cells wide, so equal flex divides it exactly
-    // — no measurement, and no rounding that can push a cell onto a new line.
-    flex: 1,
-    aspectRatio: 1,
+    // A measured integer box where one was given, so every row agrees to the
+    // pixel. Otherwise equal flex, which History's wider columns can afford.
+    ...(size ? { width: size, height: size } : { flex: 1, aspectRatio: 1 }),
     borderRadius: radius.sm,
     backgroundColor: future ? "transparent" : (fill ?? color.surface),
-    // A down day is an outline; an up day is a fill. Today keeps the brighter
-    // ring on top of whichever it is.
-    borderWidth: fill && !isToday && !future ? 0 : 1,
+    /**
+     * **Every cell carries a border, always.** A filled day's border is simply
+     * its own fill, so it is invisible while still occupying the box.
+     *
+     * This used to be `borderWidth: fill ? 0 : 1`, which meant an up day and a
+     * down day were DIFFERENT SIZES: React Native draws a border inside the
+     * box, so a 1px border shrinks the painted square by 2px against a
+     * borderless neighbour. Mixed rows therefore sat a couple of pixels out
+     * from each other and the grid read as shifted left and right — reported
+     * on device 2026-08-04, and correctly traced by the owner to the ring
+     * around today, which is 2px and was the most visible offender.
+     *
+     * Keeping the width constant and moving only the COLOUR is the same
+     * technique `TodayCell` already uses to stop its pulse resizing the cell.
+     */
+    borderWidth: 1,
     borderColor: future
       ? color.surface
       : isToday
         ? color.lineHi
-        : color.line,
+        : (fill ?? color.line),
   } as const;
 
   // Future days are not openable: there is nothing to show, and a sheet that
@@ -464,10 +545,13 @@ const PULSE_MS = 1800;
 function TodayCell({
   fill,
   date,
+  size,
   onPress,
 }: {
   fill: string | null;
   date: string;
+  /** See `DayCell`. Home measures; History flexes. */
+  size?: number;
   onPress?: (date: string) => void;
 }) {
   const phase = useSharedValue(0);
@@ -501,17 +585,25 @@ function TodayCell({
     ),
   }));
 
-  // The outer element carries the `flex: 1` that divides the row; the animated
-  // box fills it. Splitting them keeps the flex sizing off the element whose
-  // style is being driven on the UI thread.
   const box = [
     {
+      // Fills whatever the outer element measures out to, so this matches the
+      // plain cells exactly on both grids.
       width: "100%" as const,
-      aspectRatio: 1,
+      ...(size ? { height: size } : { aspectRatio: 1 }),
       borderRadius: radius.sm,
       backgroundColor: fill ?? color.surface,
-      // 2px at both ends of the pulse, so the cell does not resize as it
-      // animates — only the colour moves.
+      /**
+       * 2px at both ends of the pulse, so the cell does not resize as it
+       * animates — only the colour moves.
+       *
+       * It is deliberately one step THICKER than the 1px every other cell
+       * carries: this ring has to read as "you are here" across the grid. RN
+       * draws borders inside the box, so the extra pixel eats into the painted
+       * square rather than growing it, and today's cell stays exactly the same
+       * outer size as its neighbours — which is the property that keeps the
+       * rows aligned. Do not "fix" this by dropping it to 1.
+       */
       borderWidth: 2,
     },
     // Reduce Motion gets the bright end of the same ramp, statically. The
@@ -519,9 +611,14 @@ function TodayCell({
     reduceMotion ? { borderColor: color.ink } : animated,
   ];
 
+  // The outer element carries the sizing that divides the row; the animated box
+  // fills it. Splitting them keeps the flex sizing off the element whose style
+  // is being driven on the UI thread.
+  const outer = size ? { width: size } : { flex: 1 };
+
   if (!onPress) {
     return (
-      <View style={{ flex: 1 }}>
+      <View style={outer}>
         <Animated.View style={box} />
       </View>
     );
@@ -534,8 +631,8 @@ function TodayCell({
       accessibilityLabel={`${date}, today: ${fill ? "up" : "down"}`}
       android_ripple={ripple()}
       style={({ pressed }) => [
+        outer,
         {
-          flex: 1,
           // Invisible — this element has no fill and no border; the animated
           // box inside carries both. It exists so the foreground ripple has
           // an outline to clip to, or it paints a square over a rounded cell.

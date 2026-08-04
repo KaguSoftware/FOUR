@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { View } from "react-native";
+import { I18nManager, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Stack } from "expo-router/stack";
 import * as SplashScreen from "expo-splash-screen";
@@ -21,6 +21,27 @@ import { SessionProvider, useSession } from "@/lib/session";
 import { color } from "@/theme";
 
 SplashScreen.preventAutoHideAsync();
+
+/**
+ * This app is LTR everywhere, on every device.
+ *
+ * Not a statement about who uses it — a statement about what it contains. Every
+ * string here is English and the layout is full of things whose direction is
+ * their MEANING: the day grid reads left-to-right as time, History's month
+ * pager pages backwards through it, and the pixel wall fills in reading order.
+ * Mirroring those would not translate the app, it would reverse the clock.
+ *
+ * Without this, a phone whose system language is RTL flips all of it — and the
+ * first symptom is small and baffling rather than obviously a mirroring bug:
+ * the sign-in password field types backwards. See `components/fields.ts`.
+ *
+ * At module scope, so it runs before the first render. **On Android this only
+ * takes effect after a restart** — `I18nManager` writes a native flag that is
+ * read at startup — so a reload will not show the change and is not evidence
+ * that it failed.
+ */
+I18nManager.allowRTL(false);
+I18nManager.forceRTL(false);
 
 /**
  * A real native sheet, presented by the navigator rather than drawn by us:

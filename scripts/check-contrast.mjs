@@ -121,18 +121,16 @@ const ENFORCED = [
   // transfer.
   ["snackbar · message text", "ink", "surface-hi", TEXT],
   ["snackbar · action label", "ink", "surface-hi", TEXT],
-  // The mood strip's live readout, which floats over the bars on the same
-  // raised surface the snackbar uses. Its own row rather than leaning on the
-  // two above: a token on a new ground is a new measurement, and this one is
-  // read at `size.xs` while a finger is moving.
-  ["mood strip · drag readout", "ink", "surface-hi", TEXT],
-  // The readout's edge, measured against what is BEHIND it rather than against
-  // its own fill — same reasoning as the snackbar below. The border exists to
-  // separate a floating chip from the page and the bars it covers, so those
-  // are the grounds that matter. Against its own `surface-hi` it measures
-  // 2.80:1, which is fine: nothing has to find the edge from the inside.
-  ["mood strip · readout edge on the page", "line-hi", "bg", NONTEXT],
-  ["mood strip · readout edge on a bar", "line-hi", "surface", NONTEXT],
+  // The mood chart's bars, on the page. `line-hi` is a past day's reading and
+  // `line` is a day nobody answered — the two MUST stay distinguishable from
+  // each other and from the ground, because "you skipped this" and "this was
+  // rough" are the one distinction the whole control exists to make.
+  ["mood chart · a past day's bar", "line-hi", "bg", NONTEXT],
+  ["mood chart · today's bar", "ink", "bg", NONTEXT],
+  // The value beside the slider, which is also the button that opens the
+  // number pad. Set and unset are different tokens on the same ground.
+  ["mood chart · value readout", "ink", "bg", TEXT],
+  ["mood chart · value when unset", "ink-mute", "bg", TEXT],
   // DESIGN.md forbids shadows, so the border is what separates the snackbar
   // from whatever is under it. That makes the stroke the whole boundary, and a
   // boundary that carries the component's edge owes WCAG 1.4.11's 3:1.

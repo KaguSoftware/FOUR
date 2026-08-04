@@ -223,8 +223,14 @@ export function moodWeek(
  * a day nobody answered, which is the one distinction the strip exists to make.
  * An answered day therefore never falls below `floor`; `null` returns 0 and the
  * client draws its own "skipped" treatment.
+ *
+ * The floor is deliberately generous. It was 0.12, which on a 36pt chart put
+ * the lowest answer 1.3pt above a skipped day's stub — a difference only the
+ * COLOUR was really carrying, and PRODUCT.md requires that state never be
+ * communicated by colour alone. At 0.22 the two differ by roughly a stub's own
+ * height as well as by tone.
  */
-export function moodBarHeight(value: number | null, floor = 0.12): number {
+export function moodBarHeight(value: number | null, floor = 0.22): number {
   if (value === null || !Number.isFinite(value)) return 0;
   return floor + moodFraction(value) * (1 - floor);
 }

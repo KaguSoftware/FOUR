@@ -197,11 +197,16 @@ describe("moodWeek", () => {
 });
 
 describe("moodBarHeight", () => {
-  it("keeps the lowest real reading visible", () => {
+  it("keeps the lowest real reading clearly above a skipped day", () => {
     // MOOD_MIN maps to fraction 0, so without a floor the lowest answer would
     // draw a zero-height bar — identical to a day nobody answered.
-    expect(moodBarHeight(MOOD_MIN)).toBeGreaterThan(0);
-    expect(moodBarHeight(MOOD_MIN)).toBeCloseTo(0.12, 5);
+    //
+    // Asserted as a RATIO rather than against the constant: the exact floor is
+    // a layout call that has already moved once (0.12 → 0.22, when the chart
+    // went to 14 days and 1.3pt of difference stopped being visible). What
+    // must not regress is that the gap stays big enough to read without
+    // relying on colour, which PRODUCT.md forbids as a lone signal.
+    expect(moodBarHeight(MOOD_MIN)).toBeGreaterThan(0.2);
   });
 
   it("gives an unanswered day no height at all", () => {

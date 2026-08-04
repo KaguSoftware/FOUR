@@ -8,7 +8,7 @@ import { Body, Label, Mono } from "@/components/ui";
 import { useNotify } from "@/components/snackbar";
 import { DayGrid } from "@/components/day-grid";
 import { LeverButtons } from "@/components/lever-buttons";
-import { MoodStrip } from "@/components/mood-slider";
+import { MoodStrip, MOOD_DAYS } from "@/components/mood-slider";
 import { Screen } from "@/components/screen";
 import { Takeover } from "@/components/takeover";
 import { useStatus } from "@/lib/use-status";
@@ -122,12 +122,17 @@ export default function StatusScreen() {
   } = status;
 
   /**
-   * The week the strip draws, with this device's unlanded write laid on top.
+   * The fortnight the mood chart draws, with this device's unlanded write laid
+   * on top.
    *
    * Same shape as `shownAsLogged` below: the server list is the base, and a
    * local value only overrides the one day it is for.
+   *
+   * The length is stated here rather than left to `moodWeek`'s default, because
+   * it is a layout decision — the chart is sized from it — and a component
+   * reading a different number of days than it draws bars for is a silent bug.
    */
-  const week = moodWeek(signals, today).map((d) =>
+  const week = moodWeek(signals, today, MOOD_DAYS).map((d) =>
     justSaved && justSaved.date === d.date
       ? { ...d, value: justSaved.value }
       : d,

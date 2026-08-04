@@ -291,25 +291,50 @@ manager or backup drive — see *Gotchas*.
   eslint + expo lint clean, 39 migration checks, contrast clean, the web app
   builds, both bundles export.** **Nothing in it has been on hardware.**
 
-- **The mood strip, 2026-08-04.** The dashboard's "how was today" section was
-  rebuilt a third time, and this time the diagnosis was different: the two
-  earlier attempts treated it as a layout problem, and it was not one.
+- **The mood chart + slider, 2026-08-04.** The dashboard's "how was today"
+  section was rebuilt several times over one day, and the version that stuck
+  came from a different diagnosis: the earlier attempts treated it as a layout
+  problem, and it was not one.
   **The reading was effectively write-only.** Nothing in the app showed mood
   back except the day sheet, one day at a time behind a grid tap, as the
   literal string `63 mood` — a form `mood.ts`'s own docblock calls "not an
   answer". You fed it daily and never saw it again.
-  It is now a **seven-bar strip**: six days behind you, today last, set by
-  dragging anywhere on the row. The control is its own readback. Seven because
-  a week is the unit `evaluatePlateau` already reasons in — it folds days into
-  ISO weeks and discards any week under three readings — so the strip shows
-  exactly the window the pager judges, and each bar is twice as wide to hit as
-  a fortnight's would be. A `n/7` count sits on the label's row.
-  **The face, the slider and the Save button are all gone.** Save existed
-  because a drag taken to browse the faces was indistinguishable from an
-  answer; there are no faces now, a drag has one meaning, and the strip shows
-  the result immediately. Releasing writes. Owner's call, reversing their own
-  08-04 decision — and it moves mobile *back towards* web, which has always
-  committed on pointer-up and never had a Save button.
+  It is now **two halves with one job each**, and keeping them separate is the
+  design:
+  - **A 14-bar chart reports.** Read-only. It exists so an answer visibly joins
+    a record, and so the flat stretch `evaluatePlateau` pages about four weeks
+    late is something you can see coming. A `n/14` count sits on the label row.
+  - **A slider sets today.** The platform's own control, below the chart, with
+    the value beside it. Releasing writes.
+
+  **Fourteen days, not seven.** A week of context shows the current week with
+  nothing to compare it against; `evaluatePlateau` needs four consecutive
+  sampled weeks to fire, so a fortnight is the shortest window in which "this
+  week is flatter than last" is visible at all. `MOOD_DAYS` is exported from
+  the component and passed explicitly by Home, so the screen feeding the chart
+  cannot ask for a different number of days than it draws bars for.
+
+  **The chart was briefly draggable and is not any more.** An earlier cut had
+  today's bar grow under the finger with a floating readout — it worked, but it
+  made one element both the input and the output, which is *why* the bar had to
+  grow: a fingertip covers a ~40pt bar completely. Splitting the two removes
+  the problem instead of animating around it, and deletes the pan gesture, the
+  grow spring and the overlay with it. Owner's call.
+
+  **The face and the Save button are gone.** The face was a caricature of a
+  rating the slider already shows. Save existed because a drag taken to browse
+  the faces was indistinguishable from an answer — there are no faces now, and
+  releasing writes, which is what web has always done.
+
+  **A tap on the value opens a number pad**, because a slider is fast but
+  imprecise. `Alert.prompt` is **iOS-only** — the same wall the activity rename
+  hit — so Android opens an inline field that *replaces* the slider row rather
+  than sitting under it, keeping the section's height fixed with the keyboard
+  up. Both paths land in one `commitTyped`, which clamps rather than refusing.
+
+  **The drag haptic fires per BAND, not per point.** A full drag crosses ~99
+  values and a tick on each is a buzz that says nothing; the bands are the five
+  words `moodLabel` already divides the range into.
   **`moodWeek` and `moodBarHeight` are in core**, with the load-bearing rule
   under test: **an unanswered day is `null`, never `0`**. The monitor drops an
   unsampled day rather than inventing one, and `MOOD_MIN` is 1 — so
@@ -319,51 +344,24 @@ manager or backup drive — see *Gotchas*.
   Also: **the separate `loadMood` round trip is deleted.** `loadStatus` already
   selects every signal unbounded, so today's row was being fetched anyway and
   the extra request was pure latency — the same conclusion web reached earlier.
-  **`@react-native-community/slider` is now unused in source but deliberately
-  still in `package.json`**: removing a native module forces every dev build to
-  be rebuilt, and it buys nothing. Drop it next time the build is regenerated
-  for another reason.
+  **`@react-native-community/slider` is in use again.** It was briefly orphaned
+  when the strip was drag-only, and was deliberately left in `package.json`
+  rather than removed — a native module coming out forces every dev build to be
+  rebuilt. That call paid for itself within the day: the slider came back as
+  the input half. Do not remove it.
   **Web is untouched** — it keeps the face and `<input type=range>`. The two
   clients have diverged on this control on purpose, for one round; `moodWeek`
   living in core is what makes the port cheap, and it can also replace web's
   local `todaysMood` helper.
 
-  **Three refinements, same day, all owner-requested from using it:**
-
-  1. **Today's bar grows while held**, on a spring, in both axes. Not
-     decoration: the bar is ~40pt wide and a fingertip covers all of it, so the
-     thing being adjusted is invisible at the moment of adjusting it. Widening
-     past the finger puts an edge back on both sides and the extra height buys
-     travel per pixel. It grows **outside its slot** — `marginHorizontal` goes
-     negative by half the added width, so it expands from its own centre and
-     **nothing else in the row moves**, which is the rule the lever grid
-     already follows. The strip reserves `GROW_Y` of headroom and the header
-     gives back the same amount, so the section's total height is unchanged.
-     Under Reduce Motion the bar still grows — that is the feedback the drag
-     registered — it just arrives without the spring.
-  2. **A live readout floats over the strip while dragging.** Absolutely
-     positioned so it costs no layout and nothing reflows as the digits change
-     width, `pointerEvents="none"` so it can never intercept the drag it is
-     reporting on, and gone the instant the finger lifts — a number parked
-     permanently over the week would turn a glanceable strip into a dashboard.
-     **`check:contrast` caught a real defect here**: its border was `line` on
-     `surface-hi` at **1.22:1**, invisible. It is `line-hi` now, and measured
-     against the page and the bars *behind* it rather than its own fill —
-     the same reasoning already recorded for the snackbar's edge.
-  3. **Double tap to type an exact number.** A drag is fast but imprecise, and
-     "I want exactly 70 on this" is a real thing to want. `Gesture.Exclusive`
-     gives the double tap first refusal so it is never also read as two drags.
-     **`Alert.prompt` is iOS-only** — the same constraint the activity rename
-     hit — so Android opens an inline field that *replaces* the strip rather
-     than sitting under it, keeping the section's height fixed while the
-     keyboard is up. Both paths land in one `commitTyped`, which clamps rather
-     than rejecting.
-
-  **The drag haptic fires per BAND, not per point.** A full-height drag crosses
-  ~99 values and a tick on each is a continuous buzz that says nothing;
-  `nudged` is documented as the constant for "switching between a series of
-  potential choices", and the choices are the five words `moodLabel` bands the
-  range into.
+  **`moodBarHeight`'s floor moved 0.12 → 0.22 when the chart went to 14 days**,
+  and the reason is worth keeping: at 0.12 on a 36pt chart, the lowest possible
+  ANSWER drew 4.3pt against a skipped day's 3pt stub. A 1.3pt difference is not
+  a difference — only the colour was really carrying it, and PRODUCT.md forbids
+  state being communicated by colour alone. At 0.22 the two differ by roughly a
+  stub's own height as well as by tone. The test asserts the *property* (a real
+  reading stays clearly above a skipped one) rather than the constant, because
+  the exact floor is a layout call that has now moved once already.
 
   Verified: **302 core tests, tsc clean ×3, eslint + expo lint clean, contrast
   clean (2 new enforced pairs, 1 defect caught and fixed), both bundles
@@ -504,26 +502,24 @@ manager or backup drive — see *Gotchas*.
   5. **The activity cap under a real log.** Fill a lever to ten, then log it
      with a brand-new note. **The day must still land.** That is the whole
      safety property of the round.
-- **The mood strip is untested on hardware.** In rough order of how likely each
-  is to be wrong:
-  1. **The grow, clipped.** It expands outside its slot and relies on
-     `overflow: visible` plus `GROW_Y` of reserved headroom. If the top of the
-     held bar is cut off, that allowance is wrong — and on Android the parent
-     `Screen` may clip differently than iOS.
-  2. **Whether the drag is comfortable at all.** The whole premise is that a
-     bar you can see past your fingertip is easier to land than a slider thumb.
-     That is a claim about a real hand on real glass and nothing else can test
-     it. If it is worse, the fallback is a taller `TRACK`, not more animation.
-  3. **The double tap against the drag.** `Gesture.Exclusive` should stop a
-     double tap also registering as two drags, but a slow double tap may still
-     set a value on its first touch before the dialog opens.
-  4. **Android's inline field.** It replaces the strip while open; check the
-     keyboard does not push the section under the tab bar, and that `cancel`
-     leaves the previous value intact.
-  5. **The band haptic.** Five ticks across a full drag should read as
-     detents. If it feels like nothing, the bands are too coarse.
-  6. **`justSaved` and the refresh.** Drag, release, and watch for the bar
-     dropping to its old height for a frame before the reload lands.
+- **The mood chart + slider is untested on hardware.** In rough order of how
+  likely each is to be wrong:
+  1. **Fourteen bars on a small phone.** They land near 20pt wide with a 3pt
+     gap. Check the chart still reads as fourteen separate days rather than a
+     texture — if it does not, the honest fix is fewer days, not a smaller gap.
+  2. **A skipped day against the lowest real reading.** 3pt versus ~8pt, in
+     `line` versus `line-hi`. This is the one distinction the control exists to
+     make, and the floor was already raised once for it. **Seed a gap and look
+     at it.**
+  3. **The section's total height.** Chart plus slider plus the label row —
+     confirm Home still fits, on the Android device that found the inset bug.
+  4. **Android's inline number field.** It replaces the slider row while open;
+     check the keyboard does not push the section under the tab bar, and that
+     `cancel` leaves the previous value intact.
+  5. **The band haptic.** Five ticks across a full drag should read as detents.
+     If it feels like nothing, the bands are too coarse.
+  6. **`justSaved` and the refresh.** Release the slider and watch for today's
+     bar dropping to its old height for a frame before the reload lands.
 
 - **The 2026-08-04 auth round is untested on hardware**, and it is the cheapest
   of the four to check — one screen, no data, reachable by signing out.

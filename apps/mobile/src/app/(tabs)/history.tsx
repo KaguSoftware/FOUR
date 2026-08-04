@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { View, type ScrollView } from "react-native";
 import { useRouter } from "expo-router";
-import { monthsBetween } from "@uptime/core";
+import { monthsBetween } from "@four/core";
 import { Body, Label, Mono, Rule } from "@/components/ui";
 import { MonthStack } from "@/components/day-grid";
 import { Loading } from "@/components/states";

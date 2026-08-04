@@ -10,7 +10,7 @@ import Animated, {
   withSpring,
   withTiming,
 } from "react-native-reanimated";
-import { MAX_LEVERS } from "@uptime/core";
+import { MAX_LEVERS } from "@four/core";
 import { androidMetrics } from "./ui";
 import { committed, nudged, pickedUp } from "@/lib/haptics";
 import { pressFill, pressFillFlat, ripple } from "@/lib/press";

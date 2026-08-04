@@ -3,7 +3,7 @@ import {
   normalizeActivityLabel,
   validateActivityLabel,
   type ActivityRow,
-} from "@uptime/core";
+} from "@four/core";
 import { supabase } from "./supabase";
 
 /**

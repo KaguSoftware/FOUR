@@ -375,7 +375,7 @@ not repeat it in words.
 the number of levers is user-defined. `L = 0.51 + (fired / leverCount) × 0.44`,
 so two of three levers sits two thirds of the way from the floor to ink rather
 than at the midpoint. Chroma eases from 0.008 to ink's 0.004 over the same span.
-Steps come from `gridFill()` in `@uptime/core`, so the phone and the web
+Steps come from `gridFill()` in `@four/core`, so the phone and the web
 dashboard cannot disagree about how a day looked.
 
 | Levers | Steps (dimmest → all) |

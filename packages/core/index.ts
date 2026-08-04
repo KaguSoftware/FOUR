@@ -1,5 +1,5 @@
 /**
- * @uptime/core — the derivation engine.
+ * @four/core — the derivation engine.
  *
  * This package exists exactly once and is consumed by every client (web today,
  * mobile next). That is the whole point: uptime, runs and outages are derived,

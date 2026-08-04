@@ -2,7 +2,7 @@ import { useCallback, useState } from "react";
 import { Linking, Platform } from "react-native";
 import * as Notifications from "expo-notifications";
 import { useFocusEffect } from "expo-router";
-import { addDays, clampBoundaryHour } from "@uptime/core";
+import { addDays, clampBoundaryHour } from "@four/core";
 
 import { useNotify } from "@/components/snackbar";
 import { Loading } from "@/components/states";

@@ -4,7 +4,7 @@ import { NavLink } from "./nav-link";
 import { useState, useTransition } from "react";
 import { logEntry } from "@/app/actions";
 import type { LeverRow, PlaybookItem } from "@/lib/system";
-import { rankActivities, type Interval } from "@uptime/core";
+import { rankActivities, type Interval } from "@four/core";
 
 /**
  * Re-entry. This replaces the dashboard entirely when down 3+ days.

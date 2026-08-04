@@ -62,7 +62,7 @@ has a single job: **catch the fade early and make restarting trivial.**
 A monorepo, so the derivation engine exists exactly once.
 
 ```
-packages/core/     @uptime/core — uptime, runs, outages, fade tiers, milestones.
+packages/core/     @four/core — uptime, runs, outages, fade tiers, milestones.
                    Pure TypeScript. No React, no Next, no DOM. 162 tests.
 apps/web/          Next.js 16.2 App Router client. Live on Vercel.
 apps/mobile/       Expo / React Native client. Runs on hardware.

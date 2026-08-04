@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { completeOnboarding } from "@/app/actions";
 import { Wordmark } from "@/app/components/wordmark";
-import { MAX_LEVERS } from "@uptime/core";
+import { MAX_LEVERS } from "@four/core";
 
 /**
  * First run, in one screen.

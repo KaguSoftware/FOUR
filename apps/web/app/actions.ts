@@ -22,7 +22,7 @@ import {
   MOOD_MIN,
   type ActivityRow,
   type Lever,
-} from "@uptime/core";
+} from "@four/core";
 
 /**
  * Every action re-checks auth. Server Functions are reachable via direct POST,

@@ -7,7 +7,7 @@ import {
   rankActivities,
   splitDetail,
   type ActivityRow,
-} from "@uptime/core";
+} from "@four/core";
 import { field, fieldTint } from "@/components/fields";
 import { Body, Label } from "@/components/ui";
 import { SheetHandle } from "@/components/sheet";

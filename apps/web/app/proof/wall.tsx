@@ -1,7 +1,7 @@
 "use client";
 
 import { useLayoutEffect, useRef, useState } from "react";
-import { pixelPaths, pixelWall, wallCaption, wallGrid } from "@uptime/core";
+import { pixelPaths, pixelWall, wallCaption, wallGrid } from "@four/core";
 
 /**
  * The pixel wall, measured to whatever box it is given.

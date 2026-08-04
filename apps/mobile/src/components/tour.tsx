@@ -11,7 +11,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect, useRouter } from "expo-router";
 import Svg, { Path } from "react-native-svg";
-import { pixelPaths, pixelWall, wallGrid } from "@uptime/core";
+import { pixelPaths, pixelWall, wallGrid } from "@four/core";
 import Animated, {
   cancelAnimation,
   Easing,

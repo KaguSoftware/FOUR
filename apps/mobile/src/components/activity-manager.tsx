@@ -12,7 +12,7 @@ import {
   rankActivities,
   validateActivityLabel,
   type ActivityRow,
-} from "@uptime/core";
+} from "@four/core";
 
 import { field, fieldTint } from "./fields";
 import { Body, Label, Rule } from "./ui";

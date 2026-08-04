@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Pressable, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { LEVER_LABEL_MAX, MAX_LEVERS } from "@uptime/core";
+import { LEVER_LABEL_MAX, MAX_LEVERS } from "@four/core";
 
 import { field, fieldTint } from "@/components/fields";
 import { Body, Label } from "@/components/ui";

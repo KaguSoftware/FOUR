@@ -2,7 +2,7 @@ import { Platform } from "react-native";
 import * as Notifications from "expo-notifications";
 import * as Device from "expo-device";
 import Constants from "expo-constants";
-import { PUSH_CHANNEL, REMINDER_CHANNEL } from "@uptime/core";
+import { PUSH_CHANNEL, REMINDER_CHANNEL } from "@four/core";
 import { supabase } from "./supabase";
 import { color } from "@/theme";
 

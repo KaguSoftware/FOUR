@@ -17,7 +17,7 @@ import {
   type Entry,
   type LeverSpan,
   type Signal,
-} from "@uptime/core";
+} from "@four/core";
 
 /**
  * An activity — a remembered thing that worked, attached to one lever.
@@ -60,7 +60,7 @@ export type SystemState = {
 
 export const DEFAULT_TZ = "Europe/Istanbul";
 
-// The lever set lives in @uptime/core so client components can read it without
+// The lever set lives in @four/core so client components can read it without
 // pulling next/headers into the browser bundle. Re-exported for server callers.
 export { ACTIVE_LEVERS };
 

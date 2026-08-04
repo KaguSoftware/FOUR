@@ -16,7 +16,7 @@ import {
   MAX_LEVERS,
   uniqueLeverKey,
   validateLeverLabel,
-} from "@uptime/core";
+} from "@four/core";
 
 import { Button, TextButton } from "@/components/button";
 import { field, fieldTint } from "@/components/fields";

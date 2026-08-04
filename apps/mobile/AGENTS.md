@@ -209,7 +209,7 @@ To change a dependency: `cd apps/mobile && npx expo install --fix`.
 
 - **Never `logicalDate()` — always `logicalDateLocal()`.** Hermes delegates
   `Intl` to platform ICU and it varies by Android version. See HANDOFF gotchas.
-- **`@uptime/core` is the only place a number is derived.** If you find yourself
+- **`@four/core` is the only place a number is derived.** If you find yourself
   writing date maths or a colour ramp in this app, import it instead.
 - **Metro needs no monorepo config** — Expo detects workspaces since SDK 52.
 - **A stale hoisted package will silently break the bundler.** After any SDK

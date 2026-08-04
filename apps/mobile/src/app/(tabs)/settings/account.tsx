@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 import { Alert, View } from "react-native";
-import { oldestAgeDays, pending, type OutboxItem } from "@uptime/core";
+import { oldestAgeDays, pending, type OutboxItem } from "@four/core";
 
 import { useNotify } from "@/components/snackbar";
 import { Fault, Loading } from "@/components/states";

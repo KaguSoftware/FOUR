@@ -1,6 +1,6 @@
 import { NavLink } from "./components/nav-link";
 import { requireStatus } from "@/lib/system";
-import { MILESTONE_COPY, MOOD_KIND, type Signal } from "@uptime/core";
+import { MILESTONE_COPY, MOOD_KIND, type Signal } from "@four/core";
 import { DayGrid } from "./components/day-grid";
 import { Levers } from "./components/levers";
 import { MoodSlider } from "./components/mood-slider";

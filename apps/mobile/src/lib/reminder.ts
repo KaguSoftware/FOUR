@@ -1,6 +1,6 @@
 import * as Notifications from "expo-notifications";
 import { SchedulableTriggerInputTypes } from "expo-notifications";
-import { PUSH_CHANNEL, REMINDER_CHANNEL } from "@uptime/core";
+import { PUSH_CHANNEL, REMINDER_CHANNEL } from "@four/core";
 import { ensureChannels } from "./push";
 
 /**

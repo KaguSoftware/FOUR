@@ -1,7 +1,7 @@
 import { requireStatus } from "@/lib/system";
 import { BackLink } from "@/app/components/nav-link";
 import { Wordmark } from "@/app/components/wordmark";
-import { monthMotto, monthUptime } from "@uptime/core";
+import { monthMotto, monthUptime } from "@four/core";
 import { Wall } from "./wall";
 
 export const dynamic = "force-dynamic";

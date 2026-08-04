@@ -40,7 +40,7 @@ comment on table public.monitor_runs is
 -- ---------------------------------------------------------------------------
 -- 2. `entries.detail` gets the cap the app has always claimed it had.
 --
--- `DETAIL_MAX = 160` lives in @uptime/core and is enforced by `appendDetail`,
+-- `DETAIL_MAX = 160` lives in @four/core and is enforced by `appendDetail`,
 -- but both write paths bypassed it — web wrote `detail.trim()` and the mobile
 -- outbox wrote `detail` — into a bare `text` column. Existing rows are
 -- truncated first so the constraint can be added without a rewrite failing.

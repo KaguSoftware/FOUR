@@ -12,7 +12,7 @@ import {
   OUTBOX_MAX,
   type ActivityRow,
   type OutboxItem,
-} from "@uptime/core";
+} from "@four/core";
 import { createStore } from "./store";
 import { supabase } from "./supabase";
 import { currentBoundaryHour, today } from "./status";
@@ -20,7 +20,7 @@ import { currentBoundaryHour, today } from "./status";
 /**
  * The outbox, persisted and shared.
  *
- * The rules live in `@uptime/core/outbox` where they are tested; this file is
+ * The rules live in `@four/core/outbox` where they are tested; this file is
  * storage, network, and who can see the queue. Tapping a lever on the subway
  * writes here first and reaches Supabase whenever it can.
  *

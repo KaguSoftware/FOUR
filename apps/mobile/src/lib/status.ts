@@ -15,13 +15,13 @@ import {
   type Entry,
   type LeverSpan,
   type Signal,
-} from "@uptime/core";
+} from "@four/core";
 
 /**
  * Everything a screen needs, in one pass.
  *
  * The port of `apps/web/lib/system.ts::getStatus()`. Three queries, then every
- * number on screen is DERIVED locally by `@uptime/core` — the same functions
+ * number on screen is DERIVED locally by `@four/core` — the same functions
  * the web app and the monitor run. No server round-trip computes anything, so
  * the dashboard is correct offline as long as the rows are cached.
  *

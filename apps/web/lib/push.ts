@@ -4,7 +4,7 @@ import {
   pushMessage,
   readPushResponse,
   type PushResult,
-} from "@uptime/core";
+} from "@four/core";
 
 /**
  * The push transport.
@@ -15,7 +15,7 @@ import {
  * which one it is talking to.
  *
  * Everything about *what* to send and *how to read the answer* lives in
- * `@uptime/core/push`, where it is unit-tested. This file is only the fetch.
+ * `@four/core/push`, where it is unit-tested. This file is only the fetch.
  */
 export async function sendPush(
   token: string,

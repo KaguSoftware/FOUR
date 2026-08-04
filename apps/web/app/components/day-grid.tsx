@@ -10,7 +10,7 @@ import {
   type Entry,
   type LeverSpan,
   type Signal,
-} from "@uptime/core";
+} from "@four/core";
 import { InteractiveGrid, type GridCell } from "./interactive-grid";
 import { MonthPager } from "./month-pager";
 

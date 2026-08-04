@@ -8,7 +8,7 @@ import {
   MOOD_MIN,
   MOOD_NEUTRAL,
   type MoodDay,
-} from "@uptime/core";
+} from "@four/core";
 
 import { field, fieldTint } from "./fields";
 import { Body, Label, Mono } from "./ui";

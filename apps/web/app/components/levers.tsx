@@ -4,7 +4,7 @@ import { useOptimistic, useState, useTransition } from "react";
 import { logEntry, undoEntry } from "@/app/actions";
 import { Sheet } from "./sheet";
 import type { LeverRow, PlaybookItem } from "@/lib/system";
-import { rankActivities, type Lever } from "@uptime/core";
+import { rankActivities, type Lever } from "@four/core";
 
 /**
  * The whole logging path: tap a lever, tap a chip. Two taps, no typing.

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams } from "expo-router";
-import { dayDetail } from "@uptime/core";
+import { dayDetail } from "@four/core";
 import { Body, Label, Mono } from "@/components/ui";
 import { cachedStatus } from "@/lib/use-status";
 import { color, radius, size, space } from "@/theme";

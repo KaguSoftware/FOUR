@@ -8,7 +8,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import * as Localization from "expo-localization";
-import { applyToDay, MILESTONE_COPY, moodWeek } from "@uptime/core";
+import { applyToDay, MILESTONE_COPY, moodWeek } from "@four/core";
 
 import { Body, Label, Mono } from "@/components/ui";
 import { useNotify } from "@/components/snackbar";

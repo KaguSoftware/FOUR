@@ -119,7 +119,7 @@ export function pressFillFlat(
  * The third iOS held-press form: dimming, for a control whose fill IS content.
  *
  * A day cell has no resting colour to step to — its fill is the day's value,
- * computed by `@uptime/core`, and swapping it for a pressed surface would say
+ * computed by `@four/core`, and swapping it for a pressed surface would say
  * the day changed. So iOS answers by fading the whole cell instead.
  *
  * Android returns `1`: the ripple is already the answer, and the same rule

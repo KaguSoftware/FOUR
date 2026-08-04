@@ -12,7 +12,7 @@ import {
   validateLeverLabel,
   LEVER_LABEL_MAX,
   MAX_LEVERS,
-} from "@uptime/core";
+} from "@four/core";
 import { Body, Label, Rule } from "./ui";
 import { useNotify } from "./snackbar";
 import { supabase } from "@/lib/supabase";

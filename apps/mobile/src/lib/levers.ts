@@ -1,4 +1,4 @@
-import { canAddLever, uniqueLeverKey, validateLeverLabel } from "@uptime/core";
+import { canAddLever, uniqueLeverKey, validateLeverLabel } from "@four/core";
 import { supabase } from "./supabase";
 
 export type LeverResult = { ok: true } | { ok: false; error: string };

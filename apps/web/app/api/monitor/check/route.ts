@@ -17,7 +17,7 @@ import {
   MILESTONE_COPY,
   isPushToken,
   type Entry,
-} from "@uptime/core";
+} from "@four/core";
 import { sendPage } from "@/lib/telegram";
 import { sendPush } from "@/lib/push";
 import { DEFAULT_TZ } from "@/lib/system";

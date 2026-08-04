@@ -1,4 +1,4 @@
-import { MOOD_KIND, MOOD_MAX, MOOD_MIN } from "@uptime/core";
+import { MOOD_KIND, MOOD_MAX, MOOD_MIN } from "@four/core";
 import { supabase } from "./supabase";
 
 /**

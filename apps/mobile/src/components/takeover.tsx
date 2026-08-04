@@ -1,6 +1,6 @@
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { rankActivities, type Interval } from "@uptime/core";
+import { rankActivities, type Interval } from "@four/core";
 import { androidMetrics, Body, Label, Mono } from "./ui";
 import { committed } from "@/lib/haptics";
 import { pressFill, pressFillFlat, ripple } from "@/lib/press";

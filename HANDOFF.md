@@ -86,7 +86,7 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 | Auth | Email 6-digit code · Sign in with Apple · Google · email + password |
 | Widget | **After launch (v1.1+)** |
 | Money | Free for v1 |
-| Name | **`four`**, after the four-lever ceiling. Display name only — the `uptime` slug, the `uptime://` scheme, `com.kagusoftware.uptime` and the `@uptime/*` packages are all unchanged |
+| Name | **`four`**, after the four-lever ceiling. Display name only — the `uptime` slug, the `uptime://` scheme, `com.kagusoftware.uptime` and the `@four/*` packages are all unchanged |
 | Tone | Blunt ops register, **one voice** — the `STRICT`/`SOFT` posture setting shipped 2026-07-28 and was removed 2026-07-30 by owner decision |
 | Lever edits | **Rename freely; archive never deletes** |
 | **Day grid encoding** | **Lightness ramp** — see below. Owner's call, 2026-07-28 |
@@ -170,7 +170,7 @@ manager or backup drive — see *Gotchas*.
 - Status dashboard, re-entry takeover, day grid, two-tap logging with playbook chips, history, playbook, proof, settings.
 - Monitor route with fade tiers, milestone ledger, plateau detection. **Verified end-to-end** against seeded data: silent at 1 day, pages at 2, escalates at 3, same-day dedupe works.
 - **Telegram paging verified 2026-07-19.** A real `DOWN 3 DAYS` alert was composed by `/api/monitor/check` and delivered to a phone.
-- **Monorepo restructure, 2026-07-28.** `lib/uptime.ts` + `lib/monitor.ts` → `packages/core` as `@uptime/core`; Next app → `apps/web`. Verified after the move: **44/44 tests green, `tsc` clean in both workspaces, production build emits an identical route table, eslint clean.**
+- **Monorepo restructure, 2026-07-28.** `lib/uptime.ts` + `lib/monitor.ts` → `packages/core` as `@four/core`; Next app → `apps/web`. Verified after the move: **44/44 tests green, `tsc` clean in both workspaces, production build emits an identical route table, eslint clean.**
 - **Design foundation, 2026-07-28.** `PRODUCT.md`, `DESIGN.md`, `.impeccable/design.json`. Palette ported oklch → RN-safe hex with **every ratio re-measured against the converted values** (zero gamut clipping, all reproduce within 0.04). Design detector reports no findings.
 - **Two real contrast defects found and fixed** — see Gotchas.
 - **Mobile surface spec, rev 3** — [claude.ai/code/artifact/68c1c6a8-26ee-41ba-acde-37fd303bb3c3](https://claude.ai/code/artifact/68c1c6a8-26ee-41ba-acde-37fd303bb3c3). Every v1 screen at 390×844: dashboard at 1–4 levers, the day-grid encoding options with the ramp chosen and the rejects shown, per-platform navigation, takeover and milestone in both postures, onboarding, lever sheet, and `/proof` with the daily trend and optional weight. **Design specimens, not a running build.** Source lives in `scratch/spec.html` (gitignored); republish with the same file path to keep the URL.
@@ -178,7 +178,7 @@ manager or backup drive — see *Gotchas*.
 - **Three legibility defects caught by reviewing renders rather than reading code**, all fixed: 6px horizontal overflow from an assumed `box-sizing`; a run length set in the label face instead of tabular mono; and a 1–5 scale whose selected step sat at **1.10:1** against its unselected siblings — effectively invisible. Now 15.31:1. **Screenshot and look at the render; the detector does not catch these.**
 
 - **The mobile app runs on hardware, 2026-07-29.** It is being used and bug-reported against. Expo SDK **54** (moved back from 57 deliberately — Expo Go ships one SDK and the owner's phone has 54).
-- **Renamed to `four`, 2026-07-29.** Display name only. App name, both wordmarks, web title, PWA manifest, and the push-notification title fallback. The `uptime` slug, the `uptime://` scheme, `com.kagusoftware.uptime` and the `@uptime/*` packages are all unchanged, and ~60 uses of "uptime" as the *metric* are untouched — including the persisted `uptime_80` / `uptime_90` milestone kinds.
+- **Renamed to `four`, 2026-07-29.** Display name only. App name, both wordmarks, web title, PWA manifest, and the push-notification title fallback. The `uptime` slug, the `uptime://` scheme, `com.kagusoftware.uptime` and the `@four/*` packages are all unchanged, and ~60 uses of "uptime" as the *metric* are untouched — including the persisted `uptime_80` / `uptime_90` milestone kinds.
 - **All six migrations applied to the live database, 2026-07-29.** `npx supabase migration list` shows local and remote matching.
 - **The device-testing round, 2026-07-29.** Screen scaffold with correct tab-bar and status-bar insets; the page-switch twitch; calendar-month grid on Home with today's cell pulsing; History captions and incident ranges; Settings split into an index and four sub-screens on a native stack; drag-to-reorder and drag-to-archive with fade-and-collapse motion; the undo control replaced by tapping a logged lever; the per-day grid denominator and its two follow-up bugs. All verified as `tsc` clean, 162 tests, `expo lint` clean, `expo export` bundling both platforms, and the web app building.
 - **The real-app Settings + Auth round, 2026-07-29.** Settings grew to the full surface: Alerts now holds the daily reminder (opt-in, native time picker, local scheduling via `lib/reminder.ts`) and a delivery block (permission status + send-a-test-alert); Tracking gained the kg/lb unit control; Account gained change email, change password, a passive sync row (outbox depth + staleness), export-as-JSON through the share sheet, and delete account (typed-email confirm → native alert → `delete_own_account()` RPC, migration `20260729030000`); a new About screen (version, privacy, terms, support mailto). Auth: sign-in rebuilt with Sign in with Apple (native button, nonce flow), Google (PKCE browser round-trip), and a 6-digit email OTP screen that doubles as forgot-password; onboarding is now five steps (rule+levers → posture → tracking → reminder → alerts priming before the OS prompt). New deps (all SDK 54 pins, Expo Go-safe): expo-apple-authentication, expo-crypto, expo-web-browser, datetimepicker, expo-file-system, expo-sharing. Verified: tsc clean ×3, 162 tests, 19 migration checks, expo lint clean, expo export both platforms. **Provider flows and the reminder are untested on device; the third-party providers are dead until the Supabase dashboard config below is done.**
@@ -812,7 +812,7 @@ gate.
 ## Roadmap / next steps
 
 1. ~~Telegram bot connected, delivery verified~~ — 2026-07-19.
-2. ~~Monorepo restructure, `@uptime/core` extracted~~ — 2026-07-28, fully verified.
+2. ~~Monorepo restructure, `@four/core` extracted~~ — 2026-07-28, fully verified.
 3. ~~Design foundation: PRODUCT.md, DESIGN.md, token port~~ — 2026-07-28.
 4. ~~Apply the three product changes decided 2026-07-28~~ — done. Day-grid ramp (`packages/core/grid.ts`, 11 new tests), daily proof trend, optional weight. 55 tests green, tsc/eslint clean, build succeeds.
 5. ~~Push, run the weight migration, set the Vercel root directory~~ — done by the owner 2026-07-28.
@@ -1239,11 +1239,11 @@ gate.
   (`submit.production.ios`), which skips the Apple Developer Portal login that
   step needed** — the upload itself uses the App Store Connect API key already
   stored on EAS, so submits should no longer touch `idmsa.apple.com` at all.
-- **If `tsc` says "Cannot find module '@uptime/core'", run `npm install` at the
+- **If `tsc` says "Cannot find module '@four/core'", run `npm install` at the
   repo root — the workspace symlinks are stale, and typecheck has been lying.**
-  `node_modules/@uptime/*` are symlinks baked with an absolute path. The repo was
+  `node_modules/@four/*` are symlinks baked with an absolute path. The repo was
   moved from `kagu/uptime` to `kagu/four`, which left all three pointing at a
-  directory that no longer exists. `@uptime/core` was then unresolvable, so
+  directory that no longer exists. `@four/core` was then unresolvable, so
   `npm run typecheck` failed on a **clean checkout** with a wall of module-not-
   found errors — and every genuine type error in both apps was hidden behind
   them. Found and repaired 2026-07-31. **Any move or rename of the repo folder

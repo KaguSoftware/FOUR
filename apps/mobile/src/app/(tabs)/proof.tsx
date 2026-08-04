@@ -8,7 +8,7 @@ import {
   pixelWall,
   wallCaption,
   wallGrid,
-} from "@uptime/core";
+} from "@four/core";
 
 import { Body, Label, Mono } from "@/components/ui";
 import { Frame } from "@/components/screen";
@@ -35,7 +35,7 @@ import { color, size, space } from "@/theme";
  * The app never tells you to keep going; it gradually stops hiding the fact
  * that it would.
  *
- * Every number and every coordinate comes from `@uptime/core`, so the browser
+ * Every number and every coordinate comes from `@four/core`, so the browser
  * draws the identical wall from the identical month.
  */
 export default function ProofScreen() {

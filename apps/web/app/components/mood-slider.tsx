@@ -7,7 +7,7 @@ import {
   MOOD_MIN,
   MOOD_NEUTRAL,
   moodLabel,
-} from "@uptime/core";
+} from "@four/core";
 import { saveMood } from "@/app/actions";
 
 /**

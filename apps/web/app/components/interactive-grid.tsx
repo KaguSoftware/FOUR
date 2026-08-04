@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { DayDetail } from "@uptime/core";
+import type { DayDetail } from "@four/core";
 import { Sheet } from "./sheet";
 
 /**

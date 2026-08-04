@@ -7,7 +7,7 @@ import {
   canAddActivity,
   rankActivities,
   type ActivityRow,
-} from "@uptime/core";
+} from "@four/core";
 import {
   createActivity,
   deleteActivity,

@@ -513,6 +513,44 @@ manager or backup drive — see *Gotchas*.
   computed in-script and the inverted pill, 1 exempt row), both bundles
   export, no `how-it-works` reference survives.** **Not on hardware.**
 
+- **The pre-TestFlight round, 2026-08-04 (v1.0.0).** Six owner changes before
+  build 5:
+  **(1) Version is 1.0.0** — `app.json` only; build numbers are EAS-remote.
+  **(2) Today's cell is a dashed ring marching anti-clockwise**, replacing
+  the colour pulse — a SHAPE cue, identical up or down, static under
+  reduce-motion, stopped when the tab is unfocused. Two device-screenshot
+  fixes baked in: no border on the box (RN lays children INSIDE the border
+  band, which offset the SVG ring 2px down-right), and the dash pattern
+  scales so a whole number of periods tiles the perimeter (unscaled, the
+  remainder piled up as one mis-sized chunk in a corner). Web keeps its
+  static ring — deliberate divergence for now.
+  **(3) Tour v3.1**: reorder and the History swipe joined logging as
+  action-driven steps (`advanceOn` per step; counters from the screens
+  themselves; each degrades to explaining when impossible — one lever, one
+  month); a mood step joined Home's walk (8 steps total); explaining cards
+  say "tap anywhere to continue"; the whole-tour skip is top-right and
+  CONFIRMS via Alert; the spotlight flies on a spring; the overlay fades
+  in/out instead of hard-cutting; the pill bobs with the breathing ring;
+  `nudged()` ticks every advance. `MonthStack` gained `onPageChange`.
+  **(4) Leaving the Settings tab resets it to the index** — a `blur`
+  listener on the TAB route dispatching a POP_TO_TOP **targeted at the
+  nested stack's state key** (untargeted would pop the DESTINATION tab's
+  stack; there is no declarative prop — verified from the installed .d.ts).
+  **(5) The log sheet's three secondary actions are outlined 48pt buttons**
+  (`quiet` in log.tsx) — real controls, still a clear step under the 56pt
+  filled chips; stroke `line-hi` because with no fill it IS the button.
+  **(6) `@uptime/*` is `@four/*`** — packages, imports, comments, workspace
+  flags; internal only. The `uptime` slug, `uptime://` scheme,
+  `com.kagusoftware.uptime`, the EAS project, milestone kinds and the metric
+  WORD are all deliberately untouched (owner-scoped decision; changing app
+  identity would orphan ASC app 6796259740, the Android OAuth client and
+  the Supabase allowlist).
+  Verified: **302 tests, tsc ×3, expo lint, contrast (+1 today-ring pair),
+  web production build, both bundles export, zero `@uptime` matches
+  repo-wide including the regenerated lock.** The owner has a device on
+  Metro and has seen the ring live (one screenshot round); the rest of the
+  round is **not confirmed on hardware**.
+
 **Written but NOT verified end-to-end:**
 
 - **Vercel cron has never run.** The route works locally; the schedule is unproven.
@@ -918,7 +956,15 @@ gate.
     a sample `PROOF` wall on the Proof step. Verified: **302 tests, tsc ×3,
     expo lint, contrast (6 tour pairs), both bundles export.** Full notes
     under *Current status*.
-27. Then: **custom SMTP** (it unblocks the Magic Link template, which the OTP
+27. ~~The pre-TestFlight round~~ — done 2026-08-04. v1.0.0; the marching
+    today ring; tour v3.1 (action-driven reorder/swipe, mood step, top-right
+    confirmed skip, spring/fade/haptic polish); Settings tab resets on
+    leave; the log sheet's quiet buttons; `@four/*`. Full notes under
+    *Current status*. Device checks outstanding: dash direction reads
+    anti-clockwise; reorder step on a real drag + its one-lever fallback;
+    History swipe step + its one-month fallback; the skip confirm; the
+    settings reset on Android (the JS path is the only one there).
+28. Then: **custom SMTP** (it unblocks the Magic Link template, which the OTP
     screen depends on — see *Blocked*) · store listings · Play Console identity
     verification · the `eas.json` Android submit block.
 

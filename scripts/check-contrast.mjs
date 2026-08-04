@@ -268,6 +268,12 @@ const ENFORCED = [
   // The "tap one" pill on the doing step — the one inverted surface in the
   // tour, precisely so "do this now" cannot be mistaken for "look at this".
   ["tour · tap-here pill label", "bg", "ink", TEXT],
+
+  // Today's marker became a marching dashed ring (2026-08-04) — ink dashes
+  // drawn by SVG over the cell border band. State carried by a stroke, so it
+  // owes 1.4.11 on the darkest ground it borders (the page, in the gaps
+  // between cells) — and the dash pattern itself is the non-colour cue.
+  ["today ring · dashes against the page", "ink", "bg", NONTEXT],
 ];
 
 const EXEMPT = [

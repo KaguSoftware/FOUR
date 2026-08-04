@@ -1,14 +1,14 @@
 import { useCallback, useState } from "react";
-import { FlatList, Pressable, View } from "react-native";
+import { FlatList, Pressable, StyleSheet, View } from "react-native";
 import Animated, {
   cancelAnimation,
   Easing,
-  interpolateColor,
-  useAnimatedStyle,
+  useAnimatedProps,
   useSharedValue,
   withRepeat,
   withTiming,
 } from "react-native-reanimated";
+import Svg, { Rect } from "react-native-svg";
 import { useFocusEffect } from "expo-router";
 import {
   addDays,
@@ -242,11 +242,17 @@ export function MonthStack({
   today,
   spans,
   onPressDay,
+  onPageChange,
 }: {
   entries: Entry[];
   today: string;
   spans: LeverSpan[];
   onPressDay?: (date: string) => void;
+  /**
+   * A completed swipe to another page. The tour's History step advances on
+   * it; nothing else listens today. Fires on settle, not per frame.
+   */
+  onPageChange?: () => void;
 }) {
   const [width, setWidth] = useState(0);
   const fired = firedByDate(entries);
@@ -286,6 +292,7 @@ export function MonthStack({
             offset: width * index,
             index,
           })}
+          onMomentumScrollEnd={onPageChange}
           renderItem={({ item, index }) => (
             <View style={{ width }}>
               <MonthView
@@ -522,25 +529,41 @@ function DayCell({
   );
 }
 
-/** ~2s each way. Slow enough to read as a heartbeat rather than a blink. */
-const PULSE_MS = 1800;
+/**
+ * The dash pattern and its march. `DASH_ON + DASH_OFF` is one period, and the
+ * loop animates the offset by EXACTLY one period with linear easing, so the
+ * seam where the repeat restarts is invisible — the motion reads as one
+ * continuous rotation. ~2.6s per period: a slow instrument, not a spinner.
+ */
+const DASH_ON = 9;
+const DASH_OFF = 6;
+const DASH_PERIOD = DASH_ON + DASH_OFF;
+const MARCH_MS = 2600;
+
+const AnimatedRect = Animated.createAnimatedComponent(Rect);
 
 /**
- * Today's cell, breathing.
+ * Today's cell: a dashed ring marching anti-clockwise around the border.
  *
- * A static `lineHi` ring measures 3.33:1 and was not reading as "you are here"
- * on a real phone. The answer is motion rather than more colour: every bright
- * hue in this palette is reserved for status (amber is degraded, red is down),
- * so today cannot borrow one.
+ * It replaced a colour pulse (owner call, 2026-08-04): the moving dashes are
+ * a SHAPE cue, so "you are here" no longer rests on a colour ramp at all —
+ * and every bright hue in this palette is reserved for status anyway (amber
+ * is degraded, red is down), so today cannot borrow one. It is identical
+ * whether the day is up or down, deliberately.
  *
  * This is a liveness indicator, not a celebration — the register `DESIGN.md`
- * forbids is triumph, and an instrument panel marking its current sample is the
- * opposite of that. It stays slow, greyscale, and identical whether the day is
- * up or down.
+ * forbids is triumph, and an instrument panel marking its current sample is
+ * the opposite of that.
+ *
+ * The direction: an SVG rect's path winds clockwise, and a growing
+ * `strokeDashoffset` slides the pattern against the path's own direction, so
+ * the dashes travel anti-clockwise. (Flagged in HANDOFF for a device check —
+ * this is exactly the kind of fact a simulator screenshot cannot prove.)
  *
  * Two things it must do: stop when the screen is not focused, or it animates
- * forever behind three other tabs; and collapse to a static ring under Reduce
- * Motion, since an indefinite loop is precisely what that setting is for.
+ * forever behind three other tabs; and hold still under Reduce Motion — a
+ * static dashed ring keeps the cue, and an indefinite loop is precisely what
+ * that setting is for.
  */
 function TodayCell({
   fill,
@@ -558,17 +581,19 @@ function TodayCell({
   // Was an inline subscription here — the only one in the app. It is
   // `lib/reduce-motion` now, because the snackbar has the same obligation.
   const reduceMotion = useReduceMotion();
+  // History's cells flex (no measured size), and the SVG ring needs real
+  // pixels — so this cell measures itself there. Home passes `size` and the
+  // measurement never runs.
+  const [measured, setMeasured] = useState(0);
+  const side = size ?? measured;
 
   useFocusEffect(
     useCallback(() => {
       if (reduceMotion) return;
       phase.value = withRepeat(
-        withTiming(1, {
-          duration: PULSE_MS,
-          easing: Easing.inOut(Easing.quad),
-        }),
+        withTiming(1, { duration: MARCH_MS, easing: Easing.linear }),
         -1,
-        true,
+        false,
       );
       return () => {
         cancelAnimation(phase);
@@ -577,39 +602,65 @@ function TodayCell({
     }, [phase, reduceMotion]),
   );
 
-  const animated = useAnimatedStyle(() => ({
-    borderColor: interpolateColor(
-      phase.value,
-      [0, 1],
-      [color.lineHi, color.ink],
-    ),
+  const dashProps = useAnimatedProps(() => ({
+    strokeDashoffset: phase.value * DASH_PERIOD,
   }));
 
-  const box = [
-    {
-      // Fills whatever the outer element measures out to, so this matches the
-      // plain cells exactly on both grids.
-      width: "100%" as const,
-      ...(size ? { height: size } : { aspectRatio: 1 }),
-      borderRadius: radius.sm,
-      backgroundColor: fill ?? color.surface,
-      /**
-       * 2px at both ends of the pulse, so the cell does not resize as it
-       * animates — only the colour moves.
-       *
-       * It is deliberately one step THICKER than the 1px every other cell
-       * carries: this ring has to read as "you are here" across the grid. RN
-       * draws borders inside the box, so the extra pixel eats into the painted
-       * square rather than growing it, and today's cell stays exactly the same
-       * outer size as its neighbours — which is the property that keeps the
-       * rows aligned. Do not "fix" this by dropping it to 1.
-       */
-      borderWidth: 2,
-    },
-    // Reduce Motion gets the bright end of the same ramp, statically. The
-    // cue survives; only the movement goes.
-    reduceMotion ? { borderColor: color.ink } : animated,
-  ];
+  const box = {
+    // Fills whatever the outer element measures out to, so this matches the
+    // plain cells exactly on both grids.
+    width: "100%" as const,
+    ...(size ? { height: size } : { aspectRatio: 1 }),
+    borderRadius: radius.sm,
+    backgroundColor: fill ?? color.surface,
+    /**
+     * The border is TRANSPARENT but still 2px — the SVG ring is drawn in the
+     * same 2px band, and keeping the border reserves it, so today's painted
+     * square stays exactly the size it always was.
+     *
+     * It is deliberately one step THICKER than the 1px every other cell
+     * carries: this ring has to read as "you are here" across the grid. RN
+     * draws borders inside the box, so the extra pixel eats into the painted
+     * square rather than growing it, and today's cell stays exactly the same
+     * outer size as its neighbours — which is the property that keeps the
+     * rows aligned. Do not "fix" this by dropping it to 1.
+     */
+    borderWidth: 2,
+    borderColor: "transparent",
+  };
+
+  // Stroke centred 1px in, so the 2px stroke occupies exactly the border
+  // band. `pointerEvents="none"` — the ring is paint, not a control.
+  const ring =
+    side > 0 ? (
+      <Svg
+        width={side}
+        height={side}
+        style={StyleSheet.absoluteFill}
+        pointerEvents="none"
+      >
+        <AnimatedRect
+          x={1}
+          y={1}
+          width={side - 2}
+          height={side - 2}
+          rx={radius.sm}
+          fill="none"
+          stroke={color.ink}
+          strokeWidth={2}
+          strokeDasharray={`${DASH_ON} ${DASH_OFF}`}
+          animatedProps={dashProps}
+        />
+      </Svg>
+    ) : null;
+
+  const onBoxLayout =
+    size === undefined
+      ? (e: { nativeEvent: { layout: { width: number } } }) => {
+          const w = Math.round(e.nativeEvent.layout.width);
+          setMeasured((prev) => (Math.abs(prev - w) < 1 ? prev : w));
+        }
+      : undefined;
 
   // The outer element carries the sizing that divides the row; the animated box
   // fills it. Splitting them keeps the flex sizing off the element whose style
@@ -619,7 +670,9 @@ function TodayCell({
   if (!onPress) {
     return (
       <View style={outer}>
-        <Animated.View style={box} />
+        <View style={box} onLayout={onBoxLayout}>
+          {ring}
+        </View>
       </View>
     );
   }
@@ -641,7 +694,9 @@ function TodayCell({
         { opacity: pressDim(pressed) },
       ]}
     >
-      <Animated.View style={box} />
+      <View style={box} onLayout={onBoxLayout}>
+        {ring}
+      </View>
     </Pressable>
   );
 }

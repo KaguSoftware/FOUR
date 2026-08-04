@@ -17,13 +17,13 @@ import { LeverButtons } from "@/components/lever-buttons";
 import { MoodStrip, MOOD_DAYS } from "@/components/mood-slider";
 import { Screen } from "@/components/screen";
 import { Takeover } from "@/components/takeover";
-import { Tour } from "@/components/tour";
+import { TourOverlay, useTourOn } from "@/components/tour";
 import { useStatus } from "@/lib/use-status";
 import { useOutbox } from "@/lib/use-outbox";
 import { archiveLever, reorderLevers } from "@/lib/levers";
 import { saveMood } from "@/lib/mood";
 import { syncTimeZone, type LeverRow } from "@/lib/status";
-import { markTourSeen, tourRequest, tourSeen } from "@/lib/tour";
+import { markTourSeen, startTour, tourRequest, tourSeen } from "@/lib/tour";
 import { color, size, space } from "@/theme";
 
 export default function StatusScreen() {
@@ -80,9 +80,11 @@ export default function StatusScreen() {
     value: number;
   } | null>(null);
 
-  // The first-run tour, ON this screen: spotlights the real hero, levers and
-  // grid one at a time. See components/tour.tsx.
-  const [tour, setTour] = useState(false);
+  // The first-run tour: starts on this screen, walks History and Proof, and
+  // closes back here. The step index lives in lib/tour.ts; this screen owns
+  // starting it and the steps that spotlight its own elements. See
+  // components/tour.tsx.
+  const tourHere = useTourOn("home");
   const scrollRef = useRef<ScrollView>(null);
   // `collapsable={false}` on each wrapper — Android flattens a styleless View
   // out of the native tree, and a flattened view cannot be measured.
@@ -107,7 +109,7 @@ export default function StatusScreen() {
     tourSeen(userId).then((seen) => {
       if (!live || seen) return;
       markTourSeen(userId);
-      setTour(true);
+      startTour();
     });
     return () => {
       live = false;
@@ -123,7 +125,7 @@ export default function StatusScreen() {
   useEffect(() => {
     if (!tourWanted || !userId) return;
     tourRequest.set(false);
-    if (!inTakeover) setTour(true);
+    if (!inTakeover) startTour();
   }, [tourWanted, userId, inTakeover]);
 
   if (!status) {
@@ -210,7 +212,7 @@ export default function StatusScreen() {
     <View style={{ flex: 1 }}>
     <Screen
       scrollRef={scrollRef}
-      scrollEnabled={!tour}
+      scrollEnabled={!tourHere}
       refreshControl={
         <RefreshControl
           refreshing={loading}
@@ -266,7 +268,7 @@ export default function StatusScreen() {
       {/* First run. Not an outage, not a failure — nothing has happened yet.
           Hidden while the tour is up: its lever step says the same thing,
           better, pointing at the buttons themselves. */}
-      {entries.length === 0 && !tour && (
+      {entries.length === 0 && !tourHere && (
         <Body tone="dim" style={{ marginTop: space[3] }}>
           Nothing logged yet. One small real thing puts the system up today —
           any one of your levers. One is enough on its own.
@@ -375,12 +377,12 @@ export default function StatusScreen() {
       </View>
     </Screen>
 
-    {tour && (
-      <Tour
+    {tourHere && (
+      <TourOverlay
+        screen="home"
         targets={{ hero: heroRef, levers: leverRef, grid: gridRef }}
         scrollRef={scrollRef}
         loggedCount={shownAsLogged.length}
-        onDone={() => setTour(false)}
       />
     )}
     </View>

@@ -456,39 +456,62 @@ manager or backup drive — see *Gotchas*.
   Verified: **tsc clean ×3, contrast clean (2 new enforced pairs, 1 exempt),
   both bundles export, the web app builds.** **Not on hardware.**
 
-- **The tour round, 2026-08-04.** The seven-page written manual
-  (`how-it-works.tsx`, ~1,000 words) is **deleted** and replaced by a
-  five-step spotlight tour ON the live dashboard —
-  `src/components/tour.tsx`. Owner's decisions: teach on the live system,
-  learn-by-doing, mobile only, manual gone, replayable from Settings → About.
+- **The tour round, 2026-08-04 — two passes in one day.** The seven-page
+  written manual (`how-it-works.tsx`, ~1,000 words) is **deleted** and
+  replaced by a spotlight tour ON the live app — `src/components/tour.tsx`.
+  Owner's decisions, first pass: teach on the live system, learn-by-doing,
+  mobile only, manual gone, replayable from Settings → About. Second pass,
+  from owner feedback the same day: **(a) the tour CROSSES screens** — seven
+  steps now: Home (number → levers, performed → grid → hold gesture), then
+  History (the month pager), then Proof (the wall), then a closing card back
+  on Home covering the pager and Settings. The step index moved to a store in
+  `lib/tour.ts` (`tourStep`); each screen mounts a `<TourOverlay screen=…>`
+  with refs to its own elements, and only the overlay owning the current step
+  renders — advancing onto another screen's step calls `router.navigate`.
+  Skipping from History/Proof navigates home so nobody is stranded.
+  **(b) doing vs explaining is explicit** — the lever step gets an inverted
+  "tap one" pill (bg-on-ink, the only inverted surface in the tour) with an
+  arrow pointing into the hole, plus a ring that BREATHES (withRepeat ±4dp;
+  under reduce-motion it becomes a static 3px ring — cue survives, movement
+  goes). Explaining steps keep the calm 2px static ring and tap-anywhere.
+  **(c) two short sentences per step** instead of one terse line.
+  **(d) the Proof step shows a SAMPLE wall in the card** — real
+  `wallGrid`/`pixelWall`/`pixelPaths` from core at pct 0.7 spelling `PROOF`,
+  a word deliberately NOT in `MOTTOS` so it can never spoil the month's own —
+  because a new user's real wall behind the scrim is uniformly dark and the
+  sentence would describe something invisible. The real wall is never faked.
+  Also: hole gets 6dp breathing pad; a hole taller than 55% of the screen
+  (the wall) pins the card over its lower edge instead of above/below; the
+  card fades in per step (FadeInDown 200ms, off under reduce-motion).
   How it works: everything dims behind a scrim (four plain Views around a
   hole — the hole is literally uncovered screen, which is what lets the lever
   step stay live with zero touch-forwarding) except one real element at a
-  time; a 2px ink ring marks the element (the non-colour cue; it survives
-  reduce-motion as a static outline); one lowercase sentence per step (~55
-  words total) on a snackbar-recipe card; tap anywhere advances. **Step 2 is
-  performed, not read**: "tap a lever when it's true — that's all logging is",
-  the real buttons under the hole, and the tour advances when the
-  outbox-overlaid `shownAsLogged` count grows — the cell lighting and the
-  tour moving on are one event. A "skip" is always there; nothing is faked.
-  The native tab bar stays bright (JS cannot cover it; it is real chrome).
+  time; the ink ring marks the element (the non-colour cue); two lowercase
+  sentences per step on a snackbar-recipe card; tap anywhere advances. **The
+  lever step is performed, not read**: "done one of them today? tap it", the
+  real buttons under the hole, and the tour advances when the outbox-overlaid
+  `shownAsLogged` count grows — the cell lighting and the tour moving on are
+  one event. A skip is always there; nothing is faked. The native tab bar
+  stays bright (JS cannot cover it; it is real chrome), which mid-tour also
+  means a user CAN wander to another tab — the overlay for the current step
+  simply is not there until they come back or use Back.
   Machinery: `lib/walkthrough.ts` → `lib/tour.ts`, key bumped
   `walkthrough.v1` → `tour.v1` so **existing devices meet the new tour once,
   deliberately**; `tourRequest` (a `createStore`) is how About asks the
-  dashboard to run it (`requestTour(); router.navigate("/")`) — the
+  dashboard to start it (`requestTour(); router.navigate("/")`) — the
   "reset the flag for next launch" About row is gone, since replay and
   first-run now render the identical component. `Screen` grew optional
-  `scrollRef`/`scrollEnabled`; the tour owns the scroll offset while up (user
-  scrolling disabled), scrolling targets clear of the tab bar before
+  `scrollRef`/`scrollEnabled`; the active overlay owns the scroll offset
+  (user scrolling disabled), scrolling targets clear of the tab bar before
   measuring via `measureInWindow` (target and overlay both, to convert
-  window→overlay coordinates under edge-to-edge). Takeover still suppresses
-  the auto-run without burning the flag; the empty-state hint hides while the
-  tour is up. The proof screen's one-liner is now the ONLY place the wall is
-  explained — noted in its comment.
-  Verified: **302 core tests, tsc clean ×3, expo lint clean, contrast clean
-  (5 new enforced pairs incl. two scrim-composite grounds computed in-script,
-  1 new exempt row), both bundles export, no `how-it-works` reference
-  survives.** **Not on hardware.**
+  window→overlay coordinates under edge-to-edge), and re-measures on focus
+  when its screen is arrived at mid-tour. Takeover still suppresses the
+  auto-run without burning the flag; the empty-state hint hides while the
+  tour is on Home.
+  Verified after the second pass: **302 core tests, tsc clean ×3, expo lint
+  clean, contrast clean (6 tour pairs incl. two scrim-composite grounds
+  computed in-script and the inverted pill, 1 exempt row), both bundles
+  export, no `how-it-works` reference survives.** **Not on hardware.**
 
 **Written but NOT verified end-to-end:**
 
@@ -565,16 +588,28 @@ manager or backup drive — see *Gotchas*.
   2. **The lever step's hole.** It exposes the whole `LeverButtons` block,
      including "+ add a lever" and long-press drag. If a mid-tour drag feels
      wrong, shrink the hole to the grid minus the add cell.
-  3. **The log sheet over the tour.** Tapping a lever presents the native
+  3. **The cross-screen hops.** Advancing onto the History and Proof steps
+     calls `router.navigate` and the overlay measures on `useFocusEffect` +
+     one rAF — if a freshly-mounted tab has not laid out by then, the
+     spotlight lands on a stale rect. Also check Back walks History → grid
+     step correctly, and that skipping from History/Proof lands home.
+  4. **The wall step's card.** The hole is taller than 55% of the screen, so
+     the card (now carrying the sample `PROOF` wall) pins over the wall's
+     lower edge — check it does not swallow the whole wall on a small phone,
+     and that the sample itself renders one clean word at card width.
+  5. **The log sheet over the tour.** Tapping a lever presents the native
      formSheet OVER the dimmed screen; the write lands instantly (outbox), so
-     step 3 may be announced while the sheet has focus. Check what VoiceOver /
-     TalkBack actually do; the fix would be deferring the announce to refocus.
-  4. **The card at large Dynamic Type** — one sentence plus a counter row at
-     half the screen's width budget; check it clears both the hole and the
-     tab bar on a small phone.
-  5. **The replay path** — About → "How four works" must land on the Home tab
+     the grid step may be announced while the sheet has focus. Check what
+     VoiceOver / TalkBack actually do.
+  6. **The pill vs the card on the lever step** — the card sits above the
+     hole plus a reserved `PILL_BLOCK`; at large Dynamic Type check they do
+     not collide and both clear the hole.
+  7. **The replay path** — About → "How four works" must land on the Home tab
      with the tour up (`router.navigate("/")` from inside the settings
      stack). Fallback: `router.dismissTo`.
+  8. **Mid-tour tab wandering.** The bar stays live; tapping another tab
+     mid-step shows that screen with no overlay while the tour stays armed.
+     Confirm coming back resumes cleanly, and decide then if it needs more.
 - **The 2026-08-04 auth round is untested on hardware**, and it is the cheapest
   of the four to check — one screen, no data, reachable by signing out.
   1. **The white Google button on iOS.** It is the ONLY light surface in a
@@ -718,8 +753,8 @@ gate.
 | `packages/core/monitor.ts` | Fade thresholds, milestone selection, plateau detection. Pure functions, fully tested. |
 | `packages/core/index.ts` | Barrel export — the single public surface of the engine. |
 | `packages/core/levers.ts` | Lever key/label rules: slugs, uniqueness, the four-lever ceiling. |
-| `apps/mobile/src/components/tour.tsx` | The first-run tour — a five-step spotlight on the LIVE dashboard (replaced the 7-page manual, 2026-08-04). Scrim = four Views around an uncovered hole; the lever step is performed for real and advances when the log lands. Auto-runs once per device; replays from Settings → About. |
-| `apps/mobile/src/lib/tour.ts` | The seen-once device flag (AsyncStorage, keyed per user, fails toward "seen", key `tour.v1`) plus `tourRequest`/`requestTour()` — how About asks the dashboard to run the tour. |
+| `apps/mobile/src/components/tour.tsx` | The first-run tour — a seven-step spotlight across Home → History → Proof → Home (replaced the 7-page manual, 2026-08-04). Owns the steps, the scrim-with-a-hole, the "tap one" pill, the breathing ring and the sample `PROOF` wall. Each screen mounts `<TourOverlay screen=…>` with its own refs. |
+| `apps/mobile/src/lib/tour.ts` | The seen-once device flag (AsyncStorage, keyed per user, fails toward "seen", key `tour.v1`), `tourRequest`/`requestTour()` (About asking for a replay) and `tourStep` — the cross-screen step index every overlay reads. |
 | `apps/web/lib/system.ts` | Loads status in one pass; `requireStatus()` is the auth + onboarding gate every page uses. |
 | `apps/web/app/onboarding/` | First run: the rule, 1–4 levers. The only screen that may not call `requireStatus()`. |
 | `apps/web/app/page.tsx` | Status dashboard; routes to the takeover when down ≥3 days with history. |
@@ -876,11 +911,13 @@ gate.
     `GoogleMark`. `TextButton` was deliberately left alone. Mirrored on web.
     Verified: **tsc ×3, contrast, both bundles export, the web build.** Full
     notes under *Current status*.
-26. ~~The tour round~~ — done 2026-08-04, **not yet seen on hardware.** The
-    seven-page manual deleted; a five-step learn-by-doing spotlight tour on
-    the live dashboard replaces it, with the lever step performed for real.
-    Verified: **302 tests, tsc ×3, expo lint, contrast (5 new pairs), both
-    bundles export.** Full notes under *Current status*.
+26. ~~The tour round~~ — done 2026-08-04 (two passes), **not yet seen on
+    hardware.** The seven-page manual deleted; a seven-step learn-by-doing
+    spotlight tour across Home → History → Proof replaces it — lever step
+    performed for real, "tap one" pill + breathing ring on the doing step,
+    a sample `PROOF` wall on the Proof step. Verified: **302 tests, tsc ×3,
+    expo lint, contrast (6 tour pairs), both bundles export.** Full notes
+    under *Current status*.
 27. Then: **custom SMTP** (it unblocks the Magic Link template, which the OTP
     screen depends on — see *Blocked*) · store listings · Play Console identity
     verification · the `eas.json` Android submit block.
@@ -897,7 +934,7 @@ gate.
 | Felt state | **One mood slider on the dashboard**, continuous 1–100, replacing energy + sleep. Platform control, shared `facePath` | Unchanged | Both done 2026-08-03 |
 | Weight | **Removed 2026-08-03**, with the journal. Owner decision. Columns and rows are kept — a shipped build still selects them — and drop in a later migration | — | Closed |
 | Posture | **Removed 2026-07-30** — strict-only, one voice. The column drop is applied as of 2026-08-03 | — | Closed |
-| Walkthrough | **Mobile: a 5-step spotlight tour ON the live dashboard** (the 7-page manual was deleted 2026-08-04 — owner decision). Auto-once per device, replays from About. Web: none, and the web onboarding screen already states the rule | Unchanged — this IS the intended shape | Mobile done 2026-08-04 |
+| Walkthrough | **Mobile: a 7-step spotlight tour across the live Home → History → Proof screens** (the 7-page manual was deleted 2026-08-04 — owner decision). Doing vs explaining stated by a "tap one" pill + breathing ring. Auto-once per device, replays from About. Web: none, and the web onboarding screen already states the rule | Unchanged — this IS the intended shape | Mobile done 2026-08-04 |
 | Activities | **Editable and capped at ten per lever**, from the log sheet (long-press a chip, or "manage activities") and Settings → Activities. Rename, delete, restore a retired one. The cap ARCHIVES rather than refusing on the logging path | Unchanged | Both done 2026-08-03 |
 | Mobile levers | Full: create, rename, archive, with native alerts | Unchanged | Done |
 | Mobile auth | **Email + password, Sign in with Apple, Google, and a 6-digit email code** (the code doubles as forgot-password: sign in by code, set a new password in Settings). All built 2026-07-29; Apple/Google/OTP are inert until the Supabase dashboard config in *Blocked* is done. **Screen restyled 2026-08-04** — Google's mark, no "Authentication required.", the two email alternatives as real buttons | Verified on device, with custom SMTP | Config, then device test |

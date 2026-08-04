@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { View, type LayoutChangeEvent } from "react-native";
 import Svg, { Path } from "react-native-svg";
 import {
@@ -13,6 +13,7 @@ import {
 import { Body, Label, Mono } from "@/components/ui";
 import { Frame } from "@/components/screen";
 import { Loading } from "@/components/states";
+import { TourOverlay, useTourOn } from "@/components/tour";
 import { useStatus } from "@/lib/use-status";
 import { color, size, space } from "@/theme";
 
@@ -46,6 +47,10 @@ export default function ProofScreen() {
    * cannot round it differently.
    */
   const [box, setBox] = useState<{ width: number; height: number } | null>(null);
+  // The first-run tour passes through here for one step — it spotlights the
+  // wall. See components/tour.tsx.
+  const tourHere = useTourOn("proof");
+  const wallRef = useRef<View>(null);
 
   const onLayout = (e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
@@ -63,6 +68,7 @@ export default function ProofScreen() {
   const month = monthUptime(status.entries, status.today);
 
   return (
+    <View style={{ flex: 1 }}>
     <Frame
       headerRight={
         <Mono style={{ fontSize: size.xs, color: color.inkMute }}>
@@ -116,7 +122,12 @@ export default function ProofScreen() {
         </Body>
       </View>
 
-      <View style={{ flex: 1 }} onLayout={onLayout}>
+      <View
+        ref={wallRef}
+        collapsable={false}
+        style={{ flex: 1 }}
+        onLayout={onLayout}
+      >
         {box && (
           <Wall
             width={box.width}
@@ -131,6 +142,9 @@ export default function ProofScreen() {
         )}
       </View>
     </Frame>
+
+    {tourHere && <TourOverlay screen="proof" targets={{ wall: wallRef }} />}
+    </View>
   );
 }
 

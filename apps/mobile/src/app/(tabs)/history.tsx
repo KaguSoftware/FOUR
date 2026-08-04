@@ -1,9 +1,11 @@
-import { View } from "react-native";
+import { useRef } from "react";
+import { View, type ScrollView } from "react-native";
 import { useRouter } from "expo-router";
 import { Body, Label, Mono, Rule } from "@/components/ui";
 import { MonthStack } from "@/components/day-grid";
 import { Loading } from "@/components/states";
 import { Screen } from "@/components/screen";
+import { TourOverlay, useTourOn } from "@/components/tour";
 import { useStatus } from "@/lib/use-status";
 import { color, size, space } from "@/theme";
 
@@ -17,6 +19,11 @@ import { color, size, space } from "@/theme";
 export default function HistoryScreen() {
   const router = useRouter();
   const { status } = useStatus();
+  // The first-run tour passes through here for one step — it spotlights the
+  // month pager. See components/tour.tsx.
+  const tourHere = useTourOn("history");
+  const scrollRef = useRef<ScrollView>(null);
+  const monthsRef = useRef<View>(null);
   if (!status) return <Loading />;
 
   const { entries, today, runs, outages, allTime, leverSpans } = status;
@@ -29,7 +36,8 @@ export default function HistoryScreen() {
   ].sort((a, b) => (a.started_on < b.started_on ? 1 : -1));
 
   return (
-    <Screen>
+    <View style={{ flex: 1 }}>
+    <Screen scrollRef={scrollRef} scrollEnabled={!tourHere}>
       {/* All-time figures are monotonic by construction — they only ever go up,
           so there is nothing here that a bad month can take away. They lead the
           screen because the stack below is as long as the account is old, and
@@ -48,7 +56,7 @@ export default function HistoryScreen() {
           One per swipe, not a stack. A year-old account turned this screen
           into thirteen calendars you scrolled past to reach the incidents;
           months are peers you compare, not a single long document. */}
-      <View style={{ marginTop: space[8] }}>
+      <View ref={monthsRef} collapsable={false} style={{ marginTop: space[8] }}>
         <MonthStack
           entries={entries}
           today={today}
@@ -107,6 +115,15 @@ export default function HistoryScreen() {
         ))
       )}
     </Screen>
+
+    {tourHere && (
+      <TourOverlay
+        screen="history"
+        targets={{ months: monthsRef }}
+        scrollRef={scrollRef}
+      />
+    )}
+    </View>
   );
 }
 

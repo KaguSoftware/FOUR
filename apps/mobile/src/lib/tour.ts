@@ -55,3 +55,19 @@ export async function markTourSeen(userId: string): Promise<void> {
 export const tourRequest = createStore(false);
 
 export const requestTour = () => tourRequest.set(true);
+
+/**
+ * The running tour's step index, or null when no tour is up.
+ *
+ * A store rather than screen state because the tour CROSSES screens: it walks
+ * the dashboard, then History, then Proof, then closes back on Home. Each of
+ * those screens mounts its own overlay for the steps it owns, and this is the
+ * one index they all read — the overlay whose screen matches the current
+ * step's renders, the rest render nothing.
+ *
+ * Owned by components/tour.tsx (which defines the steps); screens should not
+ * set it directly — `startTour()` / the overlay's own advance are the writers.
+ */
+export const tourStep = createStore<number | null>(null);
+
+export const startTour = () => tourStep.set(0);

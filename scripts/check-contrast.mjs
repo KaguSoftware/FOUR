@@ -265,6 +265,9 @@ const ENFORCED = [
   // at surface-hi).
   ["tour · ring against the scrim", "ink", "scrim-over-surface-hi", NONTEXT],
   ["tour · ring against the spotlit element", "ink", "surface-hi", NONTEXT],
+  // The "tap one" pill on the doing step — the one inverted surface in the
+  // tour, precisely so "do this now" cannot be mistaken for "look at this".
+  ["tour · tap-here pill label", "bg", "ink", TEXT],
 ];
 
 const EXEMPT = [

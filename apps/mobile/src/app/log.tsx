@@ -340,12 +340,7 @@ export default function LogSheet() {
         // bare reference would hand it the press event as one.
         onPress={() => manage()}
         android_ripple={chosen !== null ? undefined : ripple()}
-        style={{
-          minHeight: TAP,
-          alignItems: "center",
-          justifyContent: "center",
-          borderRadius: radius.md,
-        }}
+        style={quiet}
       >
         <Body tone="mute" style={{ fontSize: size.xs }}>
           manage activities
@@ -361,14 +356,13 @@ export default function LogSheet() {
           disabled={chosen !== null}
           onPress={remove}
           android_ripple={chosen !== null ? undefined : ripple("destructive")}
-          style={({ pressed }) => ({
-            minHeight: TAP,
-            alignItems: "center",
-            justifyContent: "center",
-            marginTop: space[1],
-            borderRadius: radius.md,
-            backgroundColor: pressFillFlat(color.downDim, pressed),
-          })}
+          style={({ pressed }) => [
+            quiet,
+            {
+              marginTop: space[1],
+              backgroundColor: pressFillFlat(color.downDim, pressed),
+            },
+          ]}
         >
           <Body style={{ fontSize: size.xs, color: color.down }}>
             remove today&apos;s {label}
@@ -380,13 +374,7 @@ export default function LogSheet() {
           disabled={chosen !== null}
           onPress={() => commit(null)}
           android_ripple={chosen !== null ? undefined : ripple()}
-          style={{
-            minHeight: TAP,
-            alignItems: "center",
-            justifyContent: "center",
-            marginTop: space[1],
-            borderRadius: radius.md,
-          }}
+          style={[quiet, { marginTop: space[1] }]}
         >
           <Body tone="mute" style={{ fontSize: size.xs }}>
             just mark it up
@@ -396,3 +384,23 @@ export default function LogSheet() {
     </View>
   );
 }
+
+/**
+ * The sheet's secondary actions, as one shared shape: a REAL button — box,
+ * border, radius — that still sits a clear step below the activity chips
+ * above it (owner report, 2026-08-04: bare text here "didn't suit the
+ * system"). The hierarchy is deliberate on every axis: chips are 56pt with a
+ * fill and ink text; these are 48pt, outlined only, small grey text. The
+ * stroke is `line-hi` because with no fill it IS the entire button — the
+ * same 1.4.11 reasoning as the takeover's mark-it-up lever, whose pair is
+ * already enforced. Heights are static, so the sheet's single fitToContents
+ * measurement holds.
+ */
+const quiet = {
+  minHeight: TAP,
+  alignItems: "center" as const,
+  justifyContent: "center" as const,
+  borderRadius: radius.md,
+  borderWidth: 1,
+  borderColor: color.lineHi,
+};

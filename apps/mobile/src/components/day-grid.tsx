@@ -20,7 +20,7 @@ import {
   windowStart,
   type Entry,
   type LeverSpan,
-} from "@uptime/core";
+} from "@four/core";
 import { Label, Mono } from "./ui";
 import { pressDim, ripple } from "@/lib/press";
 import { useReduceMotion } from "@/lib/reduce-motion";
@@ -30,7 +30,7 @@ import { color, radius, size, space } from "@/theme";
  * The day grid — the signature component, and one of the four things in this
  * app that is deliberately NOT a platform control.
  *
- * The ramp is computed by `@uptime/core`, not here. Two clients generating
+ * The ramp is computed by `@four/core`, not here. Two clients generating
  * their own shades would be two answers to "how did that day look", and the
  * whole reason core exists is that there is one. A day where more of your
  * levers fired is lighter — proportionally, so two of three is two thirds of
@@ -602,35 +602,41 @@ function TodayCell({
     }, [phase, reduceMotion]),
   );
 
+  /**
+   * The dash pattern, SCALED so a whole number of periods tiles the ring's
+   * perimeter exactly. Unscaled, ~6.7 periods fit a 30pt cell and the
+   * remainder piles up at the path's start as one mis-sized chunk in a
+   * corner — which is precisely how it looked on the first device screenshot
+   * (2026-08-04). The centreline perimeter of the rounded rect is
+   * 4·L − 8r + 2πr for side L and corner radius r.
+   */
+  const inner = side - 2;
+  const perimeter =
+    side > 0 ? 4 * inner - 8 * radius.sm + 2 * Math.PI * radius.sm : 0;
+  const periods = Math.max(4, Math.round(perimeter / DASH_PERIOD));
+  const dashScale = perimeter > 0 ? perimeter / (periods * DASH_PERIOD) : 1;
+  const dashOn = DASH_ON * dashScale;
+  const dashOff = DASH_OFF * dashScale;
+
   const dashProps = useAnimatedProps(() => ({
-    strokeDashoffset: phase.value * DASH_PERIOD,
+    strokeDashoffset: phase.value * (dashOn + dashOff),
   }));
 
   const box = {
     // Fills whatever the outer element measures out to, so this matches the
-    // plain cells exactly on both grids.
+    // plain cells exactly on both grids. NO border here: RN lays children out
+    // INSIDE the border band, so a border shifted the SVG ring 2px down-right
+    // and it overflowed the cell (device screenshot, 2026-08-04). The ring is
+    // drawn OVER the fill's edge instead, which reads identically.
     width: "100%" as const,
     ...(size ? { height: size } : { aspectRatio: 1 }),
     borderRadius: radius.sm,
     backgroundColor: fill ?? color.surface,
-    /**
-     * The border is TRANSPARENT but still 2px — the SVG ring is drawn in the
-     * same 2px band, and keeping the border reserves it, so today's painted
-     * square stays exactly the size it always was.
-     *
-     * It is deliberately one step THICKER than the 1px every other cell
-     * carries: this ring has to read as "you are here" across the grid. RN
-     * draws borders inside the box, so the extra pixel eats into the painted
-     * square rather than growing it, and today's cell stays exactly the same
-     * outer size as its neighbours — which is the property that keeps the
-     * rows aligned. Do not "fix" this by dropping it to 1.
-     */
-    borderWidth: 2,
-    borderColor: "transparent",
   };
 
-  // Stroke centred 1px in, so the 2px stroke occupies exactly the border
-  // band. `pointerEvents="none"` — the ring is paint, not a control.
+  // Stroke centred 1px in, so the 2px stroke hugs the cell edge the way the
+  // old 2px border did. `pointerEvents="none"` — the ring is paint, not a
+  // control.
   const ring =
     side > 0 ? (
       <Svg
@@ -642,13 +648,13 @@ function TodayCell({
         <AnimatedRect
           x={1}
           y={1}
-          width={side - 2}
-          height={side - 2}
+          width={inner}
+          height={inner}
           rx={radius.sm}
           fill="none"
           stroke={color.ink}
           strokeWidth={2}
-          strokeDasharray={`${DASH_ON} ${DASH_OFF}`}
+          strokeDasharray={`${dashOn} ${dashOff}`}
           animatedProps={dashProps}
         />
       </Svg>

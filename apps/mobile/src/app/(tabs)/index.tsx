@@ -91,6 +91,10 @@ export default function StatusScreen() {
   const heroRef = useRef<View>(null);
   const gridRef = useRef<View>(null);
   const leverRef = useRef<View>(null);
+  const moodRef = useRef<View>(null);
+  // The tour's reorder step watches this: a completed drag is the lesson, so
+  // it bumps on the DROP, before the server round trip resolves.
+  const [reorders, setReorders] = useState(0);
 
   // First open on this device: teach the system once, then never again —
   // marked seen BEFORE the tour starts so no failure mode replays it on every
@@ -322,6 +326,7 @@ export default function StatusScreen() {
         // finger, and the archived button leaves the moment you drop it. These
         // only make it stick, and say so if it didn't.
         onReorder={async (ids) => {
+          setReorders((n) => n + 1);
           const res = await reorderLevers(ids);
           if (!res.ok) notify("Didn't save", res.error);
           await refresh();
@@ -345,7 +350,7 @@ export default function StatusScreen() {
           `space[6]`, not `space[10]`: the slider is one row now rather than a
           titled block, so it needs separating from the levers, not its own
           chapter heading's worth of air. */}
-      <View style={{ marginTop: space[6] }}>
+      <View ref={moodRef} collapsable={false} style={{ marginTop: space[6] }}>
         <MoodStrip
           week={week}
           saving={moodSaving}
@@ -380,9 +385,15 @@ export default function StatusScreen() {
     {tourHere && (
       <TourOverlay
         screen="home"
-        targets={{ hero: heroRef, levers: leverRef, grid: gridRef }}
+        targets={{
+          hero: heroRef,
+          levers: leverRef,
+          grid: gridRef,
+          mood: moodRef,
+        }}
         scrollRef={scrollRef}
-        loggedCount={shownAsLogged.length}
+        counts={{ log: shownAsLogged.length, reorder: reorders }}
+        can={{ reorder: levers.length > 1 }}
       />
     )}
     </View>

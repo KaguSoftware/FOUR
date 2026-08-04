@@ -1,6 +1,7 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { View, type ScrollView } from "react-native";
 import { useRouter } from "expo-router";
+import { monthsBetween } from "@uptime/core";
 import { Body, Label, Mono, Rule } from "@/components/ui";
 import { MonthStack } from "@/components/day-grid";
 import { Loading } from "@/components/states";
@@ -24,9 +25,20 @@ export default function HistoryScreen() {
   const tourHere = useTourOn("history");
   const scrollRef = useRef<ScrollView>(null);
   const monthsRef = useRef<View>(null);
+  // The tour's swipe step watches this; MonthStack bumps it per settled page.
+  const [swipes, setSwipes] = useState(0);
   if (!status) return <Loading />;
 
   const { entries, today, runs, outages, allTime, leverSpans } = status;
+
+  // Whether the pager HAS a second page to swipe to — a first-run account is
+  // one month deep, and the tour's swipe step must not ask for the
+  // impossible. Same earliest-date rule MonthStack itself uses.
+  const earliest = entries.reduce(
+    (min, e) => (e.logged_for < min ? e.logged_for : min),
+    today,
+  );
+  const canSwipe = monthsBetween(earliest, today).length > 1;
 
   // Interleaved by start date, newest first. Deliberately one list: two lists
   // would rank runs above outages and imply outages are the exceptional case.
@@ -64,6 +76,7 @@ export default function HistoryScreen() {
           onPressDay={(date) =>
             router.push({ pathname: "/day", params: { date } })
           }
+          onPageChange={() => setSwipes((n) => n + 1)}
         />
       </View>
 
@@ -121,6 +134,8 @@ export default function HistoryScreen() {
         screen="history"
         targets={{ months: monthsRef }}
         scrollRef={scrollRef}
+        counts={{ swipe: swipes }}
+        can={{ swipe: canSwipe }}
       />
     )}
     </View>

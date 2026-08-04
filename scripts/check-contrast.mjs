@@ -58,6 +58,18 @@ const T = {
   "ink-dim": bytes(0.78, 0.008, 250),
   "ink-mute": bytes(0.63, 0.01, 250),
   down: bytes(0.66, 0.19, 25),
+
+  // Google's sign-in button, and the only colours here that are NOT ours.
+  // Their identity guidelines fix the fill, the text and the mark's four hues,
+  // so these are literal sRGB rather than an oklch token — there is nothing to
+  // convert and nothing we are allowed to tune. They are measured for the same
+  // reason everything else is: the pair ships on our screen.
+  "google-bg": [255, 255, 255],
+  "google-ink": [31, 31, 31],
+  "google-blue": [66, 133, 244],
+  "google-green": [52, 168, 83],
+  "google-yellow": [251, 188, 5],
+  "google-red": [234, 67, 53],
 };
 
 const TEXT = 4.5, NONTEXT = 3;
@@ -193,9 +205,29 @@ const ENFORCED = [
   ["mood slider · unset thumb against the page", "line-hi", "bg", NONTEXT],
   ["mood slider · face at rest", "ink", "bg", NONTEXT],
   ["mood slider · face before it is set", "ink-mute", "bg", NONTEXT],
+
+  // --- the Google sign-in button, added 2026-08-04 -------------------------
+  //
+  // The white provider button on iOS and on any Android without Play Services.
+  // On Android WITH the native module this is Google's own view and none of
+  // these apply.
+  //
+  // It is the only light surface in a dark-only app, which is exactly why it
+  // is measured: every ratio recorded elsewhere is a light token on a dark
+  // ground, and this pair inverts that. The label is ours to place even though
+  // the colours are not ours to choose.
+  ["google button · label on white", "google-ink", "google-bg", TEXT],
+  // The button has no stroke — the fill IS the edge, so it owes 3:1 against
+  // the page the way any component boundary does. At 16:1 it is not close.
+  ["google button · white against the page", "google-bg", "bg", NONTEXT],
 ];
 
 const EXEMPT = [
+  [
+    "google button · the mark's four hues on white",
+    "google-yellow", "google-bg",
+    "1.71:1 for the yellow — the weakest of the four, and it does not owe a floor because the mark carries NO information. What the button says is carried entirely by its label at 16.48:1 (enforced above); the G is identification, and it is identified by SHAPE, which is the signal that survives a colour-blind viewer and a dimmed screen. It is also not ours to fix: Google's identity guidelines fix these four hues exactly, and a recoloured or monochrome G is a rejection at review. Recorded so the number is on the table and nobody 'corrects' it. The other three (blue, green, red) sit either side of the same line and are exempt for the same reason.",
+  ],
   [
     "pixel wall · unearned cell against the page",
     "line", "bg",

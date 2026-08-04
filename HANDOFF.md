@@ -35,11 +35,11 @@ Credential Manager) is now in the tree, by the owner's explicit decision.
 Testing means an **EAS dev build**. See *Gotchas* and *Development builds and
 push*.
 
-**THREE rounds are now stacked up unseen on hardware** — the 07-31 grid swap,
-the 07-31 Android-native pass, and the **08-03 proof/mood/activities round**
-(below). All three are `tsc`-clean and all three touch layout, which is exactly
-the class of change `tsc` cannot judge. Get them onto a device before adding a
-fourth.
+**FOUR rounds are now stacked up unseen on hardware** — the 07-31 grid swap,
+the 07-31 Android-native pass, the 08-03 proof/mood/activities round, and the
+**08-04 auth-screen round** (all below). Every one is `tsc`-clean and every one
+touches layout, which is exactly the class of change `tsc` cannot judge. Get
+them onto a device before adding a fifth.
 
 ---
 
@@ -291,6 +291,32 @@ manager or backup drive — see *Gotchas*.
   eslint + expo lint clean, 39 migration checks, contrast clean, the web app
   builds, both bundles export.** **Nothing in it has been on hardware.**
 
+- **The auth-screen round, 2026-08-04.** Four owner observations from looking at
+  the sign-in screen, all the same underlying problem — the screen did not
+  signal what was tappable.
+  **(1) Google has a mark now.** `GoogleMark` in `components/ui.tsx` draws the
+  official four-colour G as inline `react-native-svg`, and `Button` gained
+  `icon` + `variant="provider"` (white fill, `#1f1f1f` text) to carry it. This
+  branch — **iOS, and any Android without Play Services** — was the app's own
+  grey button reading "continue with google" with no logo, sitting directly
+  under Apple's white branded one. That was both the visual mismatch the owner
+  saw and a Google-guidelines failure. The Android branded-button branch is
+  untouched.
+  **(2) "Authentication required." is gone** from both clients. It was the one
+  piece of text on the screen and it read as a system error.
+  **(3) The two email alternatives are real buttons.** They were `TextButton`s —
+  12px grey text, no box — whose own docblock already conceded they "read as
+  dead labels that happen to work". A new `variant="subtle"` on `Button` gives
+  them the same border and radius as the primary at `TAP` height and `ink-dim`
+  text, so they are unmistakably controls a clear step below the 56pt CTA.
+  `TextButton` itself is UNCHANGED — it has seven other call sites ("← back",
+  "sign out", "remove", the OTP resend) where a boxless link is correct.
+  **(4) Nothing was needed in any dashboard**, so no Chrome-agent prompt was
+  written. Every change is client-side rendering: no new scopes, no redirect
+  URIs, no provider config.
+  Verified: **tsc clean ×3, contrast clean (2 new enforced pairs, 1 exempt),
+  both bundles export, the web app builds.** **Not on hardware.**
+
 **Written but NOT verified end-to-end:**
 
 - **Vercel cron has never run.** The route works locally; the schedule is unproven.
@@ -337,6 +363,21 @@ manager or backup drive — see *Gotchas*.
   5. **The activity cap under a real log.** Fill a lever to ten, then log it
      with a brand-new note. **The day must still land.** That is the whole
      safety property of the round.
+- **The 2026-08-04 auth round is untested on hardware**, and it is the cheapest
+  of the four to check — one screen, no data, reachable by signing out.
+  1. **The white Google button on iOS.** It is the ONLY light surface in a
+     dark-only app. Check it does not glare at 6am, and that it sits at the
+     same visual weight as Apple's `WHITE` button directly above it rather
+     than louder.
+  2. **The G mark's crispness.** It is four SVG paths on a 48-unit viewBox
+     rendered at 18pt. Vector, so it should be sharp at any density — but no
+     render has been looked at.
+  3. **The two `subtle` buttons at half width each.** Labels were shortened
+     ("create account", "email a code") to fit a 48pt box at half a phone's
+     width. Check they do not wrap or clip at large Dynamic Type.
+  4. **The gap the deleted subtitle left.** A bare `View` of `space[10]` now
+     holds the logo off the fields. Check the screen does not read as
+     top-heavy with nothing under the mark.
 - Plateau thresholds pass unit tests but have no longitudinal data behind them. `PLATEAU_WEEKS` (4) and `MIN_DAYS_PER_WEEK` (3) are educated guesses.
 
 ### The Android release, exactly where it stands (2026-07-31)
@@ -504,7 +545,7 @@ gate.
 | `apps/mobile/src/lib/reminder.ts` | The daily reminder: local scheduling, silent app-start reconcile, the test alert. The only file allowed to prompt for notification permission outside onboarding. |
 | `apps/mobile/src/lib/oauth.ts` | Apple (nonce flow → `signInWithIdToken`) and Google (PKCE browser round-trip → `exchangeCodeForSession`). |
 | `apps/mobile/src/lib/export.ts` | The whole account as one JSON file through the share sheet. Raw rows, never derived figures. |
-| `apps/mobile/src/components/button.tsx` | THE button — extracted from five drifting inline copies. Use it instead of a bare Pressable. Also `TextButton`, which replaced eight inline copies of the quiet text link. |
+| `apps/mobile/src/components/button.tsx` | THE button — extracted from five drifting inline copies. Use it instead of a bare Pressable. Three variants: `default`, `subtle` (a real control below the CTA) and `provider` (a vendor's white pair — **the only colours in the app not from `theme.ts`**). Also `TextButton`, the boxless text link, which is still right for "← back" / "sign out" / "remove" and was deliberately NOT given a border in the 08-04 round. |
 | `apps/mobile/src/lib/press.ts` | **Touch feedback.** `ripple()` (Android) and `pressFill()` (iOS), never both. Every Pressable in the app goes through it. |
 | `apps/mobile/src/lib/haptics.ts` | **Haptics, named by meaning** — `committed` / `pickedUp` / `nudged`. Android uses real `HapticFeedbackConstants`; `impactAsync` is wrong there and needs a permission the app now blocks. |
 | `apps/mobile/src/lib/back.ts` | `useAndroidBack()` — only for a screen running several steps inside ONE route. `gestureEnabled: false` does **not** stop the Android Back button. |
@@ -613,7 +654,17 @@ gate.
     with the old `/proof`. Two migrations, both applied. Verified: **264 core
     tests, tsc ×3, both linters, 39 migration checks, contrast, the web build,
     both bundles export.** Full notes under *Current status*.
-25. Then: **custom SMTP** (it unblocks the Magic Link template, which the OTP
+25. ~~The auth-screen round~~ — done 2026-08-04, **not yet seen on hardware.**
+    Four owner observations, all of them the sign-in screen failing to signal
+    what was tappable: Google's button drew no mark on iOS (and violated
+    Google's guidelines doing it); "Authentication required." read as a system
+    error; and the two email alternatives were 12px grey text. `Button` gained
+    `icon`, `variant="provider"` (the vendor's white pair) and
+    `variant="subtle"` (a real control one step below the CTA); `ui.tsx` gained
+    `GoogleMark`. `TextButton` was deliberately left alone. Mirrored on web.
+    Verified: **tsc ×3, contrast, both bundles export, the web build.** Full
+    notes under *Current status*.
+26. Then: **custom SMTP** (it unblocks the Magic Link template, which the OTP
     screen depends on — see *Blocked*) · store listings · Play Console identity
     verification · the `eas.json` Android submit block.
 
@@ -632,7 +683,8 @@ gate.
 | Walkthrough | **Mobile: 7-page manual of real rendered components**, auto-once per device, reopens from About. Web: none | Web parity if anyone asks | Mobile done 2026-07-30 |
 | Activities | **Editable and capped at ten per lever**, from the log sheet (long-press a chip, or "manage activities") and Settings → Activities. Rename, delete, restore a retired one. The cap ARCHIVES rather than refusing on the logging path | Unchanged | Both done 2026-08-03 |
 | Mobile levers | Full: create, rename, archive, with native alerts | Unchanged | Done |
-| Mobile auth | **Email + password, Sign in with Apple, Google, and a 6-digit email code** (the code doubles as forgot-password: sign in by code, set a new password in Settings). All built 2026-07-29; Apple/Google/OTP are inert until the Supabase dashboard config in *Blocked* is done | Verified on device, with custom SMTP | Config, then device test |
+| Mobile auth | **Email + password, Sign in with Apple, Google, and a 6-digit email code** (the code doubles as forgot-password: sign in by code, set a new password in Settings). All built 2026-07-29; Apple/Google/OTP are inert until the Supabase dashboard config in *Blocked* is done. **Screen restyled 2026-08-04** — Google's mark, no "Authentication required.", the two email alternatives as real buttons | Verified on device, with custom SMTP | Config, then device test |
+| Auth screen chrome | **Both clients, 2026-08-04.** One filled primary, two outlined secondaries splitting the width, then the provider buttons under a rule. Web's second secondary says "email a link", not mobile's "email a code" — **the two flows genuinely differ** (web sends a magic link with nothing to type; mobile verifies a 6-digit token) and matching the wording would misdescribe one | Unchanged — this IS the intended shape | Done both 2026-08-04 |
 | Daily reminder | **Mobile: opt-in toggle + native time picker in Alerts and onboarding; local notification, reconciled on app start.** Web: none | Unchanged — the reminder is a phone thing | Mobile done 2026-07-29 |
 | Account management | **Mobile: change email, change password, export JSON, delete account (RPC + typed confirm), sync row, About/privacy/terms/support.** Web: none of it | Web gets parity eventually | Mobile done 2026-07-29 |
 | App icon | The FOUR mark (JetBrains Mono 700, 2×2), generated by `scripts/make-mark.ps1` on all four surfaces | Real branding pass | Placeholder by design, 2026-07-30 |
@@ -712,6 +764,24 @@ gate.
   cannot test the RN-specific risks — `Frame`'s tab-bar inset, the native
   slider, the pager gesture — but it shows the round. Needs
   `apps/web/.env.local`, which is **not on the work PC**; pull from Vercel.
+
+- **The Google button's colours are the one exception to the palette, and they
+  are not ours to tune (2026-08-04).** `PROVIDER_BG` / `PROVIDER_INK` in
+  `components/button.tsx` and the four hues in `GoogleMark` are fixed by
+  Google's identity guidelines; a recoloured or monochrome G is a rejection at
+  review. So `variant="provider"` is white in a **dark-only app** — deliberately
+  the only light surface in it. Three consequences worth knowing before
+  touching it:
+  - `check:contrast` carries them as **literal sRGB byte triples**, not oklch
+    tokens, because there is nothing to convert and nothing we may change.
+  - **The mark's four hues are EXEMPT** (the yellow measures 1.71:1 on white).
+    That is correct: the mark carries no information — the label does, at
+    16.48:1 — and the G is identified by SHAPE. Do not "fix" it.
+  - **The button has no border.** Its own fill is the edge, at 19.08:1 against
+    the page. A `line-hi` stroke on white reads as a grey halo.
+  The same reasoning governs the **string**: "Sign in with Google" is title
+  case, the one place the app's lowercase convention yields, because a vendor's
+  wording is no more ours to restyle than their mark is.
 
 - **The pixel wall's message is made of cells that must be INVISIBLE.** The
   masked cells and the not-yet-earned cells are drawn in exactly the same

@@ -12,9 +12,9 @@ import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
 import { useRouter } from "expo-router";
 
-import { Button, TextButton } from "@/components/button";
+import { Button } from "@/components/button";
 import { field, fieldTint } from "@/components/fields";
-import { Body, Label, Logo, Rule } from "@/components/ui";
+import { Body, GoogleMark, Label, Logo, Rule } from "@/components/ui";
 import { googleSignin } from "@/lib/google-native";
 import { signInWithApple, signInWithGoogle } from "@/lib/oauth";
 import { supabase } from "@/lib/supabase";
@@ -149,9 +149,7 @@ export default function SignInScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <Logo width={88} />
-        <Body tone="mute" style={{ marginTop: space[4], marginBottom: space[10] }}>
-          Authentication required.
-        </Body>
+        <View style={{ height: space[10] }} />
 
         {notice ? (
           <Body tone="dim">{notice}</Body>
@@ -208,35 +206,38 @@ export default function SignInScreen() {
               tall
             />
 
-            {/* One quiet row for the two email alternatives. The emailed code
-                doubles as the forgot-password path: sign in with the code,
-                then set a new password in Settings. */}
-            <View
-              style={{
-                flexDirection: "row",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
-              <TextButton
-                title={mode === "in" ? "or create an account" : "or sign in"}
-                align="start"
-                onPress={() => {
-                  setMode(mode === "in" ? "up" : "in");
-                  setError(null);
-                }}
-              />
+            {/* The two email alternatives, as real controls splitting the
+                width. They were `TextButton`s — 12px grey text with no box —
+                and read as a caption under the CTA rather than as two things
+                you could tap. `subtle` keeps them a clear step below the 56pt
+                primary while still being unmistakably buttons.
 
-              <TextButton
-                title="email me a code"
-                align="start"
-                onPress={() =>
-                  router.push({
-                    pathname: "/email-otp",
-                    params: { email: email.trim() },
-                  })
-                }
-              />
+                The emailed code doubles as the forgot-password path: sign in
+                with the code, then set a new password in Settings. */}
+            <View style={{ flexDirection: "row", gap: space[3] }}>
+              <View style={{ flex: 1 }}>
+                <Button
+                  title={mode === "in" ? "create account" : "sign in"}
+                  variant="subtle"
+                  onPress={() => {
+                    setMode(mode === "in" ? "up" : "in");
+                    setError(null);
+                  }}
+                />
+              </View>
+
+              <View style={{ flex: 1 }}>
+                <Button
+                  title="email a code"
+                  variant="subtle"
+                  onPress={() =>
+                    router.push({
+                      pathname: "/email-otp",
+                      params: { email: email.trim() },
+                    })
+                  }
+                />
+              </View>
             </View>
 
             <View
@@ -271,10 +272,15 @@ export default function SignInScreen() {
             {/* Google's own button on Android, for the same reason Apple's is
                 Apple's above: the vendor's branding guidelines ask for it,
                 store review checks, and on Android it is also the button
-                users recognise as "the account sheet opens". Elsewhere — iOS,
-                and any Android without Play Services — it is the app's own
-                quiet button opening the browser flow, which is what that
-                path actually does. */}
+                users recognise as "the account sheet opens".
+
+                Elsewhere — iOS, and any Android without Play Services — we
+                draw it ourselves, because the native module is not there to
+                draw it for us. It still has to BE Google's button: their mark,
+                their wording, on white. Until 2026-08-04 this branch was the
+                app's own grey button reading "continue with google" with no
+                logo at all, sitting directly under Apple's white branded one,
+                which is both the visual mismatch and a guidelines failure. */}
             {android && GoogleSigninButton ? (
               <GoogleSigninButton
                 size={GoogleSigninButton.Size.Wide}
@@ -288,8 +294,14 @@ export default function SignInScreen() {
               />
             ) : (
               <Button
-                title="continue with google"
+                // Google's guidelines fix this string. It is the one place the
+                // app's lowercase convention yields — a vendor's wording is
+                // not ours to restyle, any more than their mark is.
+                title="Sign in with Google"
+                icon={<GoogleMark size={18} />}
+                variant="provider"
                 onPress={() => withProvider(signInWithGoogle)}
+                disabled={busy}
               />
             )}
           </View>

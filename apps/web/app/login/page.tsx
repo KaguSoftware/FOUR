@@ -14,7 +14,6 @@ export default async function LoginPage({
       <div className="w-full max-w-xs">
         <div className="mb-8">
           <Wordmark />
-          <p className="text-ink-mute mt-2 text-sm">Authentication required.</p>
         </div>
         <LoginForm
           next={safePath(params.next)}

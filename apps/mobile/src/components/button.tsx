@@ -1,8 +1,32 @@
+import type { ReactNode } from "react";
 import { Pressable } from "react-native";
 
 import { Body, Label } from "./ui";
 import { pressFill, ripple } from "@/lib/press";
 import { color, radius, size, space, TAP } from "@/theme";
+
+/**
+ * The three weights a button can carry.
+ *
+ * `default` is the app's own button and the only one that existed until
+ * 2026-08-04. The other two exist because the sign-in screen has to say three
+ * different things at once and a single shape could only say one:
+ *
+ * - `subtle` — a real control that is deliberately NOT the main one. Same
+ *   border and radius, one step quieter in text, and the shorter `TAP` height
+ *   rather than `tall`'s 56. It replaced the two `TextButton`s on sign-in,
+ *   which were 12px grey text with no box and read as a caption.
+ * - `provider` — a third party's button, on their terms. White fill and dark
+ *   text, because that is what Apple's own `WHITE` button gives us to match
+ *   and what Google's four-colour mark needs under it. It is the one variant
+ *   whose colours are NOT from `theme.ts`: a vendor fixes them, not us.
+ */
+export type ButtonVariant = "default" | "subtle" | "provider";
+
+/** The two vendor colours. Google's guidelines fix both; see `GoogleMark`. */
+const PROVIDER_BG = "#ffffff";
+const PROVIDER_BG_PRESSED = "#dadce0";
+const PROVIDER_INK = "#1f1f1f";
 
 /**
  * The button. One shape, everywhere.
@@ -28,6 +52,8 @@ export function Button({
   busy = false,
   destructive = false,
   tall = false,
+  variant = "default",
+  icon,
 }: {
   title: string;
   onPress: () => void;
@@ -36,8 +62,31 @@ export function Button({
   destructive?: boolean;
   /** The 56pt CTA height onboarding and the auth screens use. */
   tall?: boolean;
+  /** See `ButtonVariant`. Omitted is the app's own button, unchanged. */
+  variant?: ButtonVariant;
+  /**
+   * Drawn before the label, in a row. For a vendor mark — this app draws no
+   * decorative icons on its own buttons, and `Label` is the whole content
+   * everywhere else.
+   */
+  icon?: ReactNode;
 }) {
   const off = disabled || busy;
+  const provider = variant === "provider";
+
+  // A provider's button is theirs, so its fill and its pressed step are the
+  // vendor's light pair rather than this app's dark one.
+  const rest = provider ? PROVIDER_BG : color.surfaceHi;
+  const held = provider ? PROVIDER_BG_PRESSED : color.line;
+
+  const ink = destructive
+    ? color.down
+    : provider
+      ? PROVIDER_INK
+      : variant === "subtle"
+        ? color.inkDim
+        : color.ink;
+
   return (
     <Pressable
       accessibilityRole="button"
@@ -49,17 +98,24 @@ export function Button({
         minHeight: tall ? 56 : TAP,
         borderRadius: radius.md,
         borderWidth: 1,
-        borderColor: color.lineHi,
-        backgroundColor: pressFill(color.surfaceHi, color.line, pressed),
+        // The white button needs no stroke to separate it from the page — its
+        // own fill already does, at 16:1. A `line-hi` edge on it would read as
+        // a grey halo rather than a border.
+        borderColor: provider ? PROVIDER_BG : color.lineHi,
+        backgroundColor: pressFill(rest, held, pressed),
+        flexDirection: "row",
         alignItems: "center",
         justifyContent: "center",
+        gap: space[3],
         paddingHorizontal: space[4],
         opacity: off ? 0.4 : 1,
       })}
     >
-      <Label style={{ color: destructive ? color.down : color.ink }}>
-        {busy ? "…" : title}
-      </Label>
+      {/* The mark goes with the label, not with the button: when `busy`
+          replaces the title with "…", the icon leaves too, so the row does not
+          hold a vendor logo next to an ellipsis. */}
+      {icon && !busy ? icon : null}
+      <Label style={{ color: ink }}>{busy ? "…" : title}</Label>
     </Pressable>
   );
 }

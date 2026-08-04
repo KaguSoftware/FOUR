@@ -146,24 +146,36 @@ export function LoginForm({
         {pending ? "..." : mode === "in" ? "Sign in" : "Create account"}
       </button>
 
-      <button
-        type="button"
-        onClick={() => {
-          setMode(mode === "in" ? "up" : "in");
-          setError(null);
-        }}
-        className="text-ink-mute hover:text-ink-dim active:text-ink min-h-11 rounded text-xs transition-colors"
-      >
-        {mode === "in" ? "or create an account" : "or sign in"}
-      </button>
+      {/* The two alternatives, as real controls splitting the width. They were
+          bare text at `text-ink-mute text-xs` — no border, no fill — which read
+          as a caption under the submit button rather than as two things you
+          could click. Same border and radius as the primary above, one step
+          quieter in fill and text, so they are unmistakably buttons without
+          competing with it. Mirrors `variant="subtle"` on mobile. */}
+      <div className="flex gap-3">
+        <button
+          type="button"
+          onClick={() => {
+            setMode(mode === "in" ? "up" : "in");
+            setError(null);
+          }}
+          className="bg-surface border-line-hi text-ink-dim hover:bg-surface-hi hover:text-ink active:bg-line min-h-12 flex-1 rounded border px-3 text-xs transition-colors"
+        >
+          {mode === "in" ? "create account" : "sign in"}
+        </button>
 
-      <button
-        type="button"
-        onClick={sendMagicLink}
-        className="text-ink-mute hover:text-ink-dim active:text-ink min-h-11 rounded text-xs transition-colors"
-      >
-        or send a magic link
-      </button>
+        <button
+          type="button"
+          onClick={sendMagicLink}
+          className="bg-surface border-line-hi text-ink-dim hover:bg-surface-hi hover:text-ink active:bg-line min-h-12 flex-1 rounded border px-3 text-xs transition-colors"
+        >
+          {/* "magic link", not mobile's "email a code": this really does send
+              a link and land you back here via `/auth/callback`, with nothing
+              to type. Mobile's path verifies a 6-digit token instead. Matching
+              the wording would misdescribe one of them. */}
+          email a link
+        </button>
+      </div>
     </form>
   );
 }

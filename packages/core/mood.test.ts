@@ -4,9 +4,11 @@ import {
   MOOD_MAX,
   MOOD_MIN,
   MOOD_NEUTRAL,
+  moodBarHeight,
   moodFraction,
   moodLabel,
   moodValue,
+  moodWeek,
 } from "./mood";
 
 /** The Q control point's Y, which is the only number that moves. */
@@ -130,5 +132,89 @@ describe("moodLabel", () => {
     // skip cannot also be one that judges the answer.
     const words = [1, 25, 50, 75, 100].map(moodLabel).join(" ");
     expect(words).not.toMatch(/great|bad|awful|amazing|well done|poor/i);
+  });
+});
+
+describe("moodWeek", () => {
+  const sig = (observed_on: string, value: number | null, kind = "mood") => ({
+    observed_on,
+    kind,
+    value,
+  });
+
+  it("returns the window oldest-first, ending on today", () => {
+    const week = moodWeek([], "2026-08-04");
+    expect(week).toHaveLength(7);
+    expect(week[0].date).toBe("2026-07-29");
+    expect(week[6].date).toBe("2026-08-04");
+  });
+
+  it("places each reading on its own day", () => {
+    const week = moodWeek(
+      [sig("2026-08-02", 40), sig("2026-08-04", 80)],
+      "2026-08-04",
+    );
+    expect(week[4].date).toBe("2026-08-02");
+    expect(week[4].value).toBe(40);
+    expect(week[6].value).toBe(80);
+    // The days between stay unanswered rather than being filled in.
+    expect(week[5].value).toBeNull();
+  });
+
+  it("gives an unanswered day NULL, never zero", () => {
+    // The load-bearing case. A skipped day is not a bad day: the monitor drops
+    // it rather than inventing one, and a client must be able to draw the
+    // difference.
+    const week = moodWeek([sig("2026-08-04", 60)], "2026-08-04");
+    expect(week[0].value).toBeNull();
+    expect(week[0].value).not.toBe(0);
+    expect(week.filter((d) => d.value === null)).toHaveLength(6);
+  });
+
+  it("ignores the retired 1-5 kinds", () => {
+    // An `energy` of 4 drawn on a 1-100 strip is a bar at a height that means
+    // nothing on either scale.
+    const week = moodWeek(
+      [sig("2026-08-04", 4, "energy"), sig("2026-08-03", 3, "sleep")],
+      "2026-08-04",
+    );
+    expect(week.every((d) => d.value === null)).toBe(true);
+  });
+
+  it("ignores days outside the window", () => {
+    const week = moodWeek(
+      [sig("2026-07-01", 99), sig("2026-08-05", 99)],
+      "2026-08-04",
+    );
+    expect(week.every((d) => d.value === null)).toBe(true);
+  });
+
+  it("takes a custom length", () => {
+    expect(moodWeek([], "2026-08-04", 14)).toHaveLength(14);
+    // Never zero-length: a strip with no days is not a thing a client can draw.
+    expect(moodWeek([], "2026-08-04", 0)).toHaveLength(1);
+  });
+});
+
+describe("moodBarHeight", () => {
+  it("keeps the lowest real reading visible", () => {
+    // MOOD_MIN maps to fraction 0, so without a floor the lowest answer would
+    // draw a zero-height bar — identical to a day nobody answered.
+    expect(moodBarHeight(MOOD_MIN)).toBeGreaterThan(0);
+    expect(moodBarHeight(MOOD_MIN)).toBeCloseTo(0.12, 5);
+  });
+
+  it("gives an unanswered day no height at all", () => {
+    expect(moodBarHeight(null)).toBe(0);
+  });
+
+  it("puts the top of the scale at full height", () => {
+    expect(moodBarHeight(MOOD_MAX)).toBeCloseTo(1, 5);
+  });
+
+  it("never lets an answered day fall to a skipped day's height", () => {
+    for (let v = MOOD_MIN; v <= MOOD_MAX; v++) {
+      expect(moodBarHeight(v)).toBeGreaterThan(moodBarHeight(null));
+    }
   });
 });

@@ -291,6 +291,45 @@ manager or backup drive — see *Gotchas*.
   eslint + expo lint clean, 39 migration checks, contrast clean, the web app
   builds, both bundles export.** **Nothing in it has been on hardware.**
 
+- **The mood strip, 2026-08-04.** The dashboard's "how was today" section was
+  rebuilt a third time, and this time the diagnosis was different: the two
+  earlier attempts treated it as a layout problem, and it was not one.
+  **The reading was effectively write-only.** Nothing in the app showed mood
+  back except the day sheet, one day at a time behind a grid tap, as the
+  literal string `63 mood` — a form `mood.ts`'s own docblock calls "not an
+  answer". You fed it daily and never saw it again.
+  It is now a **seven-bar strip**: six days behind you, today last, set by
+  dragging anywhere on the row. The control is its own readback. Seven because
+  a week is the unit `evaluatePlateau` already reasons in — it folds days into
+  ISO weeks and discards any week under three readings — so the strip shows
+  exactly the window the pager judges, and each bar is twice as wide to hit as
+  a fortnight's would be. A `n/7` count sits on the label's row.
+  **The face, the slider and the Save button are all gone.** Save existed
+  because a drag taken to browse the faces was indistinguishable from an
+  answer; there are no faces now, a drag has one meaning, and the strip shows
+  the result immediately. Releasing writes. Owner's call, reversing their own
+  08-04 decision — and it moves mobile *back towards* web, which has always
+  committed on pointer-up and never had a Save button.
+  **`moodWeek` and `moodBarHeight` are in core**, with the load-bearing rule
+  under test: **an unanswered day is `null`, never `0`**. The monitor drops an
+  unsampled day rather than inventing one, and `MOOD_MIN` is 1 — so
+  `moodFraction` maps the lowest real reading to exactly 0, and without a floor
+  a genuinely rough day would draw at the same height as a day nobody answered.
+  That is the one distinction the whole design exists to make.
+  Also: **the separate `loadMood` round trip is deleted.** `loadStatus` already
+  selects every signal unbounded, so today's row was being fetched anyway and
+  the extra request was pure latency — the same conclusion web reached earlier.
+  **`@react-native-community/slider` is now unused in source but deliberately
+  still in `package.json`**: removing a native module forces every dev build to
+  be rebuilt, and it buys nothing. Drop it next time the build is regenerated
+  for another reason.
+  **Web is untouched** — it keeps the face and `<input type=range>`. The two
+  clients have diverged on this control on purpose, for one round; `moodWeek`
+  living in core is what makes the port cheap, and it can also replace web's
+  local `todaysMood` helper.
+  Verified: **302 core tests, tsc clean ×3, eslint + expo lint clean, contrast
+  clean, both bundles export.** **Not on hardware.**
+
 - **The device-feedback round, 2026-08-04 (v0.1.2).** Nine fixes reported from
   using the app on an Android phone. Two were not defects and were put to the
   owner before building; the rest were real.

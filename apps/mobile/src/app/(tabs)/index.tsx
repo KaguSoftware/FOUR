@@ -1,20 +1,20 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Alert, RefreshControl, Text, View } from "react-native";
-import { useFocusEffect, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import * as Localization from "expo-localization";
-import { applyToDay, MILESTONE_COPY } from "@uptime/core";
+import { applyToDay, MILESTONE_COPY, moodWeek } from "@uptime/core";
 
 import { Body, Label, Mono } from "@/components/ui";
 import { useNotify } from "@/components/snackbar";
 import { DayGrid } from "@/components/day-grid";
 import { LeverButtons } from "@/components/lever-buttons";
-import { MoodSlider } from "@/components/mood-slider";
+import { MoodStrip } from "@/components/mood-slider";
 import { Screen } from "@/components/screen";
 import { Takeover } from "@/components/takeover";
 import { useStatus } from "@/lib/use-status";
 import { useOutbox } from "@/lib/use-outbox";
 import { archiveLever, reorderLevers } from "@/lib/levers";
-import { loadMood, saveMood } from "@/lib/mood";
+import { saveMood } from "@/lib/mood";
 import { syncTimeZone, type LeverRow } from "@/lib/status";
 import { markWalkthroughSeen, walkthroughSeen } from "@/lib/walkthrough";
 import { color, size, space } from "@/theme";
@@ -49,30 +49,29 @@ export default function StatusScreen() {
   }, [userId, storedZone]);
 
   /**
-   * Today's mood, loaded separately from the status object.
+   * The mood write's state. The READING itself comes from `status.signals`.
    *
-   * Not folded into `getStatus`: it is one row for one day, on a different
-   * cadence to everything else here, and putting it in the status query would
-   * make every lever tap's refresh re-fetch it.
+   * There used to be a separate `loadMood` round trip here for today's single
+   * row, on the argument that folding it into the status query would refetch
+   * it on every lever tap. That argument died when the strip started needing a
+   * week: `loadStatus` already selects every signal unbounded, so the row was
+   * being fetched anyway and the extra request was pure latency. The web
+   * client had already reached the same conclusion.
    */
-  const [mood, setMood] = useState<number | null>(null);
   const [moodFailed, setMoodFailed] = useState(false);
   const [moodSaving, setMoodSaving] = useState(false);
-  const todayDate = status?.today;
-  const loadTodaysMood = useCallback(async () => {
-    if (!userId || !todayDate) return;
-    const { value, error } = await loadMood(userId, todayDate);
-    // A failed read leaves whatever is on screen rather than blanking it.
-    // Resetting the face to unset because the network blinked looks exactly
-    // like the save having been lost.
-    if (!error) setMood(value);
-  }, [userId, todayDate]);
-
-  useFocusEffect(
-    useCallback(() => {
-      loadTodaysMood();
-    }, [loadTodaysMood]),
-  );
+  /**
+   * The value this device just wrote, held until the reload catches up.
+   *
+   * `refresh()` is a five-query round trip; without this the bar would snap
+   * back to its old height for the duration and read as the write having
+   * failed. Cleared by the refresh landing, since `status.signals` then
+   * carries the same number.
+   */
+  const [justSaved, setJustSaved] = useState<{
+    date: string;
+    value: number;
+  } | null>(null);
 
   // First open on this device: explain the system once, then never again —
   // marked seen BEFORE the push so no failure mode replays it on every mount.
@@ -111,6 +110,7 @@ export default function StatusScreen() {
     entries,
     levers,
     playbook,
+    signals,
     todayLevers,
     uptime,
     run,
@@ -120,6 +120,18 @@ export default function StatusScreen() {
     slammed,
     state,
   } = status;
+
+  /**
+   * The week the strip draws, with this device's unlanded write laid on top.
+   *
+   * Same shape as `shownAsLogged` below: the server list is the base, and a
+   * local value only overrides the one day it is for.
+   */
+  const week = moodWeek(signals, today).map((d) =>
+    justSaved && justSaved.date === d.date
+      ? { ...d, value: justSaved.value }
+      : d,
+  );
 
   // The server's view with the queue laid on top. `applyToDay` is in core and
   // tested: the server list is the base and the queue only overrides the levers
@@ -282,28 +294,32 @@ export default function StatusScreen() {
           titled block, so it needs separating from the levers, not its own
           chapter heading's worth of air. */}
       <View style={{ marginTop: space[6] }}>
-        <MoodSlider
-          value={mood}
-          busy={moodSaving}
+        <MoodStrip
+          week={week}
+          saving={moodSaving}
           onCommit={async (next) => {
             setMoodFailed(false);
             setMoodSaving(true);
+            // Optimistic: the bar is already where the finger left it, and
+            // snapping it back while the write lands would read as a failure.
+            setJustSaved({ date: today, value: next });
             const { error } = await saveMood(state.user_id, today, next);
             setMoodSaving(false);
             // Reported, not swallowed. Six paths in this app used to claim
             // success unconditionally and this is not becoming the seventh.
-            //
-            // `mood` advances only on success, which is what keeps the Save
-            // button on screen after a failure: it is shown while the position
-            // differs from the last CONFIRMED value, so a failed write leaves
-            // something to press again rather than looking saved.
-            if (error) return setMoodFailed(true);
-            setMood(next);
+            if (error) {
+              // Drop the optimistic value so the strip tells the truth about
+              // what is actually stored, and the next drag is a real retry.
+              setJustSaved(null);
+              return setMoodFailed(true);
+            }
+            await refresh();
+            setJustSaved(null);
           }}
         />
         {moodFailed && (
           <Body tone="degraded" style={{ marginTop: space[2] }}>
-            Didn&apos;t save. Tap save again when you have a connection.
+            Didn&apos;t save. Drag it again when you have a connection.
           </Body>
         )}
       </View>

@@ -21,6 +21,8 @@
  * mobile); the shape is computed once, here.
  */
 
+import { addDays } from "./uptime";
+
 /** Both ends inclusive. Matches the `signals_value_check` bound for `mood`. */
 export const MOOD_MIN = 1;
 export const MOOD_MAX = 100;
@@ -162,4 +164,67 @@ export function moodLabel(value: number | null): string {
   if (f < 0.6) return "flat";
   if (f < 0.8) return "decent";
   return "good";
+}
+
+/** One day in the strip. `value` is null for a day that was never answered. */
+export type MoodDay = {
+  date: string;
+  value: number | null;
+};
+
+/**
+ * The last `days` days of mood, oldest first, ending on `today`.
+ *
+ * **A day with no reading is `null`, never `0`.** That distinction is the whole
+ * design: the monitor drops an unsampled day rather than inventing one (see
+ * `evaluatePlateau` — "absence of data is NOT a flat line"), and a client that
+ * drew a skipped day at the floor would be telling someone a day was rough when
+ * they simply did not answer. Renderers must draw the two differently.
+ *
+ * Every day in the window is present in the output whether or not it has a
+ * reading, so the array index IS the position in the strip and a caller never
+ * has to reconcile a sparse list against a calendar.
+ *
+ * **`mood` only.** The retired `energy` and `sleep` kinds are still in the
+ * table and still render in the day sheet, but they were a 1–5 scale — putting
+ * one in a 1–100 strip would draw a bar at a height that means nothing.
+ *
+ * In core rather than in a client for the reason the whole package exists: two
+ * implementations of "the last seven days" is two answers to the same question.
+ */
+export function moodWeek(
+  signals: readonly { observed_on: string; kind: string; value: number | null }[],
+  today: string,
+  days = 7,
+): MoodDay[] {
+  const span = Math.max(Math.trunc(days), 1);
+
+  // Indexed once rather than scanned per day. Later rows win, which matches the
+  // table's own `unique (user_id, observed_on, kind)` — there can only be one.
+  const byDate = new Map<string, number | null>();
+  for (const s of signals) {
+    if (s.kind !== MOOD_KIND) continue;
+    byDate.set(s.observed_on, s.value);
+  }
+
+  const out: MoodDay[] = [];
+  for (let i = span - 1; i >= 0; i--) {
+    const date = addDays(today, -i);
+    out.push({ date, value: byDate.get(date) ?? null });
+  }
+  return out;
+}
+
+/**
+ * How tall a bar should be drawn, 0..1, with a floor for an answered day.
+ *
+ * **`MOOD_MIN` is 1, not 0**, so `moodFraction` maps the lowest real reading to
+ * exactly 0 — and a bar drawn at literal zero height is indistinguishable from
+ * a day nobody answered, which is the one distinction the strip exists to make.
+ * An answered day therefore never falls below `floor`; `null` returns 0 and the
+ * client draws its own "skipped" treatment.
+ */
+export function moodBarHeight(value: number | null, floor = 0.12): number {
+  if (value === null || !Number.isFinite(value)) return 0;
+  return floor + moodFraction(value) * (1 - floor);
 }

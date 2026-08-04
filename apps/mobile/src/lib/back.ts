@@ -13,8 +13,8 @@ import { BackHandler, Platform } from "react-native";
  * - **Onboarding.** `gestureEnabled: false` in the root layout blocks the iOS
  *   edge-swipe and has no effect whatsoever on the Android Back button, so
  *   Back on step 3 of 4 signed the user out of a setup they had not finished.
- * - **The walkthrough.** Seven pages in one modal; Back closed all seven from
- *   page 6.
+ * - **The tour** (and the seven-page manual it replaced). Several steps in one
+ *   route; Back would leave the whole thing from step 4 of 5.
  *
  * On Android, Back means "up one step" — the step is the unit of navigation
  * the user perceives, not the route. Returning `true` says the press was

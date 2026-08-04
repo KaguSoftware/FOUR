@@ -1,5 +1,11 @@
-import { useEffect, useState } from "react";
-import { Alert, RefreshControl, Text, View } from "react-native";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import {
+  Alert,
+  RefreshControl,
+  Text,
+  View,
+  type ScrollView,
+} from "react-native";
 import { useRouter } from "expo-router";
 import * as Localization from "expo-localization";
 import { applyToDay, MILESTONE_COPY, moodWeek } from "@uptime/core";
@@ -11,12 +17,13 @@ import { LeverButtons } from "@/components/lever-buttons";
 import { MoodStrip, MOOD_DAYS } from "@/components/mood-slider";
 import { Screen } from "@/components/screen";
 import { Takeover } from "@/components/takeover";
+import { Tour } from "@/components/tour";
 import { useStatus } from "@/lib/use-status";
 import { useOutbox } from "@/lib/use-outbox";
 import { archiveLever, reorderLevers } from "@/lib/levers";
 import { saveMood } from "@/lib/mood";
 import { syncTimeZone, type LeverRow } from "@/lib/status";
-import { markWalkthroughSeen, walkthroughSeen } from "@/lib/walkthrough";
+import { markTourSeen, tourRequest, tourSeen } from "@/lib/tour";
 import { color, size, space } from "@/theme";
 
 export default function StatusScreen() {
@@ -73,29 +80,51 @@ export default function StatusScreen() {
     value: number;
   } | null>(null);
 
-  // First open on this device: explain the system once, then never again —
-  // marked seen BEFORE the push so no failure mode replays it on every mount.
-  // Reopening lives in Settings → About. See lib/walkthrough.ts for why this
-  // is a device flag rather than a column.
+  // The first-run tour, ON this screen: spotlights the real hero, levers and
+  // grid one at a time. See components/tour.tsx.
+  const [tour, setTour] = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
+  // `collapsable={false}` on each wrapper — Android flattens a styleless View
+  // out of the native tree, and a flattened view cannot be measured.
+  const heroRef = useRef<View>(null);
+  const gridRef = useRef<View>(null);
+  const leverRef = useRef<View>(null);
+
+  // First open on this device: teach the system once, then never again —
+  // marked seen BEFORE the tour starts so no failure mode replays it on every
+  // mount. Running it again lives in Settings → About. See lib/tour.ts for
+  // why this is a device flag rather than a column.
   //
   // NEVER over the takeover. Someone 3+ days down gets the recovery screen,
   // whole and unavoidable — a tutorial sliding over it would displace the one
   // screen that must not be displaced. The flag is not burned either, so the
-  // guide arrives once the system is back up.
+  // tour arrives once the system is back up.
   const inTakeover =
     (status?.down ?? 0) >= 3 && (status?.entries.length ?? 0) > 0;
   useEffect(() => {
     if (!userId || inTakeover) return;
     let live = true;
-    walkthroughSeen(userId).then((seen) => {
+    tourSeen(userId).then((seen) => {
       if (!live || seen) return;
-      markWalkthroughSeen(userId);
-      router.push("/how-it-works");
+      markTourSeen(userId);
+      setTour(true);
     });
     return () => {
       live = false;
     };
-  }, [userId, inTakeover, router]);
+  }, [userId, inTakeover]);
+
+  // Settings → About asking for a replay. Consumed here, and dropped quietly
+  // if the takeover is up — same rule as the first run.
+  const tourWanted = useSyncExternalStore(
+    tourRequest.subscribe,
+    tourRequest.get,
+  );
+  useEffect(() => {
+    if (!tourWanted || !userId) return;
+    tourRequest.set(false);
+    if (!inTakeover) setTour(true);
+  }, [tourWanted, userId, inTakeover]);
 
   if (!status) {
     return (
@@ -175,7 +204,13 @@ export default function StatusScreen() {
   }
 
   return (
+    // A plain wrapper so the tour can sit as a SIBLING of Screen — above its
+    // content and above its absolute status-bar scrim, which a child of the
+    // ScrollView could not be.
+    <View style={{ flex: 1 }}>
     <Screen
+      scrollRef={scrollRef}
+      scrollEnabled={!tour}
       refreshControl={
         <RefreshControl
           refreshing={loading}
@@ -204,30 +239,34 @@ export default function StatusScreen() {
           It keeps its scale. Native type systems pull toward conventional
           heading sizes; if this shrinks into the platform's ramp the dashboard
           becomes a list with a number on it. */}
-      <View style={{ flexDirection: "row", alignItems: "baseline" }}>
-        <Mono
-          style={{
-            fontFamily: "JetBrainsMono_500Medium",
-            fontSize: size.hero,
-            lineHeight: size.hero * 1.05,
-          }}
-        >
-          {uptime.up}
-        </Mono>
-        <Mono style={{ fontSize: size.xl, color: color.inkMute }}>
-          /{uptime.total}
-        </Mono>
+      <View ref={heroRef} collapsable={false}>
+        <View style={{ flexDirection: "row", alignItems: "baseline" }}>
+          <Mono
+            style={{
+              fontFamily: "JetBrainsMono_500Medium",
+              fontSize: size.hero,
+              lineHeight: size.hero * 1.05,
+            }}
+          >
+            {uptime.up}
+          </Mono>
+          <Mono style={{ fontSize: size.xl, color: color.inkMute }}>
+            /{uptime.total}
+          </Mono>
+        </View>
+
+        <Body tone="mute" style={{ marginTop: space[2] }}>
+          days up · last 30d
+          {run > 0 ? (
+            <Text style={{ color: color.inkDim }}> · current run {run}d</Text>
+          ) : null}
+        </Body>
       </View>
 
-      <Body tone="mute" style={{ marginTop: space[2] }}>
-        days up · last 30d
-        {run > 0 ? (
-          <Text style={{ color: color.inkDim }}> · current run {run}d</Text>
-        ) : null}
-      </Body>
-
-      {/* First run. Not an outage, not a failure — nothing has happened yet. */}
-      {entries.length === 0 && (
+      {/* First run. Not an outage, not a failure — nothing has happened yet.
+          Hidden while the tour is up: its lever step says the same thing,
+          better, pointing at the buttons themselves. */}
+      {entries.length === 0 && !tour && (
         <Body tone="dim" style={{ marginTop: space[3] }}>
           Nothing logged yet. One small real thing puts the system up today —
           any one of your levers. One is enough on its own.
@@ -250,7 +289,11 @@ export default function StatusScreen() {
         </Body>
       )}
 
-      <View style={{ marginTop: space[8], marginBottom: space[10] }}>
+      <View
+        ref={gridRef}
+        collapsable={false}
+        style={{ marginTop: space[8], marginBottom: space[10] }}
+      >
         <DayGrid
           entries={shownEntries}
           today={today}
@@ -261,6 +304,7 @@ export default function StatusScreen() {
         />
       </View>
 
+      <View ref={leverRef} collapsable={false}>
       <LeverButtons
         levers={levers}
         todayLevers={shownAsLogged}
@@ -284,6 +328,7 @@ export default function StatusScreen() {
           confirmArchive(lever, state.user_id, refresh, notify)
         }
       />
+      </View>
 
       {slammed && (
         <Body tone="mute" style={{ marginTop: space[3] }}>
@@ -329,6 +374,16 @@ export default function StatusScreen() {
         )}
       </View>
     </Screen>
+
+    {tour && (
+      <Tour
+        targets={{ hero: heroRef, levers: leverRef, grid: gridRef }}
+        scrollRef={scrollRef}
+        loggedCount={shownAsLogged.length}
+        onDone={() => setTour(false)}
+      />
+    )}
+    </View>
   );
 }
 

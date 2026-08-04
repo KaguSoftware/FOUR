@@ -17,7 +17,7 @@ import { color, space } from "@/theme";
  * size itself — that is why `log.tsx` reads `cachedStatus()` instead of
  * subscribing. A screen whose height changes as rows are added, renamed and
  * deleted would resize under the finger, which is the documented sheet-jolt
- * this project has already fixed twice. Same reasoning as `how-it-works`.
+ * this project has already fixed twice.
  *
  * The log sheet reaches this with `router.replace`, not `push`: it read the
  * status cache once, so returning to it after an edit would show the chips it

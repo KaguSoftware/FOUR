@@ -35,11 +35,11 @@ Credential Manager) is now in the tree, by the owner's explicit decision.
 Testing means an **EAS dev build**. See *Gotchas* and *Development builds and
 push*.
 
-**FOUR rounds are now stacked up unseen on hardware** — the 07-31 grid swap,
-the 07-31 Android-native pass, the 08-03 proof/mood/activities round, and the
-**08-04 auth-screen round** (all below). Every one is `tsc`-clean and every one
-touches layout, which is exactly the class of change `tsc` cannot judge. Get
-them onto a device before adding a fifth.
+**FIVE rounds are now stacked up unseen on hardware** — the 07-31 grid swap,
+the 07-31 Android-native pass, the 08-03 proof/mood/activities round, the
+**08-04 auth-screen round**, and the **08-04 tour round** (all below). Every
+one is `tsc`-clean and every one touches layout, which is exactly the class of
+change `tsc` cannot judge. Get them onto a device before adding a sixth.
 
 ---
 
@@ -456,6 +456,40 @@ manager or backup drive — see *Gotchas*.
   Verified: **tsc clean ×3, contrast clean (2 new enforced pairs, 1 exempt),
   both bundles export, the web app builds.** **Not on hardware.**
 
+- **The tour round, 2026-08-04.** The seven-page written manual
+  (`how-it-works.tsx`, ~1,000 words) is **deleted** and replaced by a
+  five-step spotlight tour ON the live dashboard —
+  `src/components/tour.tsx`. Owner's decisions: teach on the live system,
+  learn-by-doing, mobile only, manual gone, replayable from Settings → About.
+  How it works: everything dims behind a scrim (four plain Views around a
+  hole — the hole is literally uncovered screen, which is what lets the lever
+  step stay live with zero touch-forwarding) except one real element at a
+  time; a 2px ink ring marks the element (the non-colour cue; it survives
+  reduce-motion as a static outline); one lowercase sentence per step (~55
+  words total) on a snackbar-recipe card; tap anywhere advances. **Step 2 is
+  performed, not read**: "tap a lever when it's true — that's all logging is",
+  the real buttons under the hole, and the tour advances when the
+  outbox-overlaid `shownAsLogged` count grows — the cell lighting and the
+  tour moving on are one event. A "skip" is always there; nothing is faked.
+  The native tab bar stays bright (JS cannot cover it; it is real chrome).
+  Machinery: `lib/walkthrough.ts` → `lib/tour.ts`, key bumped
+  `walkthrough.v1` → `tour.v1` so **existing devices meet the new tour once,
+  deliberately**; `tourRequest` (a `createStore`) is how About asks the
+  dashboard to run it (`requestTour(); router.navigate("/")`) — the
+  "reset the flag for next launch" About row is gone, since replay and
+  first-run now render the identical component. `Screen` grew optional
+  `scrollRef`/`scrollEnabled`; the tour owns the scroll offset while up (user
+  scrolling disabled), scrolling targets clear of the tab bar before
+  measuring via `measureInWindow` (target and overlay both, to convert
+  window→overlay coordinates under edge-to-edge). Takeover still suppresses
+  the auto-run without burning the flag; the empty-state hint hides while the
+  tour is up. The proof screen's one-liner is now the ONLY place the wall is
+  explained — noted in its comment.
+  Verified: **302 core tests, tsc clean ×3, expo lint clean, contrast clean
+  (5 new enforced pairs incl. two scrim-composite grounds computed in-script,
+  1 new exempt row), both bundles export, no `how-it-works` reference
+  survives.** **Not on hardware.**
+
 **Written but NOT verified end-to-end:**
 
 - **Vercel cron has never run.** The route works locally; the schedule is unproven.
@@ -521,6 +555,26 @@ manager or backup drive — see *Gotchas*.
   6. **`justSaved` and the refresh.** Release the slider and watch for today's
      bar dropping to its old height for a frame before the reload lands.
 
+- **The 2026-08-04 tour round is untested on hardware.** In rough order of how
+  likely each is to be wrong:
+  1. **`measureInWindow` under Android edge-to-edge.** The hole is placed from
+     window coordinates minus the overlay's own window origin; some OEMs
+     offset one but not the other by the status bar. If the ring sits ~24–48dp
+     off its target, that is this. Fallback is `measureLayout` against the
+     overlay root.
+  2. **The lever step's hole.** It exposes the whole `LeverButtons` block,
+     including "+ add a lever" and long-press drag. If a mid-tour drag feels
+     wrong, shrink the hole to the grid minus the add cell.
+  3. **The log sheet over the tour.** Tapping a lever presents the native
+     formSheet OVER the dimmed screen; the write lands instantly (outbox), so
+     step 3 may be announced while the sheet has focus. Check what VoiceOver /
+     TalkBack actually do; the fix would be deferring the announce to refocus.
+  4. **The card at large Dynamic Type** — one sentence plus a counter row at
+     half the screen's width budget; check it clears both the hole and the
+     tab bar on a small phone.
+  5. **The replay path** — About → "How four works" must land on the Home tab
+     with the tour up (`router.navigate("/")` from inside the settings
+     stack). Fallback: `router.dismissTo`.
 - **The 2026-08-04 auth round is untested on hardware**, and it is the cheapest
   of the four to check — one screen, no data, reachable by signing out.
   1. **The white Google button on iOS.** It is the ONLY light surface in a
@@ -664,8 +718,8 @@ gate.
 | `packages/core/monitor.ts` | Fade thresholds, milestone selection, plateau detection. Pure functions, fully tested. |
 | `packages/core/index.ts` | Barrel export — the single public surface of the engine. |
 | `packages/core/levers.ts` | Lever key/label rules: slugs, uniqueness, the four-lever ceiling. |
-| `apps/mobile/src/app/how-it-works.tsx` | The in-app manual (native modal, 7 pages) — renders the REAL DayGrid/LeverButtons with sample data so it cannot drift. Auto-opens once per device; reopens from Settings → About. **Its grid page describes Home's trailing 30 — update it whenever the grid changes.** |
-| `apps/mobile/src/lib/walkthrough.ts` | The seen-once device flag — AsyncStorage, keyed per user, fails toward "seen". |
+| `apps/mobile/src/components/tour.tsx` | The first-run tour — a five-step spotlight on the LIVE dashboard (replaced the 7-page manual, 2026-08-04). Scrim = four Views around an uncovered hole; the lever step is performed for real and advances when the log lands. Auto-runs once per device; replays from Settings → About. |
+| `apps/mobile/src/lib/tour.ts` | The seen-once device flag (AsyncStorage, keyed per user, fails toward "seen", key `tour.v1`) plus `tourRequest`/`requestTour()` — how About asks the dashboard to run the tour. |
 | `apps/web/lib/system.ts` | Loads status in one pass; `requireStatus()` is the auth + onboarding gate every page uses. |
 | `apps/web/app/onboarding/` | First run: the rule, 1–4 levers. The only screen that may not call `requireStatus()`. |
 | `apps/web/app/page.tsx` | Status dashboard; routes to the takeover when down ≥3 days with history. |
@@ -822,7 +876,12 @@ gate.
     `GoogleMark`. `TextButton` was deliberately left alone. Mirrored on web.
     Verified: **tsc ×3, contrast, both bundles export, the web build.** Full
     notes under *Current status*.
-26. Then: **custom SMTP** (it unblocks the Magic Link template, which the OTP
+26. ~~The tour round~~ — done 2026-08-04, **not yet seen on hardware.** The
+    seven-page manual deleted; a five-step learn-by-doing spotlight tour on
+    the live dashboard replaces it, with the lever step performed for real.
+    Verified: **302 tests, tsc ×3, expo lint, contrast (5 new pairs), both
+    bundles export.** Full notes under *Current status*.
+27. Then: **custom SMTP** (it unblocks the Magic Link template, which the OTP
     screen depends on — see *Blocked*) · store listings · Play Console identity
     verification · the `eas.json` Android submit block.
 
@@ -838,7 +897,7 @@ gate.
 | Felt state | **One mood slider on the dashboard**, continuous 1–100, replacing energy + sleep. Platform control, shared `facePath` | Unchanged | Both done 2026-08-03 |
 | Weight | **Removed 2026-08-03**, with the journal. Owner decision. Columns and rows are kept — a shipped build still selects them — and drop in a later migration | — | Closed |
 | Posture | **Removed 2026-07-30** — strict-only, one voice. The column drop is applied as of 2026-08-03 | — | Closed |
-| Walkthrough | **Mobile: 7-page manual of real rendered components**, auto-once per device, reopens from About. Web: none | Web parity if anyone asks | Mobile done 2026-07-30 |
+| Walkthrough | **Mobile: a 5-step spotlight tour ON the live dashboard** (the 7-page manual was deleted 2026-08-04 — owner decision). Auto-once per device, replays from About. Web: none, and the web onboarding screen already states the rule | Unchanged — this IS the intended shape | Mobile done 2026-08-04 |
 | Activities | **Editable and capped at ten per lever**, from the log sheet (long-press a chip, or "manage activities") and Settings → Activities. Rename, delete, restore a retired one. The cap ARCHIVES rather than refusing on the logging path | Unchanged | Both done 2026-08-03 |
 | Mobile levers | Full: create, rename, archive, with native alerts | Unchanged | Done |
 | Mobile auth | **Email + password, Sign in with Apple, Google, and a 6-digit email code** (the code doubles as forgot-password: sign in by code, set a new password in Settings). All built 2026-07-29; Apple/Google/OTP are inert until the Supabase dashboard config in *Blocked* is done. **Screen restyled 2026-08-04** — Google's mark, no "Authentication required.", the two email alternatives as real buttons | Verified on device, with custom SMTP | Config, then device test |

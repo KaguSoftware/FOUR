@@ -174,23 +174,12 @@ function RootStack({
         <Stack.Screen name="add-lever" options={SHEET} />
         {/* Read-only: what a tapped day held. */}
         <Stack.Screen name="day" options={SHEET} />
-        {/* The activity editor, opened from the log sheet. A modal for the
-            same reason the walkthrough is one: its height changes as rows are
-            added and deleted, and `fitToContents` measures once. */}
+        {/* The activity editor, opened from the log sheet. A full-height
+            modal, NOT the formSheet options above: its height changes as rows
+            are added and deleted, and `fitToContents` measures once — a sheet
+            would resize under the finger, the documented sheet-jolt. */}
         <Stack.Screen
           name="activities"
-          options={{
-            presentation: "modal",
-            headerShown: false,
-            contentStyle: { backgroundColor: color.bg },
-          }}
-        />
-        {/* The walkthrough. A full-height native modal, NOT the formSheet
-            options above: `fitToContents` measures content once, and a
-            three-step screen whose steps differ in height would resize under
-            the finger — the documented sheet-jolt. */}
-        <Stack.Screen
-          name="how-it-works"
           options={{
             presentation: "modal",
             headerShown: false,

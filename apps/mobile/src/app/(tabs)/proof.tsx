@@ -74,9 +74,11 @@ export default function ProofScreen() {
 
           Until now nothing on it explained itself: a dark grid with a fraction
           in the corner, and the fact that there is a MESSAGE in there at all
-          was only ever stated in the walkthrough you saw once on your first
-          launch. Someone opening this early in a month sees a dark rectangle
-          and no reason to come back.
+          was only ever stated in a manual seen once on first launch — since
+          replaced by the dashboard tour, which never reaches this screen, so
+          this line is now the ONLY place the wall is explained. Someone
+          opening this early in a month sees a dark rectangle and no reason to
+          come back.
 
           It names the reward, not the mechanic. "One cell lights per day up"
           was the first attempt and it explains the plumbing — true, and no

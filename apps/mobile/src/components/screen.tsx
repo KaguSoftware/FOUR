@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ReactNode, RefObject } from "react";
 import { ScrollView, View, type ScrollViewProps } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -36,6 +36,8 @@ export function Screen({
   refreshControl,
   wordmark = true,
   underHeader = false,
+  scrollRef,
+  scrollEnabled = true,
 }: {
   children: ReactNode;
   /** Sits on the wordmark's baseline — the up/degraded label on Status. */
@@ -43,6 +45,17 @@ export function Screen({
   refreshControl?: ScrollViewProps["refreshControl"];
   /** Off for surfaces that own their whole header, like the takeover. */
   wordmark?: boolean;
+  /**
+   * For a screen that has to drive or measure its own scroll — the tour
+   * scrolls its spotlight targets into view and needs the handle.
+   */
+  scrollRef?: RefObject<ScrollView | null>;
+  /**
+   * Off while the tour is up: the tour owns the offset (so a ref it writes is
+   * the truth without a scroll listener), and a disabled ScrollView also
+   * stops pull-to-refresh from firing under a scrim.
+   */
+  scrollEnabled?: boolean;
   /**
    * For a screen pushed onto a native stack that shows a header.
    *
@@ -58,6 +71,8 @@ export function Screen({
   return (
     <View style={{ flex: 1, backgroundColor: color.bg }}>
       <ScrollView
+        ref={scrollRef}
+        scrollEnabled={scrollEnabled}
         style={{ flex: 1 }}
         contentInsetAdjustmentBehavior="never"
         contentContainerStyle={{

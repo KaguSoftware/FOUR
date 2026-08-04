@@ -72,6 +72,18 @@ const T = {
   "google-red": [234, 67, 53],
 };
 
+// The tour's scrim: `bg` at 0.78 alpha over the live dashboard (the SCRIM
+// constant in apps/mobile/src/components/tour.tsx — change one, change both).
+// Anything drawn ON the scrim sits on a composite ground, so the composites
+// are computed here the same way the compositor does, and measured like any
+// other token. `surface-hi` under the scrim is the LIGHTEST ground the ring
+// or card edge can land on (a lever button), so it is the worst case.
+const blend = (top, under, a) =>
+  top.map((t, i) => Math.round(t * a + under[i] * (1 - a)));
+const SCRIM_ALPHA = 0.78;
+T["scrim-over-surface"] = blend(T.bg, T.surface, SCRIM_ALPHA);
+T["scrim-over-surface-hi"] = blend(T.bg, T["surface-hi"], SCRIM_ALPHA);
+
 const TEXT = 4.5, NONTEXT = 3;
 
 const ENFORCED = [
@@ -230,6 +242,29 @@ const ENFORCED = [
   // The button has no stroke — the fill IS the edge, so it owes 3:1 against
   // the page the way any component boundary does. At 16:1 it is not close.
   ["google button · white against the page", "google-bg", "bg", NONTEXT],
+
+  // --- the first-run tour, added 2026-08-04 --------------------------------
+  //
+  // The tour dims the live dashboard behind a scrim and states one sentence
+  // on a card. The card reuses the snackbar's surface recipe, but "a familiar
+  // token on a new ground is a new measurement" — and the grounds here are
+  // new twice over, because everything outside the card sits on a composite
+  // the scrim creates.
+  ["tour · sentence on card", "ink", "surface-hi", TEXT],
+  // The tightest text pair in the app (4.60:1) now carries the step counter
+  // and the skip link too. If this row ever fails, the counter moves to
+  // ink-dim — do not lighten surface-hi to rescue it.
+  ["tour · counter and skip on card", "ink-mute", "surface-hi", TEXT],
+  // DESIGN.md forbids shadows, so the border is what separates the card from
+  // the dimmed screen — the whole boundary, same as the snackbar's. Worst
+  // case is the card floating over a scrimmed surface panel.
+  ["tour · card edge vs scrimmed panel", "line-hi", "scrim-over-surface", NONTEXT],
+  // The spotlight ring marks WHICH element the sentence is about — state
+  // carried by a stroke, so it owes 1.4.11's floor on the darkest ground it
+  // borders (outside: the scrim) and the lightest (inside: an undimmed lever
+  // at surface-hi).
+  ["tour · ring against the scrim", "ink", "scrim-over-surface-hi", NONTEXT],
+  ["tour · ring against the spotlit element", "ink", "surface-hi", NONTEXT],
 ];
 
 const EXEMPT = [
@@ -262,6 +297,11 @@ const EXEMPT = [
     "segmented · android selected fill vs unselected",
     "line", "surface",
     "The fill difference alone does NOT have to clear 3:1, because selection here never rests on it: the selected segment also carries Inter_500Medium instead of Regular, ink instead of ink-mute text (11.37:1 and 5.08:1 on their own grounds), and a leading check mark at 11.37:1. That check is a change of SHAPE, which is the one signal that survives a colour-blind viewer and a dimmed screen — the same reasoning recorded for the tab bar, where the fix was to add a non-colour cue rather than to brighten a fill. Measured so the number is on the table.",
+  ],
+  [
+    "tour · scrim over the page vs undimmed content",
+    "scrim-over-surface", "surface",
+    "The scrim itself carries no information — it is subtraction, not a signal. Which element the tour means is stated by the ring (enforced above) and the sentence on the card, never by the dimming alone; someone who cannot perceive the dim at all still gets both. Measured so the number is on the table when the alpha is tuned: at 0.78 the dimmed page reads clearly as 'not now' next to the spotlit element, and pushing it far higher starts to hide the dashboard the tour exists to show.",
   ],
   [
     "ripple · the old per-surface tone, on a control",

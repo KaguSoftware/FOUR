@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+import { useNavigation } from "expo-router";
 import { Stack } from "expo-router/stack";
 import { color } from "@/theme";
 
@@ -22,6 +24,36 @@ import { color } from "@/theme";
  * the status-bar scrim because real chrome is now doing that job.
  */
 export default function SettingsLayout() {
+  /**
+   * Leaving the tab RESETS it: come back to Settings and you get the index,
+   * not whatever sub-screen was open last week (owner call, 2026-08-04).
+   *
+   * There is no declarative prop for this — verified against the installed
+   * `.d.ts`: `NativeTabTriggerProps` offers only `disablePopToTop`, which
+   * governs RE-selecting the already-focused tab (iOS-only, left at its
+   * default so the two behaviours compose). So: a `blur` listener on the TAB
+   * route — `useNavigation()` here resolves to the tabs navigator, and its
+   * blur means "left Settings", which a Stack screen's own blur does not (a
+   * push inside the stack blurs the index too).
+   *
+   * The pop is TARGETED at the nested stack's state key. An untargeted
+   * `POP_TO_TOP` (or `router.dismissAll`) bubbles from the newly-focused
+   * leaf — focus has already moved by the time blur fires — and would pop
+   * the DESTINATION tab's stack instead. A literal action object, so the
+   * undeclared `@react-navigation/native` package stays un-imported.
+   */
+  const navigation = useNavigation();
+  useEffect(
+    () =>
+      navigation.addListener("blur", () => {
+        const key = navigation
+          .getState()
+          ?.routes.find((r) => r.name === "settings")?.state?.key;
+        if (key) navigation.dispatch({ type: "POP_TO_TOP", target: key });
+      }),
+    [navigation],
+  );
+
   return (
     <Stack
       screenOptions={{

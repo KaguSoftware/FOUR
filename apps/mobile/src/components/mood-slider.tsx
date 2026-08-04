@@ -1,7 +1,13 @@
 import { useMemo, useRef, useState } from "react";
-import { View } from "react-native";
+import { Alert, Platform, Pressable, TextInput, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import { runOnJS, useSharedValue } from "react-native-reanimated";
+import Animated, {
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  type SharedValue,
+} from "react-native-reanimated";
 import {
   moodBarHeight,
   moodLabel,
@@ -10,9 +16,12 @@ import {
   type MoodDay,
 } from "@uptime/core";
 
-import { Label, Mono } from "./ui";
+import { field, fieldTint } from "./fields";
+import { Body, Label, Mono } from "./ui";
 import { committed, nudged } from "@/lib/haptics";
-import { color, radius, size, space } from "@/theme";
+import { ripple } from "@/lib/press";
+import { useReduceMotion } from "@/lib/reduce-motion";
+import { color, radius, size, space, TAP } from "@/theme";
 
 /**
  * How was today — the week, and today's answer inside it.
@@ -51,6 +60,24 @@ const GAP = 6;
 const DAYS = 7;
 /** Tall enough to drag with precision; short enough to leave Home unchanged. */
 const TRACK = 44;
+/** A day nobody answered. Visible, but obviously not a reading. */
+const STUB = 3;
+
+/**
+ * How far today's bar grows while held, per side and at the top.
+ *
+ * `GROW_X` is a little under half the gap, so a widened bar closes on its
+ * neighbours without touching them — the row still reads as seven separate
+ * days at the moment it matters most.
+ */
+const GROW_X = 4;
+const GROW_Y = 8;
+
+/** The lever grid's spring. One feel for anything the finger moves. */
+const SPRING = { damping: 20, stiffness: 220 } as const;
+
+/** The usable range, for band maths inside worklets. */
+const SPAN = MOOD_MAX - MOOD_MIN;
 
 export function MoodStrip({
   week,
@@ -83,6 +110,15 @@ export function MoodStrip({
    */
   const [dragging, setDragging] = useState<number | null>(null);
 
+  /**
+   * The Android typing path: a string while the field is open, null otherwise.
+   *
+   * iOS uses `Alert.prompt` and never sets this. An inline field rather than a
+   * dialog because Android has no `Alert.prompt`, and building a custom modal
+   * for one number would be more surface than the feature is worth.
+   */
+  const [typing, setTyping] = useState<string | null>(null);
+
   const today = week[week.length - 1] ?? { date: "", value: null };
   const live = dragging ?? today.value;
   const answered = week.filter((d) => d.value !== null).length;
@@ -97,11 +133,57 @@ export function MoodStrip({
    */
   const lastSent = useSharedValue(-1);
 
+  /**
+   * 0 at rest, 1 while the finger is down. Drives the grow.
+   *
+   * A shared value rather than state so the size change runs on the UI thread
+   * and cannot be interrupted by the parent re-rendering on every step.
+   */
+  const held = useSharedValue(0);
+  /** Which of `moodLabel`'s five bands the finger is in. Gates the haptic. */
+  const lastBand = useSharedValue(-1);
+  const reduceMotion = useReduceMotion();
+
+  /**
+   * Ask for a number, and write it if it is one.
+   *
+   * `Alert.prompt` is **iOS-only** — the same constraint the activity rename
+   * hit — so Android opens the inline field below instead. Both land in the
+   * same `commitTyped`.
+   */
+  function askForNumber() {
+    if (Platform.OS !== "ios") {
+      setTyping(String(live ?? ""));
+      return;
+    }
+    Alert.prompt(
+      "How was today",
+      `${MOOD_MIN}–${MOOD_MAX}`,
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Set", onPress: (text?: string) => commitTyped(text ?? "") },
+      ],
+      "plain-text",
+      live === null ? "" : String(live),
+      "number-pad",
+    );
+  }
+
+  /** Shared by both entry paths. A number outside the range is clamped. */
+  function commitTyped(text: string) {
+    const n = Number(text.trim());
+    // Not a number, or empty: a cancel, not a write. Silently, because the
+    // user has already told us they changed their mind by typing nothing.
+    if (!Number.isFinite(n)) return;
+    const clamped = Math.min(Math.max(Math.round(n), MOOD_MIN), MOOD_MAX);
+    committed();
+    onCommit(clamped);
+  }
+
   // Read through a ref so the gesture below is never rebuilt mid-drag: the
-  // parent re-renders on every value change and `onCommit` changes identity
-  // with it.
-  const handlers = useRef({ onCommit });
-  handlers.current = { onCommit };
+  // parent re-renders on every value change and these change identity with it.
+  const handlers = useRef({ onCommit, onType: askForNumber });
+  handlers.current = { onCommit, onType: askForNumber };
 
   const pan = useMemo(
     () =>
@@ -111,7 +193,9 @@ export function MoodStrip({
         // here, so the drag starts under the finger immediately.
         .minDistance(0)
         .onBegin((e) => {
+          held.value = withSpring(1, SPRING);
           lastSent.value = -1;
+          lastBand.value = -1;
           const v = valueAt(e.y);
           lastSent.value = v;
           runOnJS(setDragging)(v);
@@ -121,9 +205,18 @@ export function MoodStrip({
           if (v === lastSent.value) return;
           lastSent.value = v;
           runOnJS(setDragging)(v);
-          // The softest constant available, because this fires many times in
-          // one drag. Never `impactAsync` on Android — see lib/haptics.
-          runOnJS(nudged)();
+
+          // The haptic fires per BAND, not per point. A full-height drag
+          // crosses ~99 values, and a tick on each is a continuous buzz that
+          // says nothing — `nudged` is documented as the constant for
+          // "switching between a series of potential choices", and the choices
+          // here are the five words `moodLabel` bands the range into. Never
+          // `impactAsync` on Android; see lib/haptics.
+          const band = Math.min(Math.floor(((v - MOOD_MIN) / SPAN) * 5), 4);
+          if (band !== lastBand.value) {
+            lastBand.value = band;
+            runOnJS(nudged)();
+          }
         })
         .onEnd(() => {
           const v = lastSent.value;
@@ -141,9 +234,38 @@ export function MoodStrip({
         // this render runs. Without that the bar would drop for one frame and
         // read as the drag having been rejected.
         .onFinalize(() => {
+          held.value = withSpring(0, SPRING);
           runOnJS(setDragging)(null);
         }),
-    [lastSent],
+    [lastSent, lastBand, held],
+  );
+
+  /**
+   * Double tap to type an exact number.
+   *
+   * A drag is quick but imprecise, and "I want to put 70 on this specifically"
+   * is a real thing to want — particularly for someone comparing today against
+   * a day they remember. The two coexist rather than one replacing the other:
+   * the drag stays the primary gesture and this is the way to be exact.
+   *
+   * `Gesture.Exclusive` gives the double tap first refusal, so a genuine
+   * double tap is never also read as two drags. A single tap still falls
+   * through to `pan`, which sets the value where you touched.
+   */
+  const doubleTap = useMemo(
+    () =>
+      Gesture.Tap()
+        .numberOfTaps(2)
+        .maxDuration(280)
+        .onEnd(() => {
+          runOnJS(handlers.current.onType)();
+        }),
+    [],
+  );
+
+  const gesture = useMemo(
+    () => Gesture.Exclusive(doubleTap, pan),
+    [doubleTap, pan],
   );
 
   return (
@@ -156,7 +278,12 @@ export function MoodStrip({
           flexDirection: "row",
           alignItems: "baseline",
           justifyContent: "space-between",
-          marginBottom: space[3],
+          // The strip below reserves `GROW_Y` of headroom for the held bar, so
+          // this gives back the same amount and the section's total height is
+          // unchanged — Home has been rebuilt twice over exactly this, and the
+          // grow must not cost it a third time. Nets to `space[2]`, which is
+          // the gap a label wants over the thing it names.
+          marginBottom: space[4] - GROW_Y,
         }}
       >
         <Label>how was today</Label>
@@ -165,11 +292,52 @@ export function MoodStrip({
         </Mono>
       </View>
 
-      <GestureDetector gesture={pan}>
+      {/* Android's typing path. It REPLACES the strip rather than sitting
+          under it, so the section's height does not change while the keyboard
+          is up — and the strip is not something you can usefully drag with a
+          field focused anyway. iOS never renders this; it gets Alert.prompt. */}
+      {typing !== null ? (
+        <View style={{ flexDirection: "row", gap: space[2], height: TRACK }}>
+          <TextInput
+            {...fieldTint}
+            autoFocus
+            value={typing}
+            onChangeText={setTyping}
+            keyboardType="number-pad"
+            maxLength={3}
+            placeholder={`${MOOD_MIN}–${MOOD_MAX}`}
+            placeholderTextColor={color.inkMute}
+            onSubmitEditing={() => {
+              commitTyped(typing);
+              setTyping(null);
+            }}
+            returnKeyType="done"
+            style={[field, { flex: 1, backgroundColor: color.surface }]}
+          />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Cancel"
+            onPress={() => setTyping(null)}
+            android_ripple={ripple()}
+            style={{
+              minHeight: TAP,
+              justifyContent: "center",
+              paddingHorizontal: space[3],
+              borderRadius: radius.md,
+            }}
+          >
+            <Body tone="mute" style={{ fontSize: size.xs }}>
+              cancel
+            </Body>
+          </Pressable>
+        </View>
+      ) : (
+      <GestureDetector gesture={gesture}>
         <View
           accessible
           accessibilityRole="adjustable"
           accessibilityLabel="How was today"
+          accessibilityHint="Double tap to type a number"
           // A word, not a number out of a hundred — "sixty-three" is not an
           // answer to "how was today".
           accessibilityValue={{
@@ -204,6 +372,13 @@ export function MoodStrip({
             flexDirection: "row",
             alignItems: "flex-end",
             gap: GAP,
+            // Headroom for the grow, taken from the margin above rather than
+            // from the track — the bars keep their full TRACK of travel, and
+            // a bar at 100% can still expand without being clipped by the row.
+            // `overflow: visible` is the RN default but stated here because
+            // the whole effect depends on it.
+            overflow: "visible",
+            marginTop: GROW_Y,
             // Dimmed as a whole while the write is in flight — the app has no
             // spinners, and the bar has already moved to where it will land.
             opacity: saving ? 0.6 : 1,
@@ -212,9 +387,19 @@ export function MoodStrip({
           {barW > 0 &&
             week.map((day, i) => {
               const isToday = i === week.length - 1;
-              const value = isToday ? live : day.value;
-              const h = moodBarHeight(value);
+              if (isToday) {
+                return (
+                  <TodayBar
+                    key={day.date}
+                    value={live}
+                    width={barW}
+                    held={held}
+                    reduceMotion={reduceMotion}
+                  />
+                );
+              }
 
+              const h = moodBarHeight(day.value);
               return (
                 <View
                   key={day.date}
@@ -224,23 +409,114 @@ export function MoodStrip({
                     // at zero — it must never read as "that day was rough".
                     // `moodBarHeight` returns 0 for null and never less than
                     // its floor for a real reading, so the two cannot collide.
-                    height: h > 0 ? Math.max(h * TRACK, 3) : 3,
+                    height: h > 0 ? Math.max(h * TRACK, STUB) : STUB,
                     borderRadius: radius.sm,
-                    backgroundColor:
-                      h === 0
-                        ? color.line
-                        : isToday
-                          ? color.ink
-                          : color.lineHi,
+                    backgroundColor: h === 0 ? color.line : color.lineHi,
                   }}
                 />
               );
             })}
+
+          {/* The live reading, over the strip rather than in the header.
+
+              Absolute, so it costs no layout and nothing reflows as the digits
+              change width. It sits at the RIGHT, above today's bar, and is
+              `pointerEvents="none"` so it can never intercept the drag it is
+              reporting on.
+
+              Only while dragging: a number parked permanently over the week
+              would turn a glanceable strip into a dashboard, and the value is
+              already the height of the bar. */}
+          {dragging !== null && (
+            <View
+              pointerEvents="none"
+              style={{
+                position: "absolute",
+                right: 0,
+                bottom: TRACK + space[1],
+                paddingHorizontal: space[2],
+                paddingVertical: 2,
+                borderRadius: radius.sm,
+                backgroundColor: color.surfaceHi,
+                // `line-hi`, not `line`. This border is the readout's whole
+                // edge against the bars behind it — DESIGN.md forbids shadows,
+                // so there is nothing else separating them — and `line` on
+                // `surface-hi` measures 1.22:1, which is invisible.
+                // `check:contrast` caught it; the same trap the snackbar and
+                // the sheet handle both hit.
+                borderWidth: 1,
+                borderColor: color.lineHi,
+              }}
+            >
+              <Mono style={{ fontSize: size.xs, color: color.ink }}>
+                {dragging}
+              </Mono>
+            </View>
+          )}
         </View>
       </GestureDetector>
+      )}
     </View>
   );
+}
 
+/**
+ * Today's bar — the one under the finger.
+ *
+ * **It grows in every direction while held**, which is not decoration: the bar
+ * is ~40pt wide on a phone and the finger covers all of it, so the thing being
+ * adjusted is entirely hidden at the moment of adjusting it. Widening past the
+ * fingertip puts a visible edge on both sides, and the extra height gives the
+ * drag more travel per pixel — it is easier to land a value, not just prettier.
+ *
+ * Overflow is deliberate: it grows OUTSIDE its slot rather than reflowing the
+ * row. Nothing else on the strip moves, which is the same rule the lever grid
+ * follows — a control must never resize its neighbours while a finger is down.
+ *
+ * Height is animated on the UI thread, so the settle after release is smooth
+ * even while the parent is re-rendering around the write.
+ */
+function TodayBar({
+  value,
+  width,
+  held,
+  reduceMotion,
+}: {
+  value: number | null;
+  width: number;
+  held: SharedValue<number>;
+  reduceMotion: boolean;
+}) {
+  const target = moodBarHeight(value);
+  const h = target > 0 ? Math.max(target * TRACK, STUB) : STUB;
+
+  const animated = useAnimatedStyle(() => {
+    // The cue survives, only the movement goes: under Reduce Motion the bar
+    // still grows — that is the feedback that the drag registered — it simply
+    // arrives without the spring.
+    const grow = reduceMotion ? (held.value > 0 ? 1 : 0) : held.value;
+    return {
+      width: width + grow * GROW_X * 2,
+      height: h + grow * GROW_Y,
+      // Half the added width, so it expands from its own centre rather than
+      // drifting right as it widens.
+      marginHorizontal: -grow * GROW_X,
+    };
+  });
+
+  return (
+    <Animated.View
+      style={[
+        {
+          width,
+          height: h,
+          borderRadius: radius.sm,
+          backgroundColor: value === null ? color.line : color.ink,
+        },
+        animated,
+      ]}
+    />
+  );
 }
 
 /**

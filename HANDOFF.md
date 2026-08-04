@@ -327,8 +327,47 @@ manager or backup drive — see *Gotchas*.
   clients have diverged on this control on purpose, for one round; `moodWeek`
   living in core is what makes the port cheap, and it can also replace web's
   local `todaysMood` helper.
+
+  **Three refinements, same day, all owner-requested from using it:**
+
+  1. **Today's bar grows while held**, on a spring, in both axes. Not
+     decoration: the bar is ~40pt wide and a fingertip covers all of it, so the
+     thing being adjusted is invisible at the moment of adjusting it. Widening
+     past the finger puts an edge back on both sides and the extra height buys
+     travel per pixel. It grows **outside its slot** — `marginHorizontal` goes
+     negative by half the added width, so it expands from its own centre and
+     **nothing else in the row moves**, which is the rule the lever grid
+     already follows. The strip reserves `GROW_Y` of headroom and the header
+     gives back the same amount, so the section's total height is unchanged.
+     Under Reduce Motion the bar still grows — that is the feedback the drag
+     registered — it just arrives without the spring.
+  2. **A live readout floats over the strip while dragging.** Absolutely
+     positioned so it costs no layout and nothing reflows as the digits change
+     width, `pointerEvents="none"` so it can never intercept the drag it is
+     reporting on, and gone the instant the finger lifts — a number parked
+     permanently over the week would turn a glanceable strip into a dashboard.
+     **`check:contrast` caught a real defect here**: its border was `line` on
+     `surface-hi` at **1.22:1**, invisible. It is `line-hi` now, and measured
+     against the page and the bars *behind* it rather than its own fill —
+     the same reasoning already recorded for the snackbar's edge.
+  3. **Double tap to type an exact number.** A drag is fast but imprecise, and
+     "I want exactly 70 on this" is a real thing to want. `Gesture.Exclusive`
+     gives the double tap first refusal so it is never also read as two drags.
+     **`Alert.prompt` is iOS-only** — the same constraint the activity rename
+     hit — so Android opens an inline field that *replaces* the strip rather
+     than sitting under it, keeping the section's height fixed while the
+     keyboard is up. Both paths land in one `commitTyped`, which clamps rather
+     than rejecting.
+
+  **The drag haptic fires per BAND, not per point.** A full-height drag crosses
+  ~99 values and a tick on each is a continuous buzz that says nothing;
+  `nudged` is documented as the constant for "switching between a series of
+  potential choices", and the choices are the five words `moodLabel` bands the
+  range into.
+
   Verified: **302 core tests, tsc clean ×3, eslint + expo lint clean, contrast
-  clean, both bundles export.** **Not on hardware.**
+  clean (2 new enforced pairs, 1 defect caught and fixed), both bundles
+  export.** **Not on hardware.**
 
 - **The device-feedback round, 2026-08-04 (v0.1.2).** Nine fixes reported from
   using the app on an Android phone. Two were not defects and were put to the
@@ -465,6 +504,27 @@ manager or backup drive — see *Gotchas*.
   5. **The activity cap under a real log.** Fill a lever to ten, then log it
      with a brand-new note. **The day must still land.** That is the whole
      safety property of the round.
+- **The mood strip is untested on hardware.** In rough order of how likely each
+  is to be wrong:
+  1. **The grow, clipped.** It expands outside its slot and relies on
+     `overflow: visible` plus `GROW_Y` of reserved headroom. If the top of the
+     held bar is cut off, that allowance is wrong — and on Android the parent
+     `Screen` may clip differently than iOS.
+  2. **Whether the drag is comfortable at all.** The whole premise is that a
+     bar you can see past your fingertip is easier to land than a slider thumb.
+     That is a claim about a real hand on real glass and nothing else can test
+     it. If it is worse, the fallback is a taller `TRACK`, not more animation.
+  3. **The double tap against the drag.** `Gesture.Exclusive` should stop a
+     double tap also registering as two drags, but a slow double tap may still
+     set a value on its first touch before the dialog opens.
+  4. **Android's inline field.** It replaces the strip while open; check the
+     keyboard does not push the section under the tab bar, and that `cancel`
+     leaves the previous value intact.
+  5. **The band haptic.** Five ticks across a full drag should read as
+     detents. If it feels like nothing, the bands are too coarse.
+  6. **`justSaved` and the refresh.** Drag, release, and watch for the bar
+     dropping to its old height for a frame before the reload lands.
+
 - **The 2026-08-04 auth round is untested on hardware**, and it is the cheapest
   of the four to check — one screen, no data, reachable by signing out.
   1. **The white Google button on iOS.** It is the ONLY light surface in a

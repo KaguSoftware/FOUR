@@ -1034,9 +1034,20 @@ gate.
     the owner's phone. Two steps, almost no text: the self-assembling lever
     panel, then the notifications screen with the quiet-days strip and the
     alert specimen; the tour's whole-tour skip is a real bordered button.
-    Full notes under *Current status*. **JS-only — rides in the next build**
-    (a new build of 1.0.0 does not repeat Beta App Review for external
-    testers; only a version-string change does).
+    Full notes under *Current status*. **Shipped as build 11 (1.0.0)** —
+    built and submitted to App Store Connect the same day (submission
+    `f47a0ad4`); add it to both TestFlight groups when processing finishes.
+    A same-version build does not repeat Beta App Review for external
+    testers; only a version-string change does.
+    **EAS Update is configured as of this build** (owner request):
+    expo-updates at the SDK 54 pin, `runtimeVersion` policy `appVersion`,
+    channels `development`/`preview`/`production` per build profile. Build 11
+    is the FIRST build carrying the update client — older installs cannot
+    receive updates. From build 11 on, a JS-only round ships with
+    `npx eas-cli@latest update --channel production --message "…"` from
+    `apps/mobile`: no build, no review. Native changes (new module,
+    `app.json` native config, SDK bump) still need a real build, and an
+    update published for 1.0.0 reaches only 1.0.0 binaries.
 29. Then: **custom SMTP** (it unblocks the Magic Link template, which the OTP
     screen depends on — see *Blocked*) · store listings · Play Console identity
     verification · the `eas.json` Android submit block.

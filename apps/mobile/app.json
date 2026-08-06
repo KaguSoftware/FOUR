@@ -68,6 +68,12 @@
         "projectId": "3570cebf-a9dd-458f-a2ce-14093600c025"
       }
     },
-    "owner": "parsa-mansouri"
+    "owner": "parsa-mansouri",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/3570cebf-a9dd-458f-a2ce-14093600c025"
+    }
   }
 }

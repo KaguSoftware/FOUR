@@ -90,8 +90,8 @@ function Levers({
     <>
       <div className="mb-10">
         <p className="text-ink text-lg leading-snug">
-          A day is <strong className="font-medium">up</strong> if you do one of
-          these. Not all of them.
+          A day counts if you do{" "}
+          <strong className="font-medium">one small thing</strong>.
         </p>
         <p className="text-ink-mute mt-3 text-sm leading-relaxed">
           No streaks. No scores. Nothing here resets to zero.
@@ -107,9 +107,8 @@ function Levers({
       >
         <p className="label mb-1">your levers — up to {MAX_LEVERS}</p>
         <p className="text-ink-mute mb-4 text-xs leading-relaxed">
-          One small real thing you can still do on a bad day. Gym, food, pages,
-          practice, meds — whatever yours is. You can rename or change these
-          later without losing a single day.
+          One small thing you can still do on a bad day — gym, food, pages,
+          meds. You can change these later.
         </p>
 
         <div className="flex flex-col gap-2">

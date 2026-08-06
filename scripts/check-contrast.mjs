@@ -268,6 +268,12 @@ const ENFORCED = [
   // The "tap one" pill on the doing step — the one inverted surface in the
   // tour, precisely so "do this now" cannot be mistaken for "look at this".
   ["tour · tap-here pill label", "bg", "ink", TEXT],
+  // The whole-tour skip became a real `subtle` button (2026-08-06) — the old
+  // grey text link was invisible over the scrim. Its label sits on the
+  // button's own fill; its border floats over the scrim, worst case a
+  // scrimmed surface-hi panel behind it.
+  ["tour · skip button label", "ink-dim", "surface-hi", TEXT],
+  ["tour · skip button edge vs scrim", "line-hi", "scrim-over-surface-hi", NONTEXT],
 
   // Today's marker became a marching dashed ring (2026-08-04) — ink dashes
   // drawn by SVG over the cell border band. State carried by a stroke, so it

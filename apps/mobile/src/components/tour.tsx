@@ -24,7 +24,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 
-import { TextButton } from "@/components/button";
+import { Button, TextButton } from "@/components/button";
 import { useTabBarInset } from "@/components/screen";
 import { Body, Label } from "@/components/ui";
 import { useAndroidBack } from "@/lib/back";
@@ -625,15 +625,18 @@ export function TourOverlay({
         </Animated.View>
       )}
 
-      {/* The whole-tour exit, parked out of the content's way. It asks
-          first — an accidental everything-dismissal is the one tap this
-          overlay must not make cheap. Hidden on the closing step, where a
-          tap anywhere IS the exit. */}
+      {/* The whole-tour exit, parked out of the content's way. A real
+          bordered button, not a text link — grey 12px text over a scrim was
+          invisible to the person most likely to want out (owner, 2026-08-06).
+          It still asks first: an accidental everything-dismissal is the one
+          tap this overlay must not make cheap, and the confirm is also what
+          names the Settings → About replay path. Hidden on the closing step,
+          where a tap anywhere IS the exit. */}
       {!last && (
         <View
           style={[styles.skipSlot, { top: insets.top + space[2] }]}
         >
-          <TextButton title="skip" onPress={confirmSkip} align="center" />
+          <Button title="skip tour" variant="subtle" onPress={confirmSkip} />
         </View>
       )}
 

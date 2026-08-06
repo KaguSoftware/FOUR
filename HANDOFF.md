@@ -35,11 +35,12 @@ Credential Manager) is now in the tree, by the owner's explicit decision.
 Testing means an **EAS dev build**. See *Gotchas* and *Development builds and
 push*.
 
-**FIVE rounds are now stacked up unseen on hardware** — the 07-31 grid swap,
+**SIX rounds are now stacked up unseen on hardware** — the 07-31 grid swap,
 the 07-31 Android-native pass, the 08-03 proof/mood/activities round, the
-**08-04 auth-screen round**, and the **08-04 tour round** (all below). Every
-one is `tsc`-clean and every one touches layout, which is exactly the class of
-change `tsc` cannot judge. Get them onto a device before adding a sixth.
+**08-04 auth-screen round**, the **08-04 tour round**, and the **08-06
+onboarding round** (all below). Every one is `tsc`-clean and every one touches
+layout, which is exactly the class of change `tsc` cannot judge. Get them onto
+a device before adding a seventh.
 
 ---
 
@@ -81,7 +82,7 @@ As of **2026-07-28** it is becoming a real mobile product: multi-user accounts, 
 | Alerts | **Native push only.** Telegram retired after transition |
 | Daily reminder | **Silent by default**, opt-in toggle in Settings |
 | v1 scope | Core + history **+ `/proof`** |
-| Onboarding | State the rule, then pick 1–4 levers; opt-ins after. A first-open walkthrough (mobile) explains the dashboard once |
+| Onboarding | **Two steps, plain words (2026-08-06):** the rule + 1–4 levers, then ONE notifications step. No ops jargon before the app is seen — the tour teaches on the live screens |
 | Repo | **Monorepo**, shared derivation core |
 | Auth | Email 6-digit code · Sign in with Apple · Google · email + password |
 | Widget | **After launch (v1.1+)** |
@@ -551,6 +552,54 @@ manager or backup drive — see *Gotchas*.
   Metro and has seen the ring live (one screenshot round); the rest of the
   round is **not confirmed on hardware**.
 
+- **The onboarding round, 2026-08-06 — four passes in one sitting, iterated
+  live on the owner's phone over Metro.** Owner report: right after sign-in,
+  new users hit a setup checklist they cannot decode — "levers" used before
+  it is defined, a settings-pane reminder toggle, an alerts step written in
+  the ops metaphor, "everything weird to a new user". Then, on seeing each
+  fix: "too much text", "looks like HTML", "doesn't send the right message".
+  The final shape:
+  **(1) Onboarding is 2 steps, not 3, with almost no text.**
+  **(2) The levers screen is a panel that assembles itself.** One heading
+  ("A day counts if you do **one small thing**."), then ONE full-width
+  64pt slot ("name it"). The moment it holds a character, the next dashed
+  slot materialises (`FadeInDown` + `LinearTransition`, off under
+  reduce-motion), up to four — the dashboard's own 2×2 lever grid building
+  under the user's hands. Structure states "one is enough, more if you want";
+  there is no help paragraph, no add/remove, no example placeholders (the
+  product must not suggest goals — owner-confirmed diagnosis: four
+  pre-offered slots with examples read as a QUOTA, the opposite of the
+  thesis). Named slots take the real lever-button treatment; revealed slots
+  never retract; return walks to the next slot. `SlotGrid` in
+  `onboarding.tsx`.
+  **(3) The notifications screen shows instead of telling.** "If you go
+  quiet, we check on you." + two short sentences, then a strip of ten
+  day-cells (real `gridRamp(2)` fills, three quiet bordered days, today's
+  ring on the last) and a specimen of the actual lock-screen alert (logo +
+  `four · now` + `DOWN 3 DAYS` in mono) — the ONE place ops register
+  appears, as the product's quoted output. Reminder switch + inline native
+  `TimeRow` (owner: set the time right there). Bottom chrome is the auth
+  screen's: 56pt CTA + two half-width `subtle` buttons ("← back" /
+  "not now") — the grey-link pile is gone, and "sign out" renders on step 1
+  only.
+  **(4) Grid-cell furniture everywhere**: the step counter is two day-cells
+  (you are the lit one). First-run prose sits at `size.base`, not 12–13px.
+  **(5) `finish()` writes `daily_reminder_at: withAlerts ? reminderAt :
+  null`** — the toggle and "not now" share a screen; recording a reminder
+  the OS cannot deliver would make Settings → Alerts lie. Write order and
+  the `registerForPush` prompt split untouched.
+  **(6) The tour's whole-tour skip is a real button** — `Button
+  variant="subtle"` "skip tour", top-right, replacing the 12px grey text
+  that was invisible over the scrim; the confirm Alert stays. Tour steps
+  otherwise untouched.
+  **(7) Web mirrors the heading string only**; web onboarding keeps its own
+  one-screen list UI.
+  Verified: **302 tests, tsc ×3, expo lint clean (one pre-existing warning),
+  contrast clean (+2 enforced pairs: skip-button label and edge over the
+  scrim), both bundles export, the web app builds.** The owner watched the
+  levers + notifications screens over Metro during the earlier passes; **the
+  final SlotGrid assembly, the TimeRow, and the tour skip are unseen.**
+
 **Written but NOT verified end-to-end:**
 
 - **Vercel cron has never run.** The route works locally; the schedule is unproven.
@@ -648,6 +697,23 @@ manager or backup drive — see *Gotchas*.
   8. **Mid-tour tab wandering.** The bar stays live; tapping another tab
      mid-step shows that screen with no overlay while the tour stays armed.
      Confirm coming back resumes cleanly, and decide then if it needs more.
+- **Parts of the 2026-08-06 onboarding round are unseen.** The owner watched
+  earlier passes live over Metro; still unverified, in rough order of risk:
+  1. **The SlotGrid assembly.** Type into slot one: the second dashed slot
+     should fade in and the first should reflow full-width → half-width
+     smoothly; return should walk to the new slot; clearing text must not
+     remove a slot. Check reduce-motion kills the movement, not the reveal.
+  2. **The inline `TimeRow` on the notifications step**, bare outside a
+     `Group` — flip the switch, set a time, and confirm the row's alignment
+     against the SwitchRow above it.
+  3. **The "skip tour" button over the scrim.** Visible on the first tour
+     step, no collision with the spotlight card near the top, confirms
+     before exiting, absent on the closing step.
+  4. **The permission prompt path.** "turn on notifications" raises the OS
+     prompt while onboarding is still mounted; "not now" → tabs mount → NO
+     prompt; reminder toggle on + "not now" → Settings → Alerts shows the
+     reminder OFF.
+  5. **Android hardware Back**: step 2 → step 1; swallowed at step 1.
 - **The 2026-08-04 auth round is untested on hardware**, and it is the cheapest
   of the four to check — one screen, no data, reachable by signing out.
   1. **The white Google button on iOS.** It is the ONLY light surface in a
@@ -964,7 +1030,14 @@ gate.
     anti-clockwise; reorder step on a real drag + its one-lever fallback;
     History swipe step + its one-month fallback; the skip confirm; the
     settings reset on Android (the JS path is the only one there).
-28. Then: **custom SMTP** (it unblocks the Magic Link template, which the OTP
+28. ~~The onboarding round~~ — done 2026-08-06, four passes iterated live on
+    the owner's phone. Two steps, almost no text: the self-assembling lever
+    panel, then the notifications screen with the quiet-days strip and the
+    alert specimen; the tour's whole-tour skip is a real bordered button.
+    Full notes under *Current status*. **JS-only — rides in the next build**
+    (a new build of 1.0.0 does not repeat Beta App Review for external
+    testers; only a version-string change does).
+29. Then: **custom SMTP** (it unblocks the Magic Link template, which the OTP
     screen depends on — see *Blocked*) · store listings · Play Console identity
     verification · the `eas.json` Android submit block.
 
@@ -973,7 +1046,7 @@ gate.
 | Area | What ships now | Intended full shape | Grows in |
 | --- | --- | --- | --- |
 | Levers | Fully user-defined on web: table, CRUD actions, Settings manager, 1–4 layout | Same on mobile | Done on web |
-| Onboarding | Web: one screen (rule + 1–4 levers). Mobile: four steps + a first-open walkthrough | Unchanged | Done both, 2026-07-30 |
+| Onboarding | Web: one screen (rule + 1–4 levers). Mobile: **two steps in plain words** (levers, then one notifications screen) — reworked 2026-08-06 after owner feedback that the old three-step flow confused new users | Unchanged — this IS the intended shape | Done both, 2026-08-06 |
 | Auth | Email + password, explicit create-account, magic link | Apple · Google · 6-digit code | With mobile |
 | Day grid | Lightness ramp, generated per lever count | Unchanged; steps grow with user-defined levers | Done |
 | Proof | **The pixel wall** — cells lit to `days up ÷ days in month`, unlit ones spelling `KEEP GOING`. The trend charts, both 1–5 scales and the journal were deleted 2026-08-03 | Unchanged — this IS the intended shape | Both done 2026-08-03 |
